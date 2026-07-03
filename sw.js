@@ -1,10 +1,10 @@
-const CACHE_NAME = "daymark-v3";
+const CACHE_NAME = "daymark-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./manifest.webmanifest",
+  "./styles.css?v=4",
+  "./app.js?v=4",
+  "./manifest.webmanifest?v=4",
   "./assets/icon.svg",
   "./assets/icon-192.png",
   "./assets/icon-512.png"
