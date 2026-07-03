@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f1eee6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Daymark" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="description" content="A personal morning brief and evening reset." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+    <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Daymark — Personal brief</title>
+  </head>
+  <body data-mode="morning">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#today" aria-label="Daymark home">
+          <span class="brand-mark" aria-hidden="true">
+            <i></i><i></i><i></i>
+          </span>
+          <span>daymark</span>
+        </a>
+
+        <div class="topbar-actions">
+          <span class="sync-state" id="syncState">
+            <span class="sync-dot"></span>
+            <span class="sync-label">brief ready</span>
+          </span>
+          <button class="icon-button" id="refreshBrief" type="button" aria-label="Refresh brief">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 11a8.1 8.1 0 0 0-14.9-4M4 4v4h4M4 13a8.1 8.1 0 0 0 14.9 4M20 20v-4h-4" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="mode-wrap">
+        <div class="mode-switch" role="group" aria-label="Brief mode">
+          <button class="mode-button is-active" type="button" data-set-mode="morning">
+            <span class="mode-time">7:00</span>
+            Plan
+          </button>
+          <button class="mode-button" type="button" data-set-mode="evening">
+            <span class="mode-time">21:00</span>
+            Reset
+          </button>
+          <span class="mode-indicator" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <main>
+        <section class="hero" id="today">
+          <div class="hero-copy">
+            <p class="eyebrow" id="dateLabel">THURSDAY · JULY 2</p>
+            <h1 id="heroTitle">Good morning, Ty.</h1>
+            <p class="hero-note mode-copy mode-morning">
+              A clear day to move the important things. The rest can wait.
+            </p>
+            <p class="hero-note mode-copy mode-evening">
+              Let’s close the open loops and make tomorrow lighter.
+            </p>
+          </div>
+
+          <div class="hero-orbit" aria-label="Brief completion">
+            <span class="orbit-label"><strong id="briefPercent">0%</strong> cleared</span>
+          </div>
+
+          <div class="hero-meta">
+            <span><i class="weather-glyph" aria-hidden="true">☀</i> 86° · Durham</span>
+            <span><i class="signal-glyph" aria-hidden="true"></i><b id="openCount">5</b> open loops</span>
+          </div>
+        </section>
+
+        <div class="content-grid">
+          <div class="primary-column">
+            <section class="section-block" id="priorities">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker mode-copy mode-morning">START HERE</p>
+                  <p class="section-kicker mode-copy mode-evening">CLOSE FIRST</p>
+                  <h2 class="mode-copy mode-morning">Today’s essential three</h2>
+                  <h2 class="mode-copy mode-evening">Tonight’s clean close</h2>
+                </div>
+                <span class="section-count" id="priorityCount">0/3</span>
+              </div>
+
+              <div class="action-stack" id="morningActions">
+                <label class="action-card" data-task="duke-followup">
+                  <input type="checkbox" class="task-check" />
+                  <span class="custom-check">
+                    <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
+                  </span>
+                  <span class="action-content">
+                    <span class="action-topline"><span>JOB SEARCH</span><time>by 10:00</time></span>
+                    <strong>Send Duke follow-up to Lena</strong>
+                    <small>Use the note from Tuesday; ask about the policy team opening.</small>
+                  </span>
+                  <span class="action-arrow" aria-hidden="true">↗</span>
+                </label>
+
+                <label class="action-card action-card--dark" data-task="veraya-pricing">
+                  <input type="checkbox" class="task-check" />
+                  <span class="custom-check">
+                    <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
+                  </span>
+                  <span class="action-content">
+                    <span class="action-topline"><span>VERAYA</span><time>90 min focus</time></span>
+                    <strong>Finish the pricing narrative</strong>
+                    <small>Decide the wedge. Draft the three-sentence customer story.</small>
+                  </span>
+                  <span class="action-arrow" aria-hidden="true">↗</span>
+                </label>
+
+                <label class="action-card" data-task="submit-application">
+                  <input type="checkbox" class="task-check" />
+                  <span class="custom-check">
+                    <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
+                  </span>
+                  <span class="action-content">
+                    <span class="action-topline"><span>APPLICATION</span><time>by 16:00</time></span>
+                    <strong>Submit Public Affairs application</strong>
+                    <small>Final pass on the cover letter, then send. Good enough is done.</small>
+                  </span>
+                  <span class="action-arrow" aria-hidden="true">↗</span>
+                </label>
+              </div>
+
+              <div class="action-stack" id="eveningActions">
+                <label class="action-card" data-task="log-duke">
+                  <input type="checkbox" class="task-check" />
+                  <span class="custom-check">
+                    <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
+                  </span>
+                  <span class="action-content">
+                    <span class="action-topline"><span>JOB SEARCH</span><time>5 min</time></span>
+                    <strong>Log today’s Duke outreach</strong>
+                    <small>Capture the follow-up date so nothing lives in your head.</small>
+                  </span>
+                  <span class="action-arrow" aria-hidden="true">↗</span>
+                </label>
+
+                <label class="action-card action-card--dark" data-task="veraya-decision">
+                  <input type="checkbox" class="task-check" />
+                  <span class="custom-check">
+                    <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
+                  </span>
+                  <span class="action-content">
+                    <span class="action-topline"><span>VERAYA</span><time>10 min</time></span>
+                    <strong>Capture the pricing decision</strong>
+                    <small>Write the decision, why it won, and what would change your mind.</small>
+                  </span>
+                  <span class="action-arrow" aria-hidden="true">↗</span>
+                </label>
+
+                <label class="action-card" data-task="tomorrow-first">
+                  <input type="checkbox" class="task-check" />
+                  <span class="custom-check">
+                    <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
+                  </span>
+                  <span class="action-content">
+                    <span class="action-topline"><span>TOMORROW</span><time>2 min</time></span>
+                    <strong>Choose the first move</strong>
+                    <small>Put one specific task at 9:00 AM before the day fills up.</small>
+                  </span>
+                  <span class="action-arrow" aria-hidden="true">↗</span>
+                </label>
+              </div>
+            </section>
+
+            <section class="section-block" id="signals">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker mode-copy mode-morning">WHAT’S IN MOTION</p>
+                  <p class="section-kicker mode-copy mode-evening">WHAT MOVED</p>
+                  <h2 class="mode-copy mode-morning">Calendar + priority mail</h2>
+                  <h2 class="mode-copy mode-evening">Day in review</h2>
+                </div>
+                <button class="text-button" type="button" data-scroll="decisions">Decide next</button>
+              </div>
+
+              <div class="signal-grid">
+                <article class="panel schedule-panel">
+                  <div class="panel-label">
+                    <span class="panel-icon panel-icon--blue" aria-hidden="true"></span>
+                    CALENDAR
+                    <span class="panel-status">3 blocks</span>
+                  </div>
+                  <div class="timeline">
+                    <div class="timeline-row">
+                      <time>09:30</time>
+                      <div><strong>Job-search power hour</strong><small>Applications + follow-ups</small></div>
+                    </div>
+                    <div class="timeline-row is-now">
+                      <time>11:00</time>
+                      <div><strong>Veraya working session</strong><small>Pricing narrative · 90 min</small></div>
+                    </div>
+                    <div class="timeline-row">
+                      <time>15:00</time>
+                      <div><strong>Coffee with Maya</strong><small>Cocoa Cinnamon · Geer St</small></div>
+                    </div>
+                  </div>
+                  <p class="panel-footnote mode-copy mode-morning">Best open window: <b>12:45–2:45 PM</b></p>
+                  <p class="panel-footnote mode-copy mode-evening">Tomorrow’s first meeting: <b>10:30 AM</b></p>
+                </article>
+
+                <article class="panel email-panel">
+                  <div class="panel-label">
+                    <span class="panel-icon panel-icon--coral" aria-hidden="true"></span>
+                    PRIORITY MAIL
+                    <span class="panel-status">2 need you</span>
+                  </div>
+                  <button class="mail-item" type="button">
+                    <span class="sender-avatar">LM</span>
+                    <span class="mail-copy">
+                      <span><strong>Lena M.</strong><time>8:12</time></span>
+                      <b>Re: Policy team introduction</b>
+                      <small>“Happy to connect you with…”</small>
+                    </span>
+                  </button>
+                  <button class="mail-item" type="button">
+                    <span class="sender-avatar sender-avatar--blue">VR</span>
+                    <span class="mail-copy">
+                      <span><strong>Veraya Research</strong><time>7:44</time></span>
+                      <b>Interview notes are ready</b>
+                      <small>3 themes tagged for review</small>
+                    </span>
+                  </button>
+                  <div class="mail-summary"><b>11</b> other messages can safely wait.</div>
+                </article>
+              </div>
+            </section>
+
+            <section class="section-block" id="jobs">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">JOB SEARCH</p>
+                  <h2>Applications in play</h2>
+                </div>
+                <button class="add-button" id="openApplicationDialog" type="button">
+                  <span>+</span> Add
+                </button>
+              </div>
+
+              <article class="panel tracker-panel">
+                <div class="tracker-summary">
+                  <div><strong id="activeApps">4</strong><span>active</span></div>
+                  <div><strong id="followupApps">2</strong><span>follow-ups</span></div>
+                  <div><strong id="interviewApps">1</strong><span>interview</span></div>
+                </div>
+                <div class="tracker-progress" aria-hidden="true">
+                  <span class="tracker-progress-fill"></span>
+                </div>
+                <div class="application-list" id="applicationList"></div>
+              </article>
+
+              <article class="duke-watch">
+                <div class="duke-wordmark" aria-hidden="true">D</div>
+                <div class="duke-copy">
+                  <div class="panel-label">DUKE WATCHLIST <span class="new-badge">2 NEW</span></div>
+                  <strong>Senior Program Coordinator</strong>
+                  <small>Sanford School · posted yesterday</small>
+                  <strong>Communications Strategist</strong>
+                  <small>University Communications · closes Jul 10</small>
+                </div>
+                <button class="round-arrow" type="button" aria-label="Open Duke opportunities">↗</button>
+              </article>
+            </section>
+
+            <section class="section-block" id="veraya">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">VERAYA · SPRINT 04</p>
+                  <h2>Make the offer legible</h2>
+                </div>
+                <div class="sprint-score"><strong id="sprintPercent">50%</strong><span>complete</span></div>
+              </div>
+
+              <article class="panel sprint-board">
+                <div class="sprint-track" aria-hidden="true"><span id="sprintTrack"></span></div>
+                <div class="sprint-context">
+                  <span>THIS WEEK</span>
+                  <p>Turn customer interviews into one clear offer and a testable price.</p>
+                </div>
+                <div class="sprint-tasks">
+                  <label data-task="veraya-interviews">
+                    <input type="checkbox" class="task-check" checked />
+                    <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
+                    <span><strong>Synthesize five interviews</strong><small>Done · 3 themes emerged</small></span>
+                  </label>
+                  <label data-task="veraya-draft">
+                    <input type="checkbox" class="task-check" checked />
+                    <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
+                    <span><strong>Draft offer architecture</strong><small>Done · v2 in notes</small></span>
+                  </label>
+                  <label data-task="veraya-price">
+                    <input type="checkbox" class="task-check" />
+                    <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
+                    <span><strong>Choose a pricing wedge</strong><small>Next · needs one decision</small></span>
+                  </label>
+                  <label data-task="veraya-page">
+                    <input type="checkbox" class="task-check" />
+                    <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
+                    <span><strong>Write the landing page spine</strong><small>Waiting on pricing</small></span>
+                  </label>
+                </div>
+              </article>
+            </section>
+          </div>
+
+          <aside class="secondary-column">
+            <section class="section-block" id="decisions">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">DECISION QUEUE</p>
+                  <h2>Three calls, not thirty tabs</h2>
+                </div>
+              </div>
+
+              <div class="decision-stack">
+                <article class="decision-card" data-decision="pricing">
+                  <span class="decision-number">01</span>
+                  <div>
+                    <strong>Which Veraya offer leads?</strong>
+                    <small>Choose the focused research sprint or ongoing advisory.</small>
+                    <div class="choice-row">
+                      <button type="button" data-choice="Sprint">Sprint</button>
+                      <button type="button" data-choice="Advisory">Advisory</button>
+                      <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
+                    </div>
+                  </div>
+                </article>
+                <article class="decision-card" data-decision="duke-event">
+                  <span class="decision-number">02</span>
+                  <div>
+                    <strong>Go to the Duke alumni mixer?</strong>
+                    <small>Thursday, 6 PM · useful for two warm paths.</small>
+                    <div class="choice-row">
+                      <button type="button" data-choice="Yes">Yes</button>
+                      <button type="button" data-choice="No">No</button>
+                      <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
+                    </div>
+                  </div>
+                </article>
+                <article class="decision-card" data-decision="housing-tour">
+                  <span class="decision-number">03</span>
+                  <div>
+                    <strong>Tour the Trinity Park listing?</strong>
+                    <small>$1,840 · Saturday slot still available.</small>
+                    <div class="choice-row">
+                      <button type="button" data-choice="Tour">Tour</button>
+                      <button type="button" data-choice="Pass">Pass</button>
+                      <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="section-block" id="scorecard">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">WEEKLY SCORECARD</p>
+                  <h2>Momentum, honestly</h2>
+                </div>
+                <span class="week-label" id="weekLabel">WEEK 27</span>
+              </div>
+
+              <article class="panel scorecard">
+                <div class="score-row">
+                  <div><strong>Job search</strong><small>3 of 5 actions</small></div>
+                  <div class="score-dots" aria-label="3 of 5"><i></i><i></i><i></i><i></i><i></i></div>
+                </div>
+                <div class="score-row">
+                  <div><strong>Veraya</strong><small>2 of 4 milestones</small></div>
+                  <div class="score-dots score-dots--blue" aria-label="2 of 4"><i></i><i></i><i></i><i></i></div>
+                </div>
+                <div class="score-row">
+                  <div><strong>Writing</strong><small>1 of 3 sessions</small></div>
+                  <div class="score-dots score-dots--violet" aria-label="1 of 3"><i></i><i></i><i></i></div>
+                </div>
+                <div class="score-row">
+                  <div><strong>Fitness</strong><small>2 of 4 sessions</small></div>
+                  <div class="score-dots score-dots--green" aria-label="2 of 4"><i></i><i></i><i></i><i></i></div>
+                </div>
+                <div class="score-row">
+                  <div><strong>Household</strong><small>4 of 5 tasks</small></div>
+                  <div class="score-dots score-dots--gold" aria-label="4 of 5"><i></i><i></i><i></i><i></i><i></i></div>
+                </div>
+              </article>
+            </section>
+
+            <section class="section-block" id="durham">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">DURHAM · TODAY</p>
+                  <h2>Outside your tabs</h2>
+                </div>
+              </div>
+
+              <article class="weather-card">
+                <div class="weather-top">
+                  <div>
+                    <span>NOW</span>
+                    <strong>78°</strong>
+                    <p>Sunny, warmer later</p>
+                  </div>
+                  <div class="sun-art" aria-hidden="true"><span></span></div>
+                </div>
+                <div class="weather-detail">
+                  <span><small>HIGH</small><b>88°</b></span>
+                  <span><small>RAIN</small><b>10%</b></span>
+                  <span><small>SUNSET</small><b>8:35</b></span>
+                </div>
+              </article>
+
+              <div class="local-list">
+                <article>
+                  <span class="local-icon local-icon--event" aria-hidden="true">✦</span>
+                  <div><small>WORTH KNOWING</small><strong>Food Truck Rodeo at Central Park</strong><p>5–8 PM · easy after coffee</p></div>
+                </article>
+                <article>
+                  <span class="local-icon local-icon--home" aria-hidden="true">⌂</span>
+                  <div><small>HOUSING</small><strong>2 promising listings, 1 price drop</strong><p>Trinity Park listing is the strongest fit.</p></div>
+                </article>
+                <article>
+                  <span class="local-icon local-icon--bell" aria-hidden="true">!</span>
+                  <div><small>PRACTICAL</small><strong>Put recycling out tonight</strong><p>Pickup is early tomorrow morning.</p></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="section-block" id="sports">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">YOUR TEAMS</p>
+                  <h2>The sporting life</h2>
+                </div>
+                <span class="quiet-label">ONLY THE SIGNAL</span>
+              </div>
+
+              <article class="sports-lead">
+                <span class="team-monogram">A</span>
+                <div>
+                  <small>DIAMONDBACKS · TONIGHT 9:40 PM</small>
+                  <strong>at San Francisco</strong>
+                  <p>Kelly vs. Harrison · Arizona has won 3 of 4.</p>
+                </div>
+                <span class="broadcast">MLB.TV</span>
+              </article>
+
+              <article class="panel standings-panel">
+                <div class="panel-label">NL WEST <span class="panel-status">WILD CARD: 1.5 GB</span></div>
+                <div class="standing-row standing-head"><span>TEAM</span><span>W–L</span><span>GB</span></div>
+                <div class="standing-row"><span><i class="team-dot team-dot--sd"></i>San Diego</span><span>47–39</span><span>—</span></div>
+                <div class="standing-row"><span><i class="team-dot team-dot--la"></i>Los Angeles</span><span>46–40</span><span>1.0</span></div>
+                <div class="standing-row is-favorite"><span><i class="team-dot team-dot--az"></i>Arizona</span><span>44–41</span><span>2.5</span></div>
+                <div class="standing-row"><span><i class="team-dot team-dot--sf"></i>San Francisco</span><span>42–43</span><span>4.5</span></div>
+              </article>
+
+              <div class="team-ticker">
+                <article><span class="mini-team mini-team--chelsea">C</span><div><small>CHELSEA</small><strong>Training resumes Monday</strong></div></article>
+                <article><span class="mini-team mini-team--cats">A</span><div><small>ARIZONA</small><strong>Recruiting: 4★ guard commits</strong></div></article>
+                <article><span class="mini-team mini-team--suns">PHX</span><div><small>SUNS</small><strong>Summer League · Jul 11</strong></div></article>
+                <article><span class="mini-team mini-team--cards">AZ</span><div><small>CARDINALS</small><strong>Camp opens in 20 days</strong></div></article>
+              </div>
+            </section>
+
+            <section class="section-block reading-section mode-copy mode-evening" id="reading">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">WIND DOWN · 28 MIN</p>
+                  <h2>Read past the scroll</h2>
+                </div>
+              </div>
+
+              <article class="reading-feature">
+                <div class="reading-art" aria-hidden="true">
+                  <span class="reading-sun"></span>
+                  <span class="reading-type">JACOBIN</span>
+                </div>
+                <div class="reading-copy">
+                  <small>SOCIALIST READING · 12 MIN</small>
+                  <strong>The Quiet Politics of Public Space</strong>
+                  <p>How shared places became private problems—and what a municipal alternative might look like.</p>
+                  <button type="button">Read tonight <span>↗</span></button>
+                </div>
+              </article>
+
+              <div class="reading-list">
+                <article>
+                  <span class="reading-index">02</span>
+                  <div><small>LONGFORM · THE NEW YORKER · 16 MIN</small><strong>A City Learning to Live With Its River</strong></div>
+                  <span>↗</span>
+                </article>
+                <article>
+                  <span class="reading-index">03</span>
+                  <div><small>SAVED FOR LATER · 9 MIN</small><strong>Notes on attention as a form of care</strong></div>
+                  <span>↗</span>
+                </article>
+              </div>
+            </section>
+
+            <section class="section-block tomorrow-card mode-copy mode-evening">
+              <span class="tomorrow-label">TOMORROW IS SET</span>
+              <h2 id="tomorrowTitle">Tomorrow begins clean.</h2>
+              <p>First task at 9:00. One meeting before noon. No urgent email waiting.</p>
+              <div><span>Alarm</span><strong>7:00 AM</strong></div>
+            </section>
+          </aside>
+        </div>
+
+        <footer>
+          <span class="footer-mark"><i></i><i></i><i></i></span>
+          <p>Enough for today.</p>
+          <small>Daymark keeps the signal. You keep the day.</small>
+        </footer>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Primary navigation">
+        <button class="nav-button is-active" type="button" data-scroll="today">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V20H4Z" /><path d="M9 20v-6h6v6" /></svg>
+          <span>Today</span>
+        </button>
+        <button class="nav-button" type="button" data-scroll="jobs">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V4h8v3M3 12h18M10 12v2h4v-2" /></svg>
+          <span>Work</span>
+        </button>
+        <button class="nav-button" type="button" data-scroll="durham">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" /><circle cx="12" cy="9" r="2.4" /></svg>
+          <span>Life</span>
+        </button>
+        <button class="nav-button" type="button" data-scroll="sports">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 9h16M9 9v11" /><path d="m13 14 2 2 4-4" /></svg>
+          <span>More</span>
+        </button>
+      </nav>
+    </div>
+
+    <dialog class="application-dialog" id="applicationDialog">
+      <form method="dialog" id="applicationForm">
+        <div class="dialog-header">
+          <div>
+            <p class="section-kicker">JOB SEARCH</p>
+            <h2>Add an application</h2>
+          </div>
+          <button class="dialog-close" type="button" id="closeApplicationDialog" aria-label="Close">×</button>
+        </div>
+        <label>
+          Organization
+          <input name="organization" required autocomplete="organization" placeholder="Duke University" />
+        </label>
+        <label>
+          Role
+          <input name="role" required placeholder="Program Manager" />
+        </label>
+        <label>
+          Status
+          <select name="status">
+            <option>Interested</option>
+            <option selected>Applied</option>
+            <option>Follow-up</option>
+            <option>Interview</option>
+          </select>
+        </label>
+        <label>
+          Next step
+          <input name="nextStep" placeholder="Follow up Friday" />
+        </label>
+        <button class="dialog-submit" value="default" type="submit">Add to tracker</button>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
