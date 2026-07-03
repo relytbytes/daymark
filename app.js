@@ -2,6 +2,10 @@ const STORAGE_KEY = "daymark-state-v1";
 const WEATHER_CACHE_KEY = "daymark-weather-cache-v1";
 const BASEBALL_CACHE_KEY = "daymark-baseball-cache-v1";
 const REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+const GOOGLE_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/gmail.readonly",
+].join(" ");
 const DEMO_APPLICATION_IDS = new Set(["duke-policy", "public-affairs", "foundation", "dataworks"]);
 const initialApplications = [];
 
@@ -12,6 +16,10 @@ const defaultState = {
   },
   decisions: {},
   applications: initialApplications,
+  captures: [],
+  readingQueue: [],
+  focusTaskId: "",
+  focusEndsAt: 0,
 };
 
 let state = loadState();
@@ -19,12 +27,17 @@ let toastTimer;
 let lastRefreshAt = new Date();
 let liveRefreshInFlight = false;
 let liveFeedCount = 0;
+let googleAccessToken = "";
+let googleTokenExpiresAt = 0;
+let focusCompletionAnnounced = false;
 
 const body = document.body;
 const taskInputs = [...document.querySelectorAll(".task-check")];
 const navButtons = [...document.querySelectorAll(".nav-button")];
 const applicationDialog = document.querySelector("#applicationDialog");
 const applicationForm = document.querySelector("#applicationForm");
+const captureDialog = document.querySelector("#captureDialog");
+const captureForm = document.querySelector("#captureForm");
 
 function getDayPhase(date = new Date()) {
   const hour = date.getHours();
@@ -45,6 +58,10 @@ function loadState() {
       applications: Array.isArray(saved?.applications)
         ? saved.applications.filter((application) => !DEMO_APPLICATION_IDS.has(application.id))
         : initialApplications,
+      captures: Array.isArray(saved?.captures) ? saved.captures : [],
+      readingQueue: Array.isArray(saved?.readingQueue) ? saved.readingQueue : [],
+      focusTaskId: typeof saved?.focusTaskId === "string" ? saved.focusTaskId : "",
+      focusEndsAt: Number(saved?.focusEndsAt) || 0,
     };
   } catch {
     return { ...defaultState };
@@ -53,6 +70,259 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function normalizeUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const candidate = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return ["http:", "https:"].includes(candidate.protocol) ? candidate.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function getOpenFocusItems() {
+  const priorityItems = getVisiblePriorityInputs()
+    .filter((input) => !input.checked)
+    .map((input) => {
+      const card = input.closest("[data-task]");
+      const taskId = card?.dataset.task || "";
+      const category = card?.querySelector(".action-topline span")?.textContent || "PRIORITY";
+      const estimate = card?.querySelector(".action-topline time")?.textContent || "25 min";
+      return {
+        id: `task:${taskId}`,
+        kind: "task",
+        taskId,
+        title: card?.querySelector(".action-content strong")?.textContent || "Open priority",
+        context: `${category} · ${estimate}`,
+        estimate,
+      };
+    });
+
+  const capturedItems = state.captures
+    .filter((item) => !item.done)
+    .map((item) => ({
+      id: `capture:${item.id}`,
+      kind: "capture",
+      captureId: item.id,
+      title: item.title,
+      context: `${item.type === "reminder" ? "REMINDER" : "INBOX"} · ${item.note || "captured today"}`,
+      estimate: item.type === "reminder" ? "5 min" : "25 min",
+    }));
+
+  return [...priorityItems, ...capturedItems];
+}
+
+function getFocusedItem() {
+  const items = getOpenFocusItems();
+  if (!items.length) return null;
+  return items.find((item) => item.id === state.focusTaskId) || items[0];
+}
+
+function renderFocusRail() {
+  const item = getFocusedItem();
+  const doneButton = document.querySelector("#focusDoneButton");
+  const nextButton = document.querySelector("#focusNextButton");
+  if (!item) {
+    state.focusTaskId = "";
+    document.querySelector("#focusTitle").textContent = "The runway is clear";
+    document.querySelector("#focusContext").textContent =
+      "Capture something new, or enjoy the rare pleasure of an empty queue.";
+    document.querySelector("#focusEstimate").textContent = "CLEAR";
+    doneButton.disabled = true;
+    nextButton.disabled = true;
+    return;
+  }
+
+  if (state.focusTaskId !== item.id) {
+    state.focusTaskId = item.id;
+    saveState();
+  }
+  document.querySelector("#focusTitle").textContent = item.title;
+  document.querySelector("#focusContext").textContent = item.context;
+  document.querySelector("#focusEstimate").textContent = item.estimate.toUpperCase();
+  doneButton.disabled = false;
+  nextButton.disabled = getOpenFocusItems().length < 2;
+}
+
+function showNextFocusItem() {
+  const items = getOpenFocusItems();
+  if (items.length < 2) return;
+  const currentIndex = Math.max(
+    0,
+    items.findIndex((item) => item.id === state.focusTaskId),
+  );
+  state.focusTaskId = items[(currentIndex + 1) % items.length].id;
+  saveState();
+  renderFocusRail();
+}
+
+function completeFocusedItem() {
+  const item = getFocusedItem();
+  if (!item) return;
+  if (item.kind === "task") {
+    state.tasks[item.taskId] = true;
+    const input = document.querySelector(`[data-task="${item.taskId}"] .task-check`);
+    if (input) input.checked = true;
+  } else {
+    const capture = state.captures.find((entry) => entry.id === item.captureId);
+    if (capture) capture.done = true;
+  }
+  state.focusTaskId = "";
+  state.focusEndsAt = 0;
+  saveState();
+  renderCaptureInbox();
+  renderFocusRail();
+  updateBriefProgress();
+  updateSprintProgress();
+  updateFocusTimer();
+  showToast("Done. Daymark pulled the next open move.");
+}
+
+function updateFocusTimer() {
+  const label = document.querySelector("#focusTimerLabel");
+  const button = document.querySelector("#focusTimerButton");
+  const progress = document.querySelector("#focusProgress");
+  const duration = 25 * 60 * 1000;
+  const remaining = state.focusEndsAt ? state.focusEndsAt - Date.now() : 0;
+
+  if (remaining > 0) {
+    const totalSeconds = Math.ceil(remaining / 1000);
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+    const seconds = String(totalSeconds % 60).padStart(2, "0");
+    label.textContent = `${minutes}:${seconds}`;
+    button.classList.add("is-running");
+    progress.style.width = `${Math.min(100, ((duration - remaining) / duration) * 100)}%`;
+    focusCompletionAnnounced = false;
+    return;
+  }
+
+  if (state.focusEndsAt) {
+    state.focusEndsAt = 0;
+    saveState();
+    if (!focusCompletionAnnounced) {
+      showToast("Focus block complete. Take a breath.");
+      focusCompletionAnnounced = true;
+    }
+  }
+  label.textContent = "Focus 25:00";
+  button.classList.remove("is-running");
+  progress.style.width = "0%";
+}
+
+function toggleFocusTimer() {
+  if (!getFocusedItem()) {
+    showToast("Capture an action before starting focus.");
+    return;
+  }
+  if (state.focusEndsAt > Date.now()) {
+    state.focusEndsAt = 0;
+    showToast("Focus timer stopped.");
+  } else {
+    state.focusEndsAt = Date.now() + 25 * 60 * 1000;
+    focusCompletionAnnounced = false;
+    showToast("Twenty-five quiet minutes. Go.");
+  }
+  saveState();
+  updateFocusTimer();
+}
+
+function renderCaptureInbox() {
+  const container = document.querySelector("#captureItems");
+  container.replaceChildren();
+  if (!state.captures.length) {
+    const empty = document.createElement("p");
+    empty.className = "capture-empty";
+    empty.textContent = "Nothing waiting. Use Capture whenever a loose end appears.";
+    container.append(empty);
+    return;
+  }
+
+  state.captures.forEach((item) => {
+    const row = document.createElement("label");
+    row.className = `capture-row${item.done ? " is-done" : ""}`;
+    row.innerHTML = `
+      <input type="checkbox" ${item.done ? "checked" : ""} />
+      <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
+      <span>
+        <strong>${escapeHtml(item.title)}</strong>
+        <small>${escapeHtml(item.type === "reminder" ? "Reminder" : "Task")}${item.note ? ` · ${escapeHtml(item.note)}` : ""}</small>
+      </span>
+    `;
+    row.querySelector("input").addEventListener("change", (event) => {
+      item.done = event.target.checked;
+      if (item.done && state.focusTaskId === `capture:${item.id}`) state.focusTaskId = "";
+      saveState();
+      renderCaptureInbox();
+      renderFocusRail();
+      updateBriefProgress();
+    });
+    container.append(row);
+  });
+}
+
+function renderReadingQueue() {
+  const container = document.querySelector("#readingQueueItems");
+  const openItems = state.readingQueue.filter((item) => !item.read);
+  document.querySelector("#readingQueueCount").textContent =
+    `${openItems.length} saved`;
+  container.replaceChildren();
+
+  if (!state.readingQueue.length) {
+    const empty = document.createElement("p");
+    empty.className = "reading-queue-empty";
+    empty.textContent = "Save an article here and it will wait without nagging you.";
+    container.append(empty);
+    return;
+  }
+
+  state.readingQueue.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = `reading-queue-row${item.read ? " is-read" : ""}`;
+    const host = item.url ? new URL(item.url).hostname.replace(/^www\./, "") : "Saved note";
+    row.innerHTML = `
+      <a href="${escapeHtml(item.url || "#")}" ${item.url ? 'target="_blank" rel="noreferrer"' : ""}>
+        <span>
+          <small>${escapeHtml(host.toUpperCase())}</small>
+          <strong>${escapeHtml(item.title)}</strong>
+        </span>
+        <span aria-hidden="true">↗</span>
+      </a>
+      <button type="button">${item.read ? "Unread" : "Read"}</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => {
+      item.read = !item.read;
+      saveState();
+      renderReadingQueue();
+      showToast(item.read ? "Moved to read." : "Back in the reading queue.");
+    });
+    container.append(row);
+  });
+}
+
+function setCaptureType(type) {
+  const input = captureForm.querySelector(`input[name="captureType"][value="${type}"]`);
+  if (input) input.checked = true;
+  const titleInput = captureForm.elements.title;
+  const placeholders = {
+    task: "What needs your attention?",
+    job: "Role or opportunity",
+    reading: "Article title",
+    reminder: "What should not slip?",
+  };
+  titleInput.placeholder = placeholders[type] || placeholders.task;
+  captureForm.querySelector(".capture-url-field span").textContent =
+    type === "reading" ? "required" : "optional";
+  captureDialog.dataset.captureType = type;
+}
+
+function openCaptureDialog(type = "task") {
+  captureForm.reset();
+  setCaptureType(type);
+  captureDialog.showModal();
+  window.setTimeout(() => captureForm.elements.title.focus(), 80);
 }
 
 function formatDate() {
@@ -144,6 +414,7 @@ function updateLiveDay(date = new Date()) {
 
   updateRefreshCountdown(date);
   updateBriefProgress();
+  renderFocusRail();
 }
 
 function updateRefreshCountdown(date = new Date()) {
@@ -169,6 +440,272 @@ async function fetchJson(url) {
     return await response.json();
   } finally {
     window.clearTimeout(timeout);
+  }
+}
+
+function hasGoogleClientId() {
+  const clientId = window.DAYMARK_CONFIG?.googleClientId?.trim() || "";
+  return clientId.endsWith(".apps.googleusercontent.com") && !clientId.startsWith("PASTE_");
+}
+
+function googleConnectMarkup(title = "Connect Google securely", copy = "Allow read-only access.") {
+  return `
+    <button class="connection-empty google-connect-button" type="button" data-google-connect>
+      <span aria-hidden="true">＋</span>
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(copy)}</p>
+    </button>
+  `;
+}
+
+function bindGoogleConnectButtons() {
+  document.querySelectorAll("[data-google-connect]").forEach((button) => {
+    if (button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+    button.addEventListener("click", connectGoogle);
+  });
+}
+
+function setGoogleButtonsDisabled(disabled) {
+  document.querySelectorAll("[data-google-connect]").forEach((button) => {
+    button.disabled = disabled;
+  });
+}
+
+function connectGoogle() {
+  if (!hasGoogleClientId()) {
+    showToast("Google OAuth setup is required first.");
+    window.open(
+      "https://github.com/relytbytes/daymark/blob/main/GOOGLE_SETUP.md",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    return;
+  }
+
+  if (!window.google?.accounts?.oauth2) {
+    showToast("Google sign-in is still loading. Try once more.");
+    return;
+  }
+
+  setGoogleButtonsDisabled(true);
+  const tokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: window.DAYMARK_CONFIG.googleClientId.trim(),
+    scope: GOOGLE_SCOPES,
+    callback: async (response) => {
+      if (response.error || !response.access_token) {
+        setGoogleButtonsDisabled(false);
+        showToast("Google connection was not completed.");
+        return;
+      }
+      googleAccessToken = response.access_token;
+      googleTokenExpiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
+      localStorage.setItem("daymark-google-was-connected", "1");
+      await loadGoogleData(true);
+    },
+    error_callback: () => {
+      setGoogleButtonsDisabled(false);
+      showToast("Google sign-in was closed or blocked.");
+    },
+  });
+
+  tokenClient.requestAccessToken({ prompt: googleAccessToken ? "" : "consent" });
+}
+
+async function fetchGoogleJson(url) {
+  if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) {
+    googleAccessToken = "";
+    throw new Error("Google access has expired.");
+  }
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${googleAccessToken}` },
+  });
+  if (response.status === 401) googleAccessToken = "";
+  if (!response.ok) throw new Error(`Google request failed: ${response.status}`);
+  return await response.json();
+}
+
+async function fetchCalendarData() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 2);
+  const params = new URLSearchParams({
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "10",
+  });
+  return await fetchGoogleJson(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+  );
+}
+
+function formatCalendarTime(event) {
+  if (event.start?.date && !event.start?.dateTime) return "ALL DAY";
+  const start = new Date(event.start?.dateTime);
+  const today = formatApiDate(new Date());
+  const eventDay = formatApiDate(start);
+  if (today === eventDay) {
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(start);
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+    .format(start)
+    .toUpperCase();
+}
+
+function renderCalendar(data) {
+  const now = new Date();
+  const events = (data.items || [])
+    .filter((event) => event.status !== "cancelled")
+    .filter((event) => {
+      const endValue = event.end?.dateTime || event.end?.date;
+      return !endValue || new Date(endValue) >= now;
+    })
+    .slice(0, 4);
+
+  document.querySelector("#calendarStatus").textContent = `LIVE · ${events.length}`;
+  document.querySelector("#calendarStatus").classList.remove("disconnected-status");
+
+  if (events.length === 0) {
+    document.querySelector("#calendarContent").innerHTML =
+      '<div class="google-empty">No remaining events on your primary calendar.</div>';
+    return;
+  }
+
+  document.querySelector("#calendarContent").innerHTML = `
+    <div class="timeline">
+      ${events
+        .map(
+          (event) => `
+            <a class="timeline-row" href="${escapeHtml(event.htmlLink || "https://calendar.google.com/")}" target="_blank" rel="noreferrer">
+              <time>${escapeHtml(formatCalendarTime(event))}</time>
+              <div>
+                <strong>${escapeHtml(event.summary || "Untitled event")}</strong>
+                <small>${escapeHtml(event.location || "Google Calendar")}</small>
+              </div>
+            </a>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function getMessageHeader(message, name) {
+  return (
+    message.payload?.headers?.find(
+      (header) => header.name.toLowerCase() === name.toLowerCase(),
+    )?.value || ""
+  );
+}
+
+function getSenderName(from) {
+  const named = from.replace(/<[^>]+>/g, "").replaceAll('"', "").trim();
+  if (named) return named;
+  return from.split("@")[0] || "Sender";
+}
+
+function getSenderInitials(sender) {
+  return sender
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+}
+
+async function fetchPriorityEmailData() {
+  const query =
+    "in:inbox newer_than:7d (is:important OR is:starred) -category:promotions -category:social";
+  const list = await fetchGoogleJson(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=4&q=${encodeURIComponent(query)}`,
+  );
+  const messages = list.messages || [];
+  return await Promise.all(
+    messages.map((message) =>
+      fetchGoogleJson(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}` +
+          "?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date",
+      ),
+    ),
+  );
+}
+
+function renderPriorityEmails(messages) {
+  document.querySelector("#emailStatus").textContent = `LIVE · ${messages.length}`;
+  document.querySelector("#emailStatus").classList.remove("disconnected-status");
+
+  if (messages.length === 0) {
+    document.querySelector("#emailContent").innerHTML =
+      '<div class="google-empty">No recent priority messages matched.</div>';
+    return;
+  }
+
+  document.querySelector("#emailContent").innerHTML = `
+    ${messages
+      .map((message, index) => {
+        const sender = getSenderName(getMessageHeader(message, "From"));
+        const subject = getMessageHeader(message, "Subject") || "(No subject)";
+        const sentAt = new Date(getMessageHeader(message, "Date"));
+        const time = Number.isNaN(sentAt.getTime())
+          ? ""
+          : new Intl.DateTimeFormat("en-US", {
+              month: sentAt.toDateString() === new Date().toDateString() ? undefined : "short",
+              day: sentAt.toDateString() === new Date().toDateString() ? undefined : "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            }).format(sentAt);
+        return `
+          <a class="mail-item" href="https://mail.google.com/mail/u/0/#inbox/${escapeHtml(message.threadId)}" target="_blank" rel="noreferrer">
+            <span class="sender-avatar${index % 2 ? " sender-avatar--blue" : ""}">${escapeHtml(getSenderInitials(sender))}</span>
+            <span class="mail-copy">
+              <span><strong>${escapeHtml(sender)}</strong><time>${escapeHtml(time)}</time></span>
+              <b>${escapeHtml(subject)}</b>
+              <small>${escapeHtml(message.snippet || "Open in Gmail")}</small>
+            </span>
+          </a>
+        `;
+      })
+      .join("")}
+    <div class="mail-summary">Read-only · Google Gmail</div>
+  `;
+}
+
+function renderGooglePanelError(type, message) {
+  const isCalendar = type === "calendar";
+  const status = document.querySelector(isCalendar ? "#calendarStatus" : "#emailStatus");
+  const content = document.querySelector(isCalendar ? "#calendarContent" : "#emailContent");
+  status.textContent = "CONNECT AGAIN";
+  status.classList.add("disconnected-status");
+  content.innerHTML = googleConnectMarkup("Reconnect Google", message);
+  bindGoogleConnectButtons();
+}
+
+async function loadGoogleData(announce = false) {
+  document.querySelector("#calendarStatus").textContent = "SYNCING";
+  document.querySelector("#emailStatus").textContent = "SYNCING";
+  const [calendarResult, emailResult] = await Promise.allSettled([
+    fetchCalendarData(),
+    fetchPriorityEmailData(),
+  ]);
+
+  if (calendarResult.status === "fulfilled") renderCalendar(calendarResult.value);
+  else renderGooglePanelError("calendar", "Calendar access needs attention.");
+
+  if (emailResult.status === "fulfilled") renderPriorityEmails(emailResult.value);
+  else renderGooglePanelError("email", "Gmail access needs attention.");
+
+  setGoogleButtonsDisabled(false);
+  if (announce) {
+    const connectedCount =
+      Number(calendarResult.status === "fulfilled") + Number(emailResult.status === "fulfilled");
+    showToast(`${connectedCount} of 2 Google feeds connected.`);
   }
 }
 
@@ -412,6 +949,9 @@ async function fetchLiveData(announce = false) {
   sync.classList.remove("is-refreshing");
   syncLabel.textContent = `${liveFeedCount}/2 live`;
   updateRefreshCountdown(lastRefreshAt);
+  if (googleAccessToken && Date.now() < googleTokenExpiresAt) {
+    await loadGoogleData(false);
+  }
   if (announce) {
     showToast(
       liveFeedCount === 2
@@ -431,6 +971,7 @@ function hydrateTasks() {
       saveState();
       updateBriefProgress();
       updateSprintProgress();
+      renderFocusRail();
       showToast(input.checked ? "Done. One less open loop." : "Moved back to active.");
     });
   });
@@ -447,9 +988,10 @@ function updateBriefProgress() {
   const done = inputs.filter((input) => input.checked).length;
   const total = inputs.length || 1;
   const percentage = Math.round((done / total) * 100);
+  const capturedOpen = state.captures.filter((item) => !item.done).length;
   document.querySelector("#briefPercent").textContent = `${percentage}%`;
   document.querySelector("#priorityCount").textContent = `${done}/${total}`;
-  document.querySelector("#openCount").textContent = String(total - done + 2);
+  document.querySelector("#openCount").textContent = String(total - done + capturedOpen + 2);
 }
 
 function updateSprintProgress() {
@@ -494,9 +1036,12 @@ function renderApplications() {
   state.applications.forEach((app) => {
     const row = document.createElement("div");
     row.className = "application-row";
+    const titleMarkup = app.url
+      ? `<a class="application-title" href="${escapeHtml(app.url)}" target="_blank" rel="noreferrer">${escapeHtml(app.role)} ↗</a>`
+      : `<strong>${escapeHtml(app.role)}</strong>`;
     row.innerHTML = `
       <div>
-        <strong>${escapeHtml(app.role)}</strong>
+        ${titleMarkup}
         <small>${escapeHtml(app.organization)} · <span class="application-next">${escapeHtml(app.nextStep || "Choose next step")}</span></small>
       </div>
       <button class="status-button" type="button" data-status="${escapeHtml(app.status)}" aria-label="Change status for ${escapeHtml(app.role)}">${escapeHtml(app.status)}</button>
@@ -598,6 +1143,109 @@ applicationForm.addEventListener("submit", (event) => {
   showToast("Application added to your tracker.");
 });
 
+document.querySelectorAll("[data-open-capture]").forEach((button) => {
+  button.addEventListener("click", () => openCaptureDialog("task"));
+});
+
+document.querySelector("#openReadingCapture").addEventListener("click", () => {
+  openCaptureDialog("reading");
+});
+
+document.querySelector("#closeCaptureDialog").addEventListener("click", () => {
+  captureDialog.close();
+});
+
+captureDialog.addEventListener("click", (event) => {
+  if (event.target === captureDialog) captureDialog.close();
+});
+
+captureForm.querySelectorAll('input[name="captureType"]').forEach((input) => {
+  input.addEventListener("change", () => setCaptureType(input.value));
+});
+
+captureForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formData = new FormData(captureForm);
+  const type = String(formData.get("captureType") || "task");
+  const title = String(formData.get("title") || "").trim();
+  const note = String(formData.get("note") || "").trim();
+  const rawUrl = String(formData.get("url") || "").trim();
+  const url = normalizeUrl(rawUrl);
+
+  if (!title) return;
+  if (rawUrl && !url) {
+    showToast("That link does not look valid yet.");
+    return;
+  }
+  if (type === "reading" && !url) {
+    showToast("Add the article link so it stays clickable.");
+    return;
+  }
+
+  if (type === "job") {
+    state.applications.unshift({
+      id: `app-${Date.now()}`,
+      organization: note || "Captured lead",
+      role: title,
+      status: "Interested",
+      nextStep: url ? "Open saved listing" : "Review opportunity",
+      url,
+    });
+    renderApplications();
+    showToast("Job lead added to Applications.");
+  } else if (type === "reading") {
+    state.readingQueue.unshift({
+      id: `read-${Date.now()}`,
+      title,
+      url,
+      note,
+      read: false,
+    });
+    renderReadingQueue();
+    showToast("Saved to your reading queue.");
+  } else {
+    state.captures.unshift({
+      id: `capture-${Date.now()}`,
+      type,
+      title,
+      note,
+      url,
+      done: false,
+    });
+    renderCaptureInbox();
+    renderFocusRail();
+    updateBriefProgress();
+    showToast(type === "reminder" ? "Reminder captured." : "Task captured.");
+  }
+
+  saveState();
+  captureForm.reset();
+  captureDialog.close();
+});
+
+document.querySelectorAll("[data-command-jump]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const destination = button.dataset.commandJump;
+    captureDialog.close();
+    window.setTimeout(() => {
+      document.querySelector(`#${destination}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  });
+});
+
+document.querySelector("#focusTimerButton").addEventListener("click", toggleFocusTimer);
+document.querySelector("#focusDoneButton").addEventListener("click", completeFocusedItem);
+document.querySelector("#focusNextButton").addEventListener("click", showNextFocusItem);
+
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  const isTyping = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+  if (!isTyping && (event.key === "q" || (event.metaKey && event.key.toLowerCase() === "k"))) {
+    event.preventDefault();
+    if (!captureDialog.open) openCaptureDialog("task");
+  }
+});
+
 const sectionObserver = new IntersectionObserver(
   (entries) => {
     const visible = entries
@@ -620,16 +1268,22 @@ const sectionObserver = new IntersectionObserver(
 });
 
 formatDate();
+bindGoogleConnectButtons();
 hydrateTasks();
 hydrateDecisions();
 renderApplications();
+renderCaptureInbox();
+renderReadingQueue();
 updateLiveDay();
 updateSprintProgress();
+renderFocusRail();
+updateFocusTimer();
 fetchLiveData();
 window.setInterval(() => updateLiveDay(), 30000);
+window.setInterval(updateFocusTimer, 1000);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=4").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=7").catch(() => {});
   });
 }
