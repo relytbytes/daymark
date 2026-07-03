@@ -1,35 +1,9 @@
 const STORAGE_KEY = "daymark-state-v1";
-
-const initialApplications = [
-  {
-    id: "duke-policy",
-    organization: "Duke University",
-    role: "Policy Program Manager",
-    status: "Interview",
-    nextStep: "Prep stories · Fri",
-  },
-  {
-    id: "public-affairs",
-    organization: "City of Durham",
-    role: "Public Affairs Specialist",
-    status: "Applied",
-    nextStep: "Follow up · Jul 8",
-  },
-  {
-    id: "foundation",
-    organization: "Triangle Community Foundation",
-    role: "Strategy Associate",
-    status: "Follow-up",
-    nextStep: "Email Jamal · today",
-  },
-  {
-    id: "dataworks",
-    organization: "DataWorks NC",
-    role: "Partnerships Lead",
-    status: "Interested",
-    nextStep: "Tailor résumé",
-  },
-];
+const WEATHER_CACHE_KEY = "daymark-weather-cache-v1";
+const BASEBALL_CACHE_KEY = "daymark-baseball-cache-v1";
+const REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+const DEMO_APPLICATION_IDS = new Set(["duke-policy", "public-affairs", "foundation", "dataworks"]);
+const initialApplications = [];
 
 const defaultState = {
   tasks: {
@@ -43,6 +17,8 @@ const defaultState = {
 let state = loadState();
 let toastTimer;
 let lastRefreshAt = new Date();
+let liveRefreshInFlight = false;
+let liveFeedCount = 0;
 
 const body = document.body;
 const taskInputs = [...document.querySelectorAll(".task-check")];
@@ -66,7 +42,9 @@ function loadState() {
       ...saved,
       tasks: { ...defaultState.tasks, ...(saved?.tasks || {}) },
       decisions: { ...defaultState.decisions, ...(saved?.decisions || {}) },
-      applications: Array.isArray(saved?.applications) ? saved.applications : initialApplications,
+      applications: Array.isArray(saved?.applications)
+        ? saved.applications.filter((application) => !DEMO_APPLICATION_IDS.has(application.id))
+        : initialApplications,
     };
   } catch {
     return { ...defaultState };
@@ -109,7 +87,6 @@ function updateLiveDay(date = new Date()) {
       priorityTitle: "Today’s essential three",
       signalKicker: "WHAT’S IN MOTION",
       signalTitle: "Calendar + priority mail",
-      calendarNote: "Best open window: <b>12:45–2:45 PM</b>",
       readingKicker: "LATER TONIGHT · 28 MIN",
     },
     afternoon: {
@@ -120,7 +97,6 @@ function updateLiveDay(date = new Date()) {
       priorityTitle: "What matters this afternoon",
       signalKicker: "THE NEXT FEW HOURS",
       signalTitle: "Calendar + priority mail",
-      calendarNote: "Best remaining window: <b>12:45–2:45 PM</b>",
       readingKicker: "FOR LATER · 28 MIN",
     },
     evening: {
@@ -131,7 +107,6 @@ function updateLiveDay(date = new Date()) {
       priorityTitle: "Finish the day clean",
       signalKicker: "WHAT MOVED",
       signalTitle: "Day in review",
-      calendarNote: "Tomorrow’s first meeting: <b>10:30 AM</b>",
       readingKicker: "WIND DOWN · 28 MIN",
     },
     night: {
@@ -142,7 +117,6 @@ function updateLiveDay(date = new Date()) {
       priorityTitle: "Leave tomorrow lighter",
       signalKicker: "TOMORROW",
       signalTitle: "A clean start is ready",
-      calendarNote: "Tomorrow’s first meeting: <b>10:30 AM</b>",
       readingKicker: "BEDTIME READING · 28 MIN",
     },
   }[phase];
@@ -155,7 +129,6 @@ function updateLiveDay(date = new Date()) {
   document.querySelector("#priorityTitle").textContent = phaseContent.priorityTitle;
   document.querySelector("#signalKicker").textContent = phaseContent.signalKicker;
   document.querySelector("#signalTitle").textContent = phaseContent.signalTitle;
-  document.querySelector("#calendarFootnote").innerHTML = phaseContent.calendarNote;
   document.querySelector("#readingKicker").textContent = phaseContent.readingKicker;
   document.querySelector("#currentTime").textContent = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -174,17 +147,278 @@ function updateLiveDay(date = new Date()) {
 }
 
 function updateRefreshCountdown(date = new Date()) {
-  const elapsedMinutes = Math.floor((date - lastRefreshAt) / 60000);
-  if (elapsedMinutes >= 15) {
-    lastRefreshAt = date;
-    const syncLabel = document.querySelector("#syncState .sync-label");
-    syncLabel.textContent = "just updated";
-    window.setTimeout(() => {
-      syncLabel.textContent = "live";
-    }, 2200);
-  }
-  const nextMinutes = Math.max(1, 15 - Math.floor((date - lastRefreshAt) / 60000));
+  const elapsed = date - lastRefreshAt;
+  if (elapsed >= REFRESH_INTERVAL_MS && !liveRefreshInFlight) fetchLiveData();
+  const nextMinutes = Math.max(1, Math.ceil((REFRESH_INTERVAL_MS - elapsed) / 60000));
   document.querySelector("#nextRefresh").textContent = `refreshes in ${nextMinutes} min`;
+}
+
+function formatApiDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+async function fetchJson(url) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function writeLiveCache(key, data) {
+  localStorage.setItem(key, JSON.stringify({ savedAt: new Date().toISOString(), data }));
+}
+
+function readLiveCache(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+function weatherDescription(code) {
+  if (code === 0) return "Clear";
+  if ([1, 2].includes(code)) return "Partly cloudy";
+  if (code === 3) return "Overcast";
+  if ([45, 48].includes(code)) return "Foggy";
+  if ([51, 53, 55, 56, 57].includes(code)) return "Drizzle";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Rain";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow";
+  if ([95, 96, 99].includes(code)) return "Thunderstorms";
+  return "Current conditions";
+}
+
+function weatherIcon(code) {
+  if (code === 0) return "☀";
+  if ([1, 2].includes(code)) return "◐";
+  if ([3, 45, 48].includes(code)) return "☁";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "✳";
+  if ([95, 96, 99].includes(code)) return "ϟ";
+  return "●";
+}
+
+function renderWeather(data, source = "live") {
+  const current = Math.round(data.current.temperature_2m);
+  const feelsLike = Math.round(data.current.apparent_temperature);
+  const high = Math.round(data.daily.temperature_2m_max[0]);
+  const rain = Math.round(data.daily.precipitation_probability_max[0]);
+  const code = data.current.weather_code;
+  const sunset = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(data.daily.sunset[0]));
+  const description = weatherDescription(code);
+  const feelsText = Math.abs(feelsLike - current) >= 3 ? ` · feels ${feelsLike}°` : "";
+
+  document.querySelector("#heroWeather").innerHTML =
+    `<i class="weather-glyph" aria-hidden="true">${weatherIcon(code)}</i> ${current}° · Durham`;
+  document.querySelector("#weatherSource").textContent = source === "live" ? "LIVE NOW" : "CACHED";
+  document.querySelector("#weatherCurrent").textContent = `${current}°`;
+  document.querySelector("#weatherSummary").textContent = `${description}${feelsText}`;
+  document.querySelector("#weatherHigh").textContent = `${high}°`;
+  document.querySelector("#weatherRain").textContent = `${rain}%`;
+  document.querySelector("#weatherSunset").textContent = sunset;
+}
+
+function renderWeatherError() {
+  document.querySelector("#heroWeather").innerHTML =
+    '<i class="weather-glyph" aria-hidden="true">!</i> Weather unavailable';
+  document.querySelector("#weatherSource").textContent = "UNAVAILABLE";
+  document.querySelector("#weatherSummary").textContent = "Could not reach the weather source.";
+}
+
+function getTeamDisplay(team) {
+  const names = {
+    LAD: "Los Angeles",
+    AZ: "Arizona",
+    SD: "San Diego",
+    SF: "San Francisco",
+    COL: "Colorado",
+  };
+  return names[team.abbreviation] || team.shortName || team.name;
+}
+
+function getTeamDotClass(abbreviation) {
+  return {
+    LAD: "team-dot--la",
+    AZ: "team-dot--az",
+    SD: "team-dot--sd",
+    SF: "team-dot--sf",
+    COL: "team-dot--col",
+  }[abbreviation] || "";
+}
+
+function renderBaseball(standingsData, scheduleData, source = "live") {
+  const division = standingsData.records.find((record) => record.division?.id === 203);
+  if (!division) throw new Error("NL West standings were missing.");
+
+  const teams = [...division.teamRecords].sort(
+    (a, b) => Number(a.divisionRank) - Number(b.divisionRank),
+  );
+  const standingsRows = document.querySelector("#standingsRows");
+  standingsRows.innerHTML = teams
+    .map((record) => {
+      const abbreviation = record.team.abbreviation;
+      const favoriteClass = record.team.id === 109 ? " is-favorite" : "";
+      const gamesBack = record.divisionGamesBack === "-" ? "—" : record.divisionGamesBack;
+      return `
+        <div class="standing-row${favoriteClass}">
+          <span><i class="team-dot ${getTeamDotClass(abbreviation)}"></i>${escapeHtml(getTeamDisplay(record.team))}</span>
+          <span>${record.wins}–${record.losses}</span>
+          <span>${escapeHtml(gamesBack)}</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  const arizona = teams.find((record) => record.team.id === 109);
+  if (arizona) {
+    const wildcard = arizona.wildCardRank
+      ? `WC #${arizona.wildCardRank} · ${arizona.wildCardGamesBack === "-" ? "IN" : `${arizona.wildCardGamesBack} GB`}`
+      : "WILD CARD: —";
+    document.querySelector("#wildCardStatus").textContent = wildcard;
+  }
+
+  const games = scheduleData.dates.flatMap((date) => date.games || []);
+  const today = formatApiDate(new Date());
+  const game =
+    games.find((item) => item.officialDate === today) ||
+    games.find((item) => new Date(item.gameDate) >= new Date());
+
+  if (game) renderDiamondbacksGame(game);
+  else renderNoDiamondbacksGame();
+
+  document.querySelector("#sportsSource").textContent =
+    source === "live" ? "LIVE · OFFICIAL MLB" : "CACHED · MLB";
+}
+
+function renderDiamondbacksGame(game) {
+  const dbacksHome = game.teams.home.team.id === 109;
+  const dbacksSide = dbacksHome ? game.teams.home : game.teams.away;
+  const opponentSide = dbacksHome ? game.teams.away : game.teams.home;
+  const opponent = opponentSide.team.shortName || opponentSide.team.name;
+  const gameDate = new Date(game.gameDate);
+  const today = formatApiDate(new Date()) === game.officialDate;
+  const dateLabel = today
+    ? "TODAY"
+    : new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(gameDate).toUpperCase();
+  const timeLabel = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(gameDate);
+  const gameState = game.status.abstractGameState;
+  const gameCard = document.querySelector("#diamondbacksGame");
+
+  document.querySelector("#gameTime").textContent = `DIAMONDBACKS · ${dateLabel} ${timeLabel}`;
+  document.querySelector("#gameOpponent").textContent = `${dbacksHome ? "vs." : "at"} ${opponent}`;
+  document.querySelector("#gameStatus").textContent = game.status.detailedState.toUpperCase();
+  gameCard.href = `https://www.mlb.com/gameday/${game.gamePk}`;
+
+  if (gameState === "Final") {
+    document.querySelector("#gameDetail").textContent =
+      `Arizona ${dbacksSide.score ?? "—"} · ${opponent} ${opponentSide.score ?? "—"} · Final`;
+  } else if (gameState === "Live") {
+    document.querySelector("#gameDetail").textContent =
+      `Arizona ${dbacksSide.score ?? 0}–${opponentSide.score ?? 0} · ${game.status.detailedState}`;
+  } else {
+    const arizonaPitcher = dbacksSide.probablePitcher?.fullName || "TBD";
+    const opponentPitcher = opponentSide.probablePitcher?.fullName || "TBD";
+    document.querySelector("#gameDetail").textContent =
+      `${arizonaPitcher} vs. ${opponentPitcher} · ${game.venue?.name || "venue TBD"}`;
+  }
+}
+
+function renderNoDiamondbacksGame() {
+  document.querySelector("#gameTime").textContent = "DIAMONDBACKS";
+  document.querySelector("#gameOpponent").textContent = "No upcoming game found";
+  document.querySelector("#gameDetail").textContent = "Open the official schedule for more.";
+  document.querySelector("#gameStatus").textContent = "MLB";
+}
+
+function renderBaseballError() {
+  document.querySelector("#sportsSource").textContent = "MLB DATA UNAVAILABLE";
+  document.querySelector("#wildCardStatus").textContent = "WILD CARD: UNAVAILABLE";
+  document.querySelector("#standingsRows").innerHTML =
+    '<div class="standing-row standings-loading"><span>Could not reach MLB.</span><span>—</span><span>—</span></div>';
+  document.querySelector("#gameOpponent").textContent = "MLB data unavailable";
+  document.querySelector("#gameDetail").textContent = "Tap to open the official schedule.";
+}
+
+async function fetchLiveData(announce = false) {
+  if (liveRefreshInFlight) return;
+  liveRefreshInFlight = true;
+  const sync = document.querySelector("#syncState");
+  const syncLabel = sync.querySelector(".sync-label");
+  sync.classList.add("is-refreshing");
+  syncLabel.textContent = "updating";
+
+  const now = new Date();
+  const end = new Date(now);
+  end.setDate(now.getDate() + 10);
+  const season = now.getFullYear();
+  const weatherUrl =
+    "https://api.open-meteo.com/v1/forecast?latitude=35.9940&longitude=-78.8986" +
+    "&current=temperature_2m,apparent_temperature,weather_code" +
+    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset" +
+    "&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=2";
+  const standingsUrl =
+    `https://statsapi.mlb.com/api/v1/standings?leagueId=104&season=${season}` +
+    "&standingsTypes=regularSeason&hydrate=team,division";
+  const scheduleUrl =
+    `https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=109` +
+    `&startDate=${formatApiDate(now)}&endDate=${formatApiDate(end)}` +
+    "&hydrate=probablePitcher,team";
+
+  const [weatherResult, standingsResult, scheduleResult] = await Promise.allSettled([
+    fetchJson(weatherUrl),
+    fetchJson(standingsUrl),
+    fetchJson(scheduleUrl),
+  ]);
+
+  liveFeedCount = 0;
+  if (weatherResult.status === "fulfilled") {
+    renderWeather(weatherResult.value);
+    writeLiveCache(WEATHER_CACHE_KEY, weatherResult.value);
+    liveFeedCount += 1;
+  } else {
+    const cached = readLiveCache(WEATHER_CACHE_KEY);
+    if (cached?.data) renderWeather(cached.data, "cached");
+    else renderWeatherError();
+  }
+
+  if (standingsResult.status === "fulfilled" && scheduleResult.status === "fulfilled") {
+    renderBaseball(standingsResult.value, scheduleResult.value);
+    writeLiveCache(BASEBALL_CACHE_KEY, {
+      standings: standingsResult.value,
+      schedule: scheduleResult.value,
+    });
+    liveFeedCount += 1;
+  } else {
+    const cached = readLiveCache(BASEBALL_CACHE_KEY);
+    if (cached?.data) renderBaseball(cached.data.standings, cached.data.schedule, "cached");
+    else renderBaseballError();
+  }
+
+  lastRefreshAt = new Date();
+  liveRefreshInFlight = false;
+  sync.classList.remove("is-refreshing");
+  syncLabel.textContent = `${liveFeedCount}/2 live`;
+  updateRefreshCountdown(lastRefreshAt);
+  if (announce) {
+    showToast(
+      liveFeedCount === 2
+        ? "Weather and MLB data are current."
+        : `${liveFeedCount} of 2 live feeds updated.`,
+    );
+  }
 }
 
 function hydrateTasks() {
@@ -250,6 +484,13 @@ function renderApplications() {
   const list = document.querySelector("#applicationList");
   list.replaceChildren();
 
+  if (state.applications.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "tracker-empty";
+    empty.innerHTML = "<strong>No applications yet</strong><small>Add the first real role you want to track.</small>";
+    list.append(empty);
+  }
+
   state.applications.forEach((app) => {
     const row = document.createElement("div");
     row.className = "application-row";
@@ -270,6 +511,13 @@ function renderApplications() {
   document.querySelector("#activeApps").textContent = String(active);
   document.querySelector("#followupApps").textContent = String(followups);
   document.querySelector("#interviewApps").textContent = String(interviews);
+  const stageWeight = { Interested: 20, Applied: 45, "Follow-up": 65, Interview: 90 };
+  const averageProgress = active
+    ? Math.round(
+        state.applications.reduce((sum, app) => sum + (stageWeight[app.status] || 0), 0) / active,
+      )
+    : 0;
+  document.querySelector(".tracker-progress-fill").style.width = `${averageProgress}%`;
 }
 
 function cycleApplicationStatus(id) {
@@ -310,24 +558,14 @@ document.querySelectorAll("[data-scroll]").forEach((button) => {
   });
 });
 
-document.querySelector("#refreshBrief").addEventListener("click", (event) => {
+document.querySelector("#refreshBrief").addEventListener("click", async (event) => {
   const button = event.currentTarget;
-  const sync = document.querySelector("#syncState");
-  const label = sync.querySelector(".sync-label");
   button.classList.add("is-spinning");
-  sync.classList.add("is-refreshing");
-  label.textContent = "checking";
-  window.setTimeout(() => {
-    lastRefreshAt = new Date();
+  try {
+    await fetchLiveData(true);
+  } finally {
     button.classList.remove("is-spinning");
-    sync.classList.remove("is-refreshing");
-    label.textContent = "just updated";
-    updateRefreshCountdown(lastRefreshAt);
-    showToast("Brief checked. Nothing urgent changed.");
-    window.setTimeout(() => {
-      label.textContent = "live";
-    }, 2200);
-  }, 850);
+  }
 });
 
 document.querySelector("#openApplicationDialog").addEventListener("click", () => {
@@ -387,6 +625,7 @@ hydrateDecisions();
 renderApplications();
 updateLiveDay();
 updateSprintProgress();
+fetchLiveData();
 window.setInterval(() => updateLiveDay(), 30000);
 
 if ("serviceWorker" in navigator) {
