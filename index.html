@@ -63,7 +63,7 @@
           </div>
 
           <div class="hero-meta">
-            <span><i class="weather-glyph" aria-hidden="true">☀</i> 86° · Durham</span>
+            <span id="heroWeather"><i class="weather-glyph" aria-hidden="true">•</i> Checking Durham weather</span>
             <span><i class="signal-glyph" aria-hidden="true"></i><b id="openCount">5</b> open loops</span>
           </div>
         </section>
@@ -176,48 +176,26 @@
                   <div class="panel-label">
                     <span class="panel-icon panel-icon--blue" aria-hidden="true"></span>
                     CALENDAR
-                    <span class="panel-status">3 blocks</span>
+                    <span class="panel-status disconnected-status">NOT CONNECTED</span>
                   </div>
-                  <div class="timeline">
-                    <div class="timeline-row">
-                      <time>09:30</time>
-                      <div><strong>Job-search power hour</strong><small>Applications + follow-ups</small></div>
-                    </div>
-                    <div class="timeline-row is-now">
-                      <time>11:00</time>
-                      <div><strong>Veraya working session</strong><small>Pricing narrative · 90 min</small></div>
-                    </div>
-                    <div class="timeline-row">
-                      <time>15:00</time>
-                      <div><strong>Coffee with Maya</strong><small>Cocoa Cinnamon · Geer St</small></div>
-                    </div>
-                  </div>
-                  <p class="panel-footnote" id="calendarFootnote">Best open window: <b>12:45–2:45 PM</b></p>
+                  <a class="connection-empty" href="https://calendar.google.com/" target="_blank" rel="noreferrer">
+                    <span aria-hidden="true">＋</span>
+                    <strong>Connect Google Calendar</strong>
+                    <p>Live events and open windows will appear here.</p>
+                  </a>
                 </article>
 
                 <article class="panel email-panel">
                   <div class="panel-label">
                     <span class="panel-icon panel-icon--coral" aria-hidden="true"></span>
                     PRIORITY MAIL
-                    <span class="panel-status">2 need you</span>
+                    <span class="panel-status disconnected-status">NOT CONNECTED</span>
                   </div>
-                  <button class="mail-item" type="button">
-                    <span class="sender-avatar">LM</span>
-                    <span class="mail-copy">
-                      <span><strong>Lena M.</strong><time>8:12</time></span>
-                      <b>Re: Policy team introduction</b>
-                      <small>“Happy to connect you with…”</small>
-                    </span>
-                  </button>
-                  <button class="mail-item" type="button">
-                    <span class="sender-avatar sender-avatar--blue">VR</span>
-                    <span class="mail-copy">
-                      <span><strong>Veraya Research</strong><time>7:44</time></span>
-                      <b>Interview notes are ready</b>
-                      <small>3 themes tagged for review</small>
-                    </span>
-                  </button>
-                  <div class="mail-summary"><b>11</b> other messages can safely wait.</div>
+                  <a class="connection-empty" href="https://mail.google.com/" target="_blank" rel="noreferrer">
+                    <span aria-hidden="true">＋</span>
+                    <strong>Connect Gmail</strong>
+                    <p>Only messages that need action will appear here.</p>
+                  </a>
                 </article>
               </div>
             </section>
@@ -248,13 +226,11 @@
               <article class="duke-watch">
                 <div class="duke-wordmark" aria-hidden="true">D</div>
                 <div class="duke-copy">
-                  <div class="panel-label">DUKE WATCHLIST <span class="new-badge">2 NEW</span></div>
-                  <strong>Senior Program Coordinator</strong>
-                  <small>Sanford School · posted yesterday</small>
-                  <strong>Communications Strategist</strong>
-                  <small>University Communications · closes Jul 10</small>
+                  <div class="panel-label">DUKE WATCHLIST <span class="new-badge">NOT CONNECTED</span></div>
+                  <strong>No live opportunities feed yet</strong>
+                  <small>Connect a Duke search or add roles manually.</small>
                 </div>
-                <button class="round-arrow" type="button" aria-label="Open Duke opportunities">↗</button>
+                <a class="round-arrow" href="https://careers.duke.edu/" target="_blank" rel="noreferrer" aria-label="Open Duke careers">↗</a>
               </article>
             </section>
 
@@ -324,8 +300,8 @@
                 <article class="decision-card" data-decision="duke-event">
                   <span class="decision-number">02</span>
                   <div>
-                    <strong>Go to the Duke alumni mixer?</strong>
-                    <small>Thursday, 6 PM · useful for two warm paths.</small>
+                    <strong>Create a Duke jobs alert?</strong>
+                    <small>Use the official careers site so new roles have a real source.</small>
                     <div class="choice-row">
                       <button type="button" data-choice="Yes">Yes</button>
                       <button type="button" data-choice="No">No</button>
@@ -336,11 +312,11 @@
                 <article class="decision-card" data-decision="housing-tour">
                   <span class="decision-number">03</span>
                   <div>
-                    <strong>Tour the Trinity Park listing?</strong>
-                    <small>$1,840 · Saturday slot still available.</small>
+                    <strong>Save a Durham housing search?</strong>
+                    <small>Choose your real filters before listing alerts appear here.</small>
                     <div class="choice-row">
-                      <button type="button" data-choice="Tour">Tour</button>
-                      <button type="button" data-choice="Pass">Pass</button>
+                      <button type="button" data-choice="Save">Save</button>
+                      <button type="button" data-choice="Later">Later</button>
                       <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
                     </div>
                   </div>
@@ -392,31 +368,32 @@
               <article class="weather-card">
                 <div class="weather-top">
                   <div>
-                    <span>NOW</span>
-                    <strong>78°</strong>
-                    <p>Sunny, warmer later</p>
+                    <span id="weatherSource">UPDATING</span>
+                    <strong id="weatherCurrent">—°</strong>
+                    <p id="weatherSummary">Checking Durham weather…</p>
                   </div>
                   <div class="sun-art" aria-hidden="true"><span></span></div>
                 </div>
                 <div class="weather-detail">
-                  <span><small>HIGH</small><b>88°</b></span>
-                  <span><small>RAIN</small><b>10%</b></span>
-                  <span><small>SUNSET</small><b>8:35</b></span>
+                  <span><small>HIGH</small><b id="weatherHigh">—°</b></span>
+                  <span><small>RAIN</small><b id="weatherRain">—%</b></span>
+                  <span><small>SUNSET</small><b id="weatherSunset">—</b></span>
                 </div>
+                <a class="source-link weather-source-link" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather by Open-Meteo ↗</a>
               </article>
 
               <div class="local-list">
-                <article>
+                <a href="https://www.discoverdurham.com/events/" target="_blank" rel="noreferrer">
                   <span class="local-icon local-icon--event" aria-hidden="true">✦</span>
-                  <div><small>WORTH KNOWING</small><strong>Food Truck Rodeo at Central Park</strong><p>5–8 PM · easy after coffee</p></div>
-                </article>
-                <article>
+                  <div><small>LOCAL EVENTS · LIVE SEARCH</small><strong>Browse Durham events</strong><p>Open the current Discover Durham calendar. ↗</p></div>
+                </a>
+                <a href="https://www.zillow.com/durham-nc/rentals/" target="_blank" rel="noreferrer">
                   <span class="local-icon local-icon--home" aria-hidden="true">⌂</span>
-                  <div><small>HOUSING</small><strong>2 promising listings, 1 price drop</strong><p>Trinity Park listing is the strongest fit.</p></div>
-                </article>
+                  <div><small>HOUSING · LIVE SEARCH</small><strong>Browse Durham rentals</strong><p>Open current Zillow listings. ↗</p></div>
+                </a>
                 <article>
                   <span class="local-icon local-icon--bell" aria-hidden="true">!</span>
-                  <div><small>PRACTICAL</small><strong>Put recycling out tonight</strong><p>Pickup is early tomorrow morning.</p></div>
+                  <div><small>PRACTICAL · MANUAL</small><strong>No reminder set</strong><p>Your own practical reminders will live here.</p></div>
                 </article>
               </div>
             </section>
@@ -427,33 +404,33 @@
                   <p class="section-kicker">YOUR TEAMS</p>
                   <h2>The sporting life</h2>
                 </div>
-                <span class="quiet-label">ONLY THE SIGNAL</span>
+                <span class="quiet-label" id="sportsSource">UPDATING MLB</span>
               </div>
 
-              <article class="sports-lead">
+              <a class="sports-lead" id="diamondbacksGame" href="https://www.mlb.com/dbacks/schedule" target="_blank" rel="noreferrer">
                 <span class="team-monogram">A</span>
                 <div>
-                  <small>DIAMONDBACKS · TONIGHT 9:40 PM</small>
-                  <strong>at San Francisco</strong>
-                  <p>Kelly vs. Harrison · Arizona has won 3 of 4.</p>
+                  <small id="gameTime">DIAMONDBACKS · CHECKING SCHEDULE</small>
+                  <strong id="gameOpponent">Loading official MLB data…</strong>
+                  <p id="gameDetail">No estimate will be shown.</p>
                 </div>
-                <span class="broadcast">MLB.TV</span>
-              </article>
+                <span class="broadcast" id="gameStatus">MLB</span>
+              </a>
 
               <article class="panel standings-panel">
-                <div class="panel-label">NL WEST <span class="panel-status">WILD CARD: 1.5 GB</span></div>
+                <div class="panel-label">NL WEST <span class="panel-status" id="wildCardStatus">WILD CARD: CHECKING</span></div>
                 <div class="standing-row standing-head"><span>TEAM</span><span>W–L</span><span>GB</span></div>
-                <div class="standing-row"><span><i class="team-dot team-dot--sd"></i>San Diego</span><span>47–39</span><span>—</span></div>
-                <div class="standing-row"><span><i class="team-dot team-dot--la"></i>Los Angeles</span><span>46–40</span><span>1.0</span></div>
-                <div class="standing-row is-favorite"><span><i class="team-dot team-dot--az"></i>Arizona</span><span>44–41</span><span>2.5</span></div>
-                <div class="standing-row"><span><i class="team-dot team-dot--sf"></i>San Francisco</span><span>42–43</span><span>4.5</span></div>
+                <div id="standingsRows">
+                  <div class="standing-row standings-loading"><span>Fetching official standings…</span><span>—</span><span>—</span></div>
+                </div>
+                <a class="source-link" href="https://www.mlb.com/standings" target="_blank" rel="noreferrer">Official MLB data ↗</a>
               </article>
 
               <div class="team-ticker">
-                <article><span class="mini-team mini-team--chelsea">C</span><div><small>CHELSEA</small><strong>Training resumes Monday</strong></div></article>
-                <article><span class="mini-team mini-team--cats">A</span><div><small>ARIZONA</small><strong>Recruiting: 4★ guard commits</strong></div></article>
-                <article><span class="mini-team mini-team--suns">PHX</span><div><small>SUNS</small><strong>Summer League · Jul 11</strong></div></article>
-                <article><span class="mini-team mini-team--cards">AZ</span><div><small>CARDINALS</small><strong>Camp opens in 20 days</strong></div></article>
+                <a href="https://www.chelseafc.com/en/matches/mens-fixtures-and-results" target="_blank" rel="noreferrer"><span class="mini-team mini-team--chelsea">C</span><div><small>CHELSEA</small><strong>Open official fixtures ↗</strong></div></a>
+                <a href="https://arizonawildcats.com/calendar" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cats">A</span><div><small>ARIZONA</small><strong>Open official calendar ↗</strong></div></a>
+                <a href="https://www.nba.com/suns/schedule" target="_blank" rel="noreferrer"><span class="mini-team mini-team--suns">PHX</span><div><small>SUNS</small><strong>Open official schedule ↗</strong></div></a>
+                <a href="https://www.azcardinals.com/schedule/" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cards">AZ</span><div><small>CARDINALS</small><strong>Open official schedule ↗</strong></div></a>
               </div>
             </section>
 

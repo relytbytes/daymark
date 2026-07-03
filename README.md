@@ -21,5 +21,8 @@ The web app manifest, offline cache, standalone display mode, safe-area spacing,
 ## Notes
 
 - The live phase, clock, framing, and refresh status update automatically throughout the day.
+- Durham weather comes from Open-Meteo, and Diamondbacks games, NL West standings, and wild-card position come from MLB.
+- Live feeds refresh every 15 minutes and fall back to the most recently cached response when temporarily offline.
+- Source-oriented cards link to their real destination. Unconnected feeds are labeled rather than populated with invented updates.
 - Tasks, decisions, sprint progress, and applications are saved in browser storage.
-- The brief content is intentionally sample data. Calendar, email, weather, sports, and local listings need live data connections before production use.
+- Calendar, email, Duke alerts, other teams, events, and individual housing alerts still need authenticated or custom feeds.

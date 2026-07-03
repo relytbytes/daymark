@@ -734,6 +734,50 @@ body[data-phase="night"] .day-progress i {
   letter-spacing: 0.05em;
 }
 
+.disconnected-status {
+  color: var(--muted);
+}
+
+.connection-empty {
+  display: grid;
+  min-height: 172px;
+  place-items: center;
+  align-content: center;
+  padding: 22px;
+  color: var(--ink);
+  text-align: center;
+  text-decoration: none;
+}
+
+.connection-empty > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 10px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--blue);
+  font-size: 19px;
+}
+
+.connection-empty strong {
+  font-size: 12px;
+}
+
+.connection-empty p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.connection-empty:active,
+.local-list a:active,
+.team-ticker a:active,
+.sports-lead:active {
+  transform: scale(0.985);
+}
+
 .timeline {
   margin-top: 17px;
 }
@@ -955,6 +999,30 @@ body[data-phase="night"] .day-progress i {
 .application-row:last-child {
   border-bottom: 0;
   padding-bottom: 0;
+}
+
+.tracker-empty {
+  display: flex;
+  min-height: 98px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.tracker-empty strong,
+.tracker-empty small {
+  display: block;
+}
+
+.tracker-empty strong {
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.tracker-empty small {
+  color: var(--muted);
+  font-size: 9px;
 }
 
 .application-row strong,
@@ -1467,6 +1535,29 @@ body[data-phase="night"] .day-progress i {
   font-size: 11px;
 }
 
+.source-link {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  color: var(--blue);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.weather-source-link {
+  min-height: 32px;
+  padding: 0 18px;
+  border-top-color: rgba(20, 32, 68, 0.13);
+  background: rgba(255, 255, 255, 0.35);
+  color: #294272;
+}
+
 .local-list {
   margin-top: 10px;
   overflow: hidden;
@@ -1475,7 +1566,8 @@ body[data-phase="night"] .day-progress i {
   background: var(--card);
 }
 
-.local-list article {
+.local-list article,
+.local-list > a {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 12px;
@@ -1483,9 +1575,12 @@ body[data-phase="night"] .day-progress i {
   align-items: center;
   padding: 13px 16px;
   border-bottom: 1px solid #e4e0d8;
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 160ms ease;
 }
 
-.local-list article:last-child {
+.local-list > :last-child {
   border-bottom: 0;
 }
 
@@ -1551,6 +1646,8 @@ body[data-phase="night"] .day-progress i {
   border-radius: var(--radius-md);
   background: #391222;
   color: white;
+  text-decoration: none;
+  transition: transform 160ms ease;
 }
 
 .sports-lead::after {
@@ -1665,6 +1762,7 @@ body[data-phase="night"] .day-progress i {
 .team-dot--la { background: #1e5ca6; }
 .team-dot--az { background: #a91c43; }
 .team-dot--sf { background: #f0672c; }
+.team-dot--col { background: #333366; }
 
 .team-ticker {
   display: grid;
@@ -1673,7 +1771,8 @@ body[data-phase="night"] .day-progress i {
   margin-top: 10px;
 }
 
-.team-ticker article {
+.team-ticker article,
+.team-ticker a {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 9px;
@@ -1683,6 +1782,9 @@ body[data-phase="night"] .day-progress i {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--card);
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 160ms ease;
 }
 
 .mini-team {
