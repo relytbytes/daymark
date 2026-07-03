@@ -32,7 +32,6 @@ const initialApplications = [
 ];
 
 const defaultState = {
-  mode: getSuggestedMode(),
   tasks: {
     "veraya-interviews": true,
     "veraya-draft": true,
@@ -43,17 +42,20 @@ const defaultState = {
 
 let state = loadState();
 let toastTimer;
+let lastRefreshAt = new Date();
 
 const body = document.body;
-const modeButtons = [...document.querySelectorAll("[data-set-mode]")];
 const taskInputs = [...document.querySelectorAll(".task-check")];
 const navButtons = [...document.querySelectorAll(".nav-button")];
 const applicationDialog = document.querySelector("#applicationDialog");
 const applicationForm = document.querySelector("#applicationForm");
 
-function getSuggestedMode() {
-  const hour = new Date().getHours();
-  return hour >= 20 || hour < 6 ? "evening" : "morning";
+function getDayPhase(date = new Date()) {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return "morning";
+  if (hour >= 12 && hour < 17) return "afternoon";
+  if (hour >= 17 && hour < 21) return "evening";
+  return "night";
 }
 
 function loadState() {
@@ -62,7 +64,6 @@ function loadState() {
     return {
       ...defaultState,
       ...saved,
-      mode: getSuggestedMode(),
       tasks: { ...defaultState.tasks, ...(saved?.tasks || {}) },
       decisions: { ...defaultState.decisions, ...(saved?.decisions || {}) },
       applications: Array.isArray(saved?.applications) ? saved.applications : initialApplications,
@@ -97,23 +98,93 @@ function formatDate() {
   document.querySelector("#weekLabel").textContent = `WEEK ${week}`;
 }
 
-function setMode(mode, announce = false) {
-  state.mode = mode;
-  body.dataset.mode = mode;
-  modeButtons.forEach((button) => {
-    const active = button.dataset.setMode === mode;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
+function updateLiveDay(date = new Date()) {
+  const phase = getDayPhase(date);
+  const phaseContent = {
+    morning: {
+      label: "Morning runway",
+      title: "Good morning, Ty.",
+      note: "A clear day to move the important things. The rest can wait.",
+      priorityKicker: "START HERE",
+      priorityTitle: "Today’s essential three",
+      signalKicker: "WHAT’S IN MOTION",
+      signalTitle: "Calendar + priority mail",
+      calendarNote: "Best open window: <b>12:45–2:45 PM</b>",
+      readingKicker: "LATER TONIGHT · 28 MIN",
+    },
+    afternoon: {
+      label: "Afternoon check-in",
+      title: "Good afternoon, Ty.",
+      note: "The day is in motion. Protect the next useful block and let the noise pass.",
+      priorityKicker: "MIDDAY CHECK",
+      priorityTitle: "What matters this afternoon",
+      signalKicker: "THE NEXT FEW HOURS",
+      signalTitle: "Calendar + priority mail",
+      calendarNote: "Best remaining window: <b>12:45–2:45 PM</b>",
+      readingKicker: "FOR LATER · 28 MIN",
+    },
+    evening: {
+      label: "Evening landing",
+      title: "Good evening, Ty.",
+      note: "The ambitious part of the day is over. Close what matters and release the rest.",
+      priorityKicker: "CLOSE THE LOOPS",
+      priorityTitle: "Finish the day clean",
+      signalKicker: "WHAT MOVED",
+      signalTitle: "Day in review",
+      calendarNote: "Tomorrow’s first meeting: <b>10:30 AM</b>",
+      readingKicker: "WIND DOWN · 28 MIN",
+    },
+    night: {
+      label: "Night reset",
+      title: "The day can end, Ty.",
+      note: "Capture the loose ends, choose tomorrow’s first move, and get out of the dashboard.",
+      priorityKicker: "RESET",
+      priorityTitle: "Leave tomorrow lighter",
+      signalKicker: "TOMORROW",
+      signalTitle: "A clean start is ready",
+      calendarNote: "Tomorrow’s first meeting: <b>10:30 AM</b>",
+      readingKicker: "BEDTIME READING · 28 MIN",
+    },
+  }[phase];
 
-  const title = document.querySelector("#heroTitle");
-  title.textContent = mode === "morning" ? "Good morning, Ty." : "Good evening, Ty.";
-  saveState();
+  body.dataset.phase = phase;
+  document.querySelector("#phaseLabel").textContent = phaseContent.label;
+  document.querySelector("#heroTitle").textContent = phaseContent.title;
+  document.querySelector("#heroNote").textContent = phaseContent.note;
+  document.querySelector("#priorityKicker").textContent = phaseContent.priorityKicker;
+  document.querySelector("#priorityTitle").textContent = phaseContent.priorityTitle;
+  document.querySelector("#signalKicker").textContent = phaseContent.signalKicker;
+  document.querySelector("#signalTitle").textContent = phaseContent.signalTitle;
+  document.querySelector("#calendarFootnote").innerHTML = phaseContent.calendarNote;
+  document.querySelector("#readingKicker").textContent = phaseContent.readingKicker;
+  document.querySelector("#currentTime").textContent = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+
+  const dayStart = new Date(date);
+  dayStart.setHours(5, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 0, 0, 0);
+  const progress = Math.max(0, Math.min(100, ((date - dayStart) / (dayEnd - dayStart)) * 100));
+  document.querySelector("#dayProgress").style.width = `${progress}%`;
+
+  updateRefreshCountdown(date);
   updateBriefProgress();
+}
 
-  if (announce) {
-    showToast(mode === "morning" ? "Morning plan is up." : "Evening reset is up.");
+function updateRefreshCountdown(date = new Date()) {
+  const elapsedMinutes = Math.floor((date - lastRefreshAt) / 60000);
+  if (elapsedMinutes >= 15) {
+    lastRefreshAt = date;
+    const syncLabel = document.querySelector("#syncState .sync-label");
+    syncLabel.textContent = "just updated";
+    window.setTimeout(() => {
+      syncLabel.textContent = "live";
+    }, 2200);
   }
+  const nextMinutes = Math.max(1, 15 - Math.floor((date - lastRefreshAt) / 60000));
+  document.querySelector("#nextRefresh").textContent = `refreshes in ${nextMinutes} min`;
 }
 
 function hydrateTasks() {
@@ -132,7 +203,8 @@ function hydrateTasks() {
 }
 
 function getVisiblePriorityInputs() {
-  const selector = state.mode === "morning" ? "#morningActions .task-check" : "#eveningActions .task-check";
+  const closingPhase = ["evening", "night"].includes(body.dataset.phase);
+  const selector = closingPhase ? "#eveningActions .task-check" : "#morningActions .task-check";
   return [...document.querySelectorAll(selector)];
 }
 
@@ -228,10 +300,6 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2200);
 }
 
-modeButtons.forEach((button) => {
-  button.addEventListener("click", () => setMode(button.dataset.setMode, true));
-});
-
 document.querySelectorAll("[data-scroll]").forEach((button) => {
   button.addEventListener("click", () => {
     const id = button.dataset.scroll;
@@ -250,10 +318,15 @@ document.querySelector("#refreshBrief").addEventListener("click", (event) => {
   sync.classList.add("is-refreshing");
   label.textContent = "checking";
   window.setTimeout(() => {
+    lastRefreshAt = new Date();
     button.classList.remove("is-spinning");
     sync.classList.remove("is-refreshing");
     label.textContent = "just updated";
+    updateRefreshCountdown(lastRefreshAt);
     showToast("Brief checked. Nothing urgent changed.");
+    window.setTimeout(() => {
+      label.textContent = "live";
+    }, 2200);
   }, 850);
 });
 
@@ -312,8 +385,9 @@ formatDate();
 hydrateTasks();
 hydrateDecisions();
 renderApplications();
-setMode(state.mode);
+updateLiveDay();
 updateSprintProgress();
+window.setInterval(() => updateLiveDay(), 30000);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

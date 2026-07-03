@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
-    <meta name="description" content="A personal morning brief and evening reset." />
+    <meta name="description" content="A personal assistant dashboard that moves with your day." />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./styles.css" />
     <title>Daymark — Personal brief</title>
   </head>
-  <body data-mode="morning">
+  <body data-phase="morning">
     <div class="app-shell">
       <header class="topbar">
         <a class="brand" href="#today" aria-label="Daymark home">
@@ -28,7 +28,7 @@
         <div class="topbar-actions">
           <span class="sync-state" id="syncState">
             <span class="sync-dot"></span>
-            <span class="sync-label">brief ready</span>
+            <span class="sync-label">live</span>
           </span>
           <button class="icon-button" id="refreshBrief" type="button" aria-label="Refresh brief">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -38,17 +38,15 @@
         </div>
       </header>
 
-      <div class="mode-wrap">
-        <div class="mode-switch" role="group" aria-label="Brief mode">
-          <button class="mode-button is-active" type="button" data-set-mode="morning">
-            <span class="mode-time">7:00</span>
-            Plan
-          </button>
-          <button class="mode-button" type="button" data-set-mode="evening">
-            <span class="mode-time">21:00</span>
-            Reset
-          </button>
-          <span class="mode-indicator" aria-hidden="true"></span>
+      <div class="live-wrap">
+        <div class="live-strip" aria-label="Live dashboard status">
+          <div class="live-now">
+            <span class="live-pulse" aria-hidden="true"></span>
+            <span id="currentTime">9:41 AM</span>
+            <strong id="phaseLabel">Morning runway</strong>
+          </div>
+          <span class="live-refresh" id="nextRefresh">refreshes in 15 min</span>
+          <span class="day-progress" aria-hidden="true"><i id="dayProgress"></i></span>
         </div>
       </div>
 
@@ -57,12 +55,7 @@
           <div class="hero-copy">
             <p class="eyebrow" id="dateLabel">THURSDAY · JULY 2</p>
             <h1 id="heroTitle">Good morning, Ty.</h1>
-            <p class="hero-note mode-copy mode-morning">
-              A clear day to move the important things. The rest can wait.
-            </p>
-            <p class="hero-note mode-copy mode-evening">
-              Let’s close the open loops and make tomorrow lighter.
-            </p>
+            <p class="hero-note" id="heroNote">A clear day to move the important things. The rest can wait.</p>
           </div>
 
           <div class="hero-orbit" aria-label="Brief completion">
@@ -80,10 +73,8 @@
             <section class="section-block" id="priorities">
               <div class="section-heading">
                 <div>
-                  <p class="section-kicker mode-copy mode-morning">START HERE</p>
-                  <p class="section-kicker mode-copy mode-evening">CLOSE FIRST</p>
-                  <h2 class="mode-copy mode-morning">Today’s essential three</h2>
-                  <h2 class="mode-copy mode-evening">Tonight’s clean close</h2>
+                  <p class="section-kicker" id="priorityKicker">START HERE</p>
+                  <h2 id="priorityTitle">Today’s essential three</h2>
                 </div>
                 <span class="section-count" id="priorityCount">0/3</span>
               </div>
@@ -174,10 +165,8 @@
             <section class="section-block" id="signals">
               <div class="section-heading">
                 <div>
-                  <p class="section-kicker mode-copy mode-morning">WHAT’S IN MOTION</p>
-                  <p class="section-kicker mode-copy mode-evening">WHAT MOVED</p>
-                  <h2 class="mode-copy mode-morning">Calendar + priority mail</h2>
-                  <h2 class="mode-copy mode-evening">Day in review</h2>
+                  <p class="section-kicker" id="signalKicker">WHAT’S IN MOTION</p>
+                  <h2 id="signalTitle">Calendar + priority mail</h2>
                 </div>
                 <button class="text-button" type="button" data-scroll="decisions">Decide next</button>
               </div>
@@ -203,8 +192,7 @@
                       <div><strong>Coffee with Maya</strong><small>Cocoa Cinnamon · Geer St</small></div>
                     </div>
                   </div>
-                  <p class="panel-footnote mode-copy mode-morning">Best open window: <b>12:45–2:45 PM</b></p>
-                  <p class="panel-footnote mode-copy mode-evening">Tomorrow’s first meeting: <b>10:30 AM</b></p>
+                  <p class="panel-footnote" id="calendarFootnote">Best open window: <b>12:45–2:45 PM</b></p>
                 </article>
 
                 <article class="panel email-panel">
@@ -469,10 +457,10 @@
               </div>
             </section>
 
-            <section class="section-block reading-section mode-copy mode-evening" id="reading">
+            <section class="section-block reading-section" id="reading">
               <div class="section-heading">
                 <div>
-                  <p class="section-kicker">WIND DOWN · 28 MIN</p>
+                  <p class="section-kicker" id="readingKicker">LATER TONIGHT · 28 MIN</p>
                   <h2>Read past the scroll</h2>
                 </div>
               </div>
@@ -504,7 +492,7 @@
               </div>
             </section>
 
-            <section class="section-block tomorrow-card mode-copy mode-evening">
+            <section class="section-block tomorrow-card">
               <span class="tomorrow-label">TOMORROW IS SET</span>
               <h2 id="tomorrowTitle">Tomorrow begins clean.</h2>
               <p>First task at 9:00. One meeting before noon. No urgent email waiting.</p>

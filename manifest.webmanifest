@@ -1,7 +1,7 @@
 {
   "name": "Daymark — Personal brief",
   "short_name": "Daymark",
-  "description": "A personal morning brief and evening reset.",
+  "description": "A personal assistant dashboard that moves with your day.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

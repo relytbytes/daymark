@@ -1,6 +1,6 @@
 # Daymark
 
-An iPhone-first personal planning brief with a 7:00 AM plan and 9:00 PM reset.
+An iPhone-first personal assistant dashboard that shifts continuously through morning, afternoon, evening, and night.
 
 ## Preview locally
 
@@ -20,5 +20,6 @@ The web app manifest, offline cache, standalone display mode, safe-area spacing,
 
 ## Notes
 
+- The live phase, clock, framing, and refresh status update automatically throughout the day.
 - Tasks, decisions, sprint progress, and applications are saved in browser storage.
 - The brief content is intentionally sample data. Calendar, email, weather, sports, and local listings need live data connections before production use.

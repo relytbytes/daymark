@@ -186,7 +186,7 @@ a:focus-visible {
   animation: spin 0.7s ease;
 }
 
-.mode-wrap {
+.live-wrap {
   position: relative;
   z-index: 10;
   max-width: 1160px;
@@ -194,57 +194,79 @@ a:focus-visible {
   padding: 14px 20px 0;
 }
 
-.mode-switch {
+.live-strip {
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
-  padding: 4px;
+  padding: 10px 14px 13px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 15px;
   background: rgba(251, 250, 246, 0.7);
 }
 
-.mode-button {
-  position: relative;
-  z-index: 2;
-  min-height: 42px;
-  padding: 0 12px;
-  border: 0;
-  background: transparent;
+.live-now {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.live-pulse {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: 0 0 0 5px rgba(255, 96, 61, 0.1);
+  animation: breathe 1.2s ease-in-out infinite alternate;
+}
+
+.live-now > span:not(.live-pulse),
+.live-refresh {
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  transition: color 180ms ease;
 }
 
-.mode-button.is-active {
-  color: white;
-}
-
-.mode-time {
-  margin-right: 5px;
-  opacity: 0.6;
+.live-now > span:not(.live-pulse) {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.mode-indicator {
+.live-now strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-refresh {
+  white-space: nowrap;
+}
+
+.day-progress {
   position: absolute;
-  z-index: 1;
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
-  width: calc(50% - 4px);
-  border-radius: 11px;
-  background: var(--ink);
-  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--paper-deep);
 }
 
-body[data-mode="evening"] .mode-indicator {
-  transform: translateX(100%);
+.day-progress i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 0 999px 999px 0;
+  background: var(--coral);
+  transition: width 400ms ease;
 }
 
 main {
@@ -291,8 +313,25 @@ main {
   background: var(--coral);
 }
 
-body[data-mode="evening"] .hero::after {
+body[data-phase="afternoon"] .hero::after,
+body[data-phase="evening"] .hero::after,
+body[data-phase="night"] .hero::after {
   background: var(--blue);
+}
+
+body[data-phase="afternoon"] .live-pulse,
+body[data-phase="afternoon"] .day-progress i {
+  background: var(--blue);
+}
+
+body[data-phase="evening"] .live-pulse,
+body[data-phase="evening"] .day-progress i {
+  background: var(--violet);
+}
+
+body[data-phase="night"] .live-pulse,
+body[data-phase="night"] .day-progress i {
+  background: var(--acid);
 }
 
 .hero-copy {
@@ -1931,24 +1970,18 @@ footer small {
   color: white;
 }
 
-.mode-copy {
+#eveningActions {
   display: none;
 }
 
-body[data-mode="morning"] .mode-morning {
-  display: block;
-}
-
-body[data-mode="evening"] .mode-evening {
-  display: block;
-}
-
-body[data-mode="morning"] #eveningActions {
+body[data-phase="evening"] #morningActions,
+body[data-phase="night"] #morningActions {
   display: none;
 }
 
-body[data-mode="evening"] #morningActions {
-  display: none;
+body[data-phase="evening"] #eveningActions,
+body[data-phase="night"] #eveningActions {
+  display: grid;
 }
 
 .application-dialog {
@@ -2067,12 +2100,12 @@ body[data-mode="evening"] #morningActions {
     padding-left: max(28px, calc((100vw - 1160px) / 2 + 20px));
   }
 
-  .mode-wrap {
+  .live-wrap {
     padding-top: 18px;
   }
 
-  .mode-switch {
-    width: 360px;
+  .live-strip {
+    width: 420px;
     margin-left: auto;
   }
 
