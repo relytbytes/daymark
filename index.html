@@ -9,11 +9,11 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=7" />
+    <link rel="manifest" href="./manifest.webmanifest?v=8" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=7" />
-    <script src="./config.js?v=7"></script>
+    <link rel="stylesheet" href="./styles.css?v=8" />
+    <script src="./config.js?v=8"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -273,7 +273,10 @@
                   <strong>No live opportunities feed yet</strong>
                   <small>Connect a Duke search or add roles manually.</small>
                 </div>
-                <a class="round-arrow" href="https://careers.duke.edu/" target="_blank" rel="noreferrer" aria-label="Open Duke careers">↗</a>
+                <div class="duke-actions">
+                  <button type="button" data-open-job-capture aria-label="Add a Duke opportunity">＋</button>
+                  <a class="round-arrow" href="https://careers.duke.edu/" target="_blank" rel="noreferrer" aria-label="Open Duke careers">↗</a>
+                </div>
               </article>
             </section>
 
@@ -377,25 +380,25 @@
               </div>
 
               <article class="panel scorecard">
-                <div class="score-row">
-                  <div><strong>Job search</strong><small>3 of 5 actions</small></div>
-                  <div class="score-dots" aria-label="3 of 5"><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="score-row" data-score-key="jobs">
+                  <div><strong>Job search</strong><small>0 of 5 actions</small></div>
+                  <div class="score-dots" data-target="5" aria-label="0 of 5"></div>
                 </div>
-                <div class="score-row">
-                  <div><strong>Veraya</strong><small>2 of 4 milestones</small></div>
-                  <div class="score-dots score-dots--blue" aria-label="2 of 4"><i></i><i></i><i></i><i></i></div>
+                <div class="score-row" data-score-key="veraya">
+                  <div><strong>Veraya</strong><small>0 of 4 milestones</small></div>
+                  <div class="score-dots score-dots--blue" data-target="4" aria-label="0 of 4"></div>
                 </div>
-                <div class="score-row">
-                  <div><strong>Writing</strong><small>1 of 3 sessions</small></div>
-                  <div class="score-dots score-dots--violet" aria-label="1 of 3"><i></i><i></i><i></i></div>
+                <div class="score-row" data-score-key="writing">
+                  <div><strong>Writing</strong><small>0 of 3 sessions</small></div>
+                  <div class="score-dots score-dots--violet" data-target="3" aria-label="0 of 3"></div>
                 </div>
-                <div class="score-row">
-                  <div><strong>Fitness</strong><small>2 of 4 sessions</small></div>
-                  <div class="score-dots score-dots--green" aria-label="2 of 4"><i></i><i></i><i></i><i></i></div>
+                <div class="score-row" data-score-key="fitness">
+                  <div><strong>Fitness</strong><small>0 of 4 sessions</small></div>
+                  <div class="score-dots score-dots--green" data-target="4" aria-label="0 of 4"></div>
                 </div>
-                <div class="score-row">
-                  <div><strong>Household</strong><small>4 of 5 tasks</small></div>
-                  <div class="score-dots score-dots--gold" aria-label="4 of 5"><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="score-row" data-score-key="household">
+                  <div><strong>Household</strong><small>0 of 5 tasks</small></div>
+                  <div class="score-dots score-dots--gold" data-target="5" aria-label="0 of 5"></div>
                 </div>
               </article>
             </section>
@@ -434,10 +437,10 @@
                   <span class="local-icon local-icon--home" aria-hidden="true">⌂</span>
                   <div><small>HOUSING · LIVE SEARCH</small><strong>Browse Durham rentals</strong><p>Open current Zillow listings. ↗</p></div>
                 </a>
-                <article>
+                <button class="local-reminder" id="practicalReminder" type="button" data-open-reminder>
                   <span class="local-icon local-icon--bell" aria-hidden="true">!</span>
-                  <div><small>PRACTICAL · MANUAL</small><strong>No reminder set</strong><p>Your own practical reminders will live here.</p></div>
-                </article>
+                  <div><small>PRACTICAL · YOURS</small><strong id="practicalReminderTitle">Add a practical reminder</strong><p id="practicalReminderNote">Tap to capture the thing that cannot slip. ↗</p></div>
+                </button>
               </div>
             </section>
 
@@ -447,11 +450,16 @@
                   <p class="section-kicker">YOUR TEAMS</p>
                   <h2>The sporting life</h2>
                 </div>
-                <span class="quiet-label" id="sportsSource">UPDATING MLB</span>
+                <span class="sports-freshness">
+                  <b id="sportsSource">UPDATING MLB</b>
+                  <small id="sportsUpdatedAt">quietly in the background</small>
+                </span>
               </div>
 
               <a class="sports-lead" id="diamondbacksGame" href="https://www.mlb.com/dbacks/schedule" target="_blank" rel="noreferrer">
-                <span class="team-monogram">A</span>
+                <span class="team-logo-shell team-logo-shell--hero" data-abbr="AZ">
+                  <img src="https://www.mlbstatic.com/team-logos/109.svg" alt="" width="52" height="52" />
+                </span>
                 <div>
                   <small id="gameTime">DIAMONDBACKS · CHECKING SCHEDULE</small>
                   <strong id="gameOpponent">Loading official MLB data…</strong>
@@ -461,12 +469,50 @@
               </a>
 
               <article class="panel standings-panel">
-                <div class="panel-label">NL WEST <span class="panel-status" id="wildCardStatus">WILD CARD: CHECKING</span></div>
-                <div class="standing-row standing-head"><span>TEAM</span><span>W–L</span><span>GB</span></div>
-                <div id="standingsRows">
-                  <div class="standing-row standings-loading"><span>Fetching official standings…</span><span>—</span><span>—</span></div>
+                <div class="standings-titlebar">
+                  <div>
+                    <span>MLB PULSE</span>
+                    <strong>National League</strong>
+                  </div>
+                  <span class="panel-status" id="wildCardStatus">WC: CHECKING</span>
                 </div>
-                <a class="source-link" href="https://www.mlb.com/standings" target="_blank" rel="noreferrer">Official MLB data ↗</a>
+
+                <div class="dbacks-standing-focus">
+                  <span class="team-logo-shell team-logo-shell--focus" data-abbr="AZ">
+                    <img src="https://www.mlbstatic.com/team-logos/109.svg" alt="" width="58" height="58" />
+                  </span>
+                  <div class="dbacks-standing-copy">
+                    <small id="dbacksRank">NL WEST · CHECKING</small>
+                    <strong id="dbacksRecord">—–—</strong>
+                    <span>Arizona Diamondbacks</span>
+                  </div>
+                  <div class="dbacks-position">
+                    <strong id="dbacksWildCard">—</strong>
+                    <small id="dbacksWildCardDetail">wild-card position</small>
+                  </div>
+                </div>
+
+                <div class="dbacks-form">
+                  <span><small>LAST 10</small><strong id="dbacksLastTen">—</strong></span>
+                  <span><small>STREAK</small><strong id="dbacksStreak">—</strong></span>
+                  <span><small>WIN %</small><strong id="dbacksWinPct">—</strong></span>
+                </div>
+
+                <div class="standings-tabs" role="tablist" aria-label="Baseball standings view">
+                  <button class="is-active" type="button" role="tab" aria-selected="true" data-standings-view="division">NL West</button>
+                  <button type="button" role="tab" aria-selected="false" data-standings-view="wildcard">Wild Card</button>
+                </div>
+
+                <div class="standing-row standing-head" id="standingsHead">
+                  <span>TEAM</span><span>W–L</span><span>PCT</span><span>GB</span>
+                </div>
+                <div id="standingsRows">
+                  <div class="standing-row standings-loading"><span>Fetching official standings…</span><span>—</span><span>—</span><span>—</span></div>
+                </div>
+                <div class="standings-source">
+                  <span>Official MLB data · refreshes every 15 min</span>
+                  <a href="https://www.mlb.com/standings" target="_blank" rel="noreferrer">Full standings ↗</a>
+                </div>
               </article>
 
               <div class="team-ticker">
@@ -524,10 +570,11 @@
             </section>
 
             <section class="section-block tomorrow-card">
-              <span class="tomorrow-label">TOMORROW IS SET</span>
-              <h2 id="tomorrowTitle">Tomorrow begins clean.</h2>
-              <p>First task at 9:00. One meeting before noon. No urgent email waiting.</p>
-              <div><span>Alarm</span><strong>7:00 AM</strong></div>
+              <span class="tomorrow-label">TOMORROW · ACTUAL CALENDAR</span>
+              <h2 id="tomorrowTitle">Tomorrow, without guesswork.</h2>
+              <p id="tomorrowSummary">Connect Google and Daymark will build this from your real schedule.</p>
+              <div><span id="tomorrowFirstLabel">FIRST EVENT</span><strong id="tomorrowFirstValue">NOT CONNECTED</strong></div>
+              <a href="https://calendar.google.com/" target="_blank" rel="noreferrer">Open Google Calendar ↗</a>
             </section>
           </aside>
         </div>
@@ -579,6 +626,10 @@
         <label>
           Role
           <input name="role" required placeholder="Program Manager" />
+        </label>
+        <label>
+          Listing link
+          <input name="url" type="url" inputmode="url" placeholder="https://…" />
         </label>
         <label>
           Status
@@ -641,6 +692,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=7" defer></script>
+    <script src="./app.js?v=8" defer></script>
   </body>
 </html>

@@ -20,6 +20,13 @@ const defaultState = {
   readingQueue: [],
   focusTaskId: "",
   focusEndsAt: 0,
+  weeklyScores: {
+    jobs: 0,
+    veraya: 0,
+    writing: 0,
+    fitness: 0,
+    household: 0,
+  },
 };
 
 let state = loadState();
@@ -30,6 +37,9 @@ let liveFeedCount = 0;
 let googleAccessToken = "";
 let googleTokenExpiresAt = 0;
 let focusCompletionAnnounced = false;
+let currentStandingsView = "division";
+let divisionStandingsRecords = [];
+let wildCardStandingsRecords = [];
 
 const body = document.body;
 const taskInputs = [...document.querySelectorAll(".task-check")];
@@ -38,6 +48,18 @@ const applicationDialog = document.querySelector("#applicationDialog");
 const applicationForm = document.querySelector("#applicationForm");
 const captureDialog = document.querySelector("#captureDialog");
 const captureForm = document.querySelector("#captureForm");
+
+document.addEventListener(
+  "error",
+  (event) => {
+    if (!(event.target instanceof HTMLImageElement)) return;
+    if (!event.target.src.includes("mlbstatic.com/team-logos")) return;
+    const shell = event.target.closest("[data-abbr]");
+    if (shell) shell.classList.add("is-missing");
+    event.target.remove();
+  },
+  true,
+);
 
 function getDayPhase(date = new Date()) {
   const hour = date.getHours();
@@ -62,6 +84,10 @@ function loadState() {
       readingQueue: Array.isArray(saved?.readingQueue) ? saved.readingQueue : [],
       focusTaskId: typeof saved?.focusTaskId === "string" ? saved.focusTaskId : "",
       focusEndsAt: Number(saved?.focusEndsAt) || 0,
+      weeklyScores: {
+        ...defaultState.weeklyScores,
+        ...(saved?.weeklyScores || {}),
+      },
     };
   } catch {
     return { ...defaultState };
@@ -230,6 +256,7 @@ function toggleFocusTimer() {
 }
 
 function renderCaptureInbox() {
+  renderPracticalReminder();
   const container = document.querySelector("#captureItems");
   container.replaceChildren();
   if (!state.captures.length) {
@@ -261,6 +288,17 @@ function renderCaptureInbox() {
     });
     container.append(row);
   });
+}
+
+function renderPracticalReminder() {
+  const reminder = state.captures.find((item) => item.type === "reminder" && !item.done);
+  document.querySelector("#practicalReminderTitle").textContent =
+    reminder?.title || "Add a practical reminder";
+  document.querySelector("#practicalReminderNote").textContent =
+    reminder?.note || "Tap to capture the thing that cannot slip. ↗";
+  document
+    .querySelector("#practicalReminder")
+    .classList.toggle("has-reminder", Boolean(reminder));
 }
 
 function renderReadingQueue() {
@@ -339,7 +377,7 @@ function formatDate() {
   const tomorrow = new Date(date);
   tomorrow.setDate(date.getDate() + 1);
   const tomorrowName = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(tomorrow);
-  document.querySelector("#tomorrowTitle").textContent = `${tomorrowName} begins clean.`;
+  document.querySelector("#tomorrowTitle").textContent = `${tomorrowName}, without guesswork.`;
 
   const startOfYear = new Date(date.getFullYear(), 0, 1);
   const week = Math.ceil(((date - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
@@ -476,7 +514,7 @@ function connectGoogle() {
   if (!hasGoogleClientId()) {
     showToast("Google OAuth setup is required first.");
     window.open(
-      "https://github.com/relytbytes/daymark/blob/main/GOOGLE_SETUP.md",
+      new URL("./GOOGLE_SETUP.md", window.location.href).href,
       "_blank",
       "noopener,noreferrer",
     );
@@ -501,7 +539,7 @@ function connectGoogle() {
       googleAccessToken = response.access_token;
       googleTokenExpiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
       localStorage.setItem("daymark-google-was-connected", "1");
-      await loadGoogleData(true);
+      await loadGoogleData();
     },
     error_callback: () => {
       setGoogleButtonsDisabled(false);
@@ -560,6 +598,45 @@ function formatCalendarTime(event) {
     .toUpperCase();
 }
 
+function renderTomorrowFromCalendar(events) {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = formatApiDate(tomorrow);
+  const tomorrowName = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(tomorrow);
+  const tomorrowEvents = (events || [])
+    .filter((event) => event.status !== "cancelled")
+    .filter((event) => {
+      if (event.start?.date) return event.start.date === tomorrowKey;
+      return event.start?.dateTime && formatApiDate(new Date(event.start.dateTime)) === tomorrowKey;
+    })
+    .sort((a, b) => {
+      const aStart = new Date(a.start?.dateTime || `${a.start?.date}T00:00:00`);
+      const bStart = new Date(b.start?.dateTime || `${b.start?.date}T00:00:00`);
+      return aStart - bStart;
+    });
+
+  if (!tomorrowEvents.length) {
+    document.querySelector("#tomorrowTitle").textContent = `${tomorrowName} is open.`;
+    document.querySelector("#tomorrowSummary").textContent =
+      "No events are currently on your primary calendar.";
+    document.querySelector("#tomorrowFirstLabel").textContent = "CALENDAR";
+    document.querySelector("#tomorrowFirstValue").textContent = "NO EVENTS";
+    return;
+  }
+
+  const first = tomorrowEvents[0];
+  const firstTime = first.start?.date
+    ? "ALL DAY"
+    : new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
+        new Date(first.start.dateTime),
+      );
+  document.querySelector("#tomorrowTitle").textContent = `${tomorrowName} has shape.`;
+  document.querySelector("#tomorrowSummary").textContent =
+    `${tomorrowEvents.length} calendar ${tomorrowEvents.length === 1 ? "event" : "events"}. First: ${first.summary || "Untitled event"}.`;
+  document.querySelector("#tomorrowFirstLabel").textContent = "FIRST EVENT";
+  document.querySelector("#tomorrowFirstValue").textContent = firstTime;
+}
+
 function renderCalendar(data) {
   const now = new Date();
   const events = (data.items || [])
@@ -572,6 +649,7 @@ function renderCalendar(data) {
 
   document.querySelector("#calendarStatus").textContent = `LIVE · ${events.length}`;
   document.querySelector("#calendarStatus").classList.remove("disconnected-status");
+  renderTomorrowFromCalendar(data.items || []);
 
   if (events.length === 0) {
     document.querySelector("#calendarContent").innerHTML =
@@ -687,7 +765,7 @@ function renderGooglePanelError(type, message) {
   bindGoogleConnectButtons();
 }
 
-async function loadGoogleData(announce = false) {
+async function loadGoogleData() {
   document.querySelector("#calendarStatus").textContent = "SYNCING";
   document.querySelector("#emailStatus").textContent = "SYNCING";
   const [calendarResult, emailResult] = await Promise.allSettled([
@@ -702,11 +780,6 @@ async function loadGoogleData(announce = false) {
   else renderGooglePanelError("email", "Gmail access needs attention.");
 
   setGoogleButtonsDisabled(false);
-  if (announce) {
-    const connectedCount =
-      Number(calendarResult.status === "fulfilled") + Number(emailResult.status === "fulfilled");
-    showToast(`${connectedCount} of 2 Google feeds connected.`);
-  }
 }
 
 function writeLiveCache(key, data) {
@@ -783,46 +856,166 @@ function getTeamDisplay(team) {
   return names[team.abbreviation] || team.shortName || team.name;
 }
 
-function getTeamDotClass(abbreviation) {
-  return {
-    LAD: "team-dot--la",
-    AZ: "team-dot--az",
-    SD: "team-dot--sd",
-    SF: "team-dot--sf",
-    COL: "team-dot--col",
-  }[abbreviation] || "";
+function getTeamPage(teamId) {
+  const slugs = {
+    109: "dbacks",
+    112: "cubs",
+    113: "reds",
+    115: "rockies",
+    119: "dodgers",
+    120: "nationals",
+    121: "mets",
+    134: "pirates",
+    135: "padres",
+    137: "giants",
+    138: "cardinals",
+    143: "phillies",
+    144: "braves",
+    146: "marlins",
+    158: "brewers",
+  };
+  return `https://www.mlb.com/${slugs[teamId] || ""}`;
 }
 
-function renderBaseball(standingsData, scheduleData, source = "live") {
-  const division = standingsData.records.find((record) => record.division?.id === 203);
-  if (!division) throw new Error("NL West standings were missing.");
+function getTeamLogo(teamId) {
+  return `https://www.mlbstatic.com/team-logos/${teamId}.svg`;
+}
 
-  const teams = [...division.teamRecords].sort(
-    (a, b) => Number(a.divisionRank) - Number(b.divisionRank),
+function formatGamesBack(value) {
+  return !value || value === "-" ? "—" : value;
+}
+
+function getLastTen(record) {
+  const split = record?.records?.splitRecords?.find(
+    (item) => item.type === "lastTen" || item.type === "lastTenGames",
   );
-  const standingsRows = document.querySelector("#standingsRows");
-  standingsRows.innerHTML = teams
+  return split ? `${split.wins}–${split.losses}` : "—";
+}
+
+function extractWildCardRecords(data) {
+  const unique = new Map();
+  (data?.records || []).forEach((group) => {
+    (group.teamRecords || []).forEach((record) => {
+      const existing = unique.get(record.team.id);
+      if (!existing || (!existing.wildCardRank && record.wildCardRank)) {
+        unique.set(record.team.id, record);
+      }
+    });
+  });
+  return [...unique.values()]
+    .filter((record) => Number(record.divisionRank) !== 1)
+    .filter((record) => Number(record.wildCardRank) > 0)
+    .sort((a, b) => Number(a.wildCardRank) - Number(b.wildCardRank));
+}
+
+function getVisibleWildCardRecords(records) {
+  return records.slice(0, 8);
+}
+
+function renderStandingsView(view = currentStandingsView) {
+  currentStandingsView = view;
+  const isWildCard = view === "wildcard";
+  const records = isWildCard
+    ? getVisibleWildCardRecords(wildCardStandingsRecords)
+    : divisionStandingsRecords;
+  const rows = document.querySelector("#standingsRows");
+
+  document.querySelectorAll("[data-standings-view]").forEach((button) => {
+    const selected = button.dataset.standingsView === view;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-selected", String(selected));
+  });
+
+  if (!records.length) {
+    rows.innerHTML =
+      '<div class="standing-row standings-loading"><span>Standings unavailable.</span><span>—</span><span>—</span><span>—</span></div>';
+    return;
+  }
+
+  rows.innerHTML = records
     .map((record) => {
-      const abbreviation = record.team.abbreviation;
+      const rank = Number(isWildCard ? record.wildCardRank : record.divisionRank);
       const favoriteClass = record.team.id === 109 ? " is-favorite" : "";
-      const gamesBack = record.divisionGamesBack === "-" ? "—" : record.divisionGamesBack;
+      const cutlineClass = isWildCard && rank === 4 ? " is-cutline" : "";
+      const gamesBack = formatGamesBack(
+        isWildCard ? record.wildCardGamesBack : record.divisionGamesBack,
+      );
+      const percentage = record.winningPercentage || "—";
       return `
-        <div class="standing-row${favoriteClass}">
-          <span><i class="team-dot ${getTeamDotClass(abbreviation)}"></i>${escapeHtml(getTeamDisplay(record.team))}</span>
+        <a class="standing-row${favoriteClass}${cutlineClass}" href="${getTeamPage(record.team.id)}" target="_blank" rel="noreferrer">
+          <span class="standing-team">
+            <b>${rank || "—"}</b>
+            <span class="standing-logo" data-abbr="${escapeHtml(record.team.abbreviation || "")}"><img src="${getTeamLogo(record.team.id)}" alt="" loading="lazy" width="28" height="28" /></span>
+            <span><strong>${escapeHtml(getTeamDisplay(record.team))}</strong><small>${escapeHtml(record.team.abbreviation || "")}</small></span>
+          </span>
           <span>${record.wins}–${record.losses}</span>
+          <span>${escapeHtml(percentage)}</span>
           <span>${escapeHtml(gamesBack)}</span>
-        </div>
+        </a>
       `;
     })
     .join("");
+}
 
-  const arizona = teams.find((record) => record.team.id === 109);
-  if (arizona) {
-    const wildcard = arizona.wildCardRank
-      ? `WC #${arizona.wildCardRank} · ${arizona.wildCardGamesBack === "-" ? "IN" : `${arizona.wildCardGamesBack} GB`}`
-      : "WILD CARD: —";
-    document.querySelector("#wildCardStatus").textContent = wildcard;
+function renderDbacksStanding(divisionRecord, wildCardRecord) {
+  if (!divisionRecord) return;
+  const divisionRank = Number(divisionRecord.divisionRank);
+  const wildCardRank = Number(wildCardRecord?.wildCardRank || divisionRecord.wildCardRank);
+  const wildCardGamesBack =
+    wildCardRecord?.wildCardGamesBack ?? divisionRecord.wildCardGamesBack;
+  const divisionLeader = divisionRank === 1;
+  const inWildCard = wildCardRank > 0 && wildCardRank <= 3;
+  const status = divisionLeader
+    ? "DIV LEAD"
+    : wildCardRank
+      ? `WC #${wildCardRank}`
+      : "WC —";
+  const detail = divisionLeader
+    ? "division position"
+    : inWildCard
+      ? "inside playoff line"
+      : wildCardRank
+        ? `${formatGamesBack(wildCardGamesBack)} GB from WC lead`
+        : "wild-card position";
+
+  document.querySelector("#dbacksRank").textContent = `NL WEST · #${divisionRank || "—"}`;
+  document.querySelector("#dbacksRecord").textContent =
+    `${divisionRecord.wins}–${divisionRecord.losses}`;
+  document.querySelector("#dbacksWildCard").textContent = status;
+  document.querySelector("#dbacksWildCardDetail").textContent = detail;
+  document.querySelector("#dbacksLastTen").textContent = getLastTen(divisionRecord);
+  document.querySelector("#dbacksStreak").textContent =
+    divisionRecord.streak?.streakCode || "—";
+  document.querySelector("#dbacksWinPct").textContent =
+    divisionRecord.winningPercentage || "—";
+  document.querySelector("#wildCardStatus").textContent =
+    divisionLeader ? "DIVISION LEADER" : status;
+  document
+    .querySelector(".dbacks-position")
+    .classList.toggle("is-in", divisionLeader || inWildCard);
+}
+
+function renderBaseball(
+  standingsData,
+  wildCardData,
+  scheduleData,
+  source = "live",
+  updatedAt = new Date(),
+) {
+  const division = standingsData.records.find((record) => record.division?.id === 203);
+  if (!division) throw new Error("NL West standings were missing.");
+
+  divisionStandingsRecords = [...division.teamRecords].sort(
+    (a, b) => Number(a.divisionRank) - Number(b.divisionRank),
+  );
+  wildCardStandingsRecords = extractWildCardRecords(wildCardData || standingsData);
+  if (!wildCardStandingsRecords.length) {
+    wildCardStandingsRecords = extractWildCardRecords(standingsData);
   }
+  const arizonaDivision = divisionStandingsRecords.find((record) => record.team.id === 109);
+  const arizonaWildCard = wildCardStandingsRecords.find((record) => record.team.id === 109);
+  renderDbacksStanding(arizonaDivision, arizonaWildCard);
+  renderStandingsView(currentStandingsView);
 
   const games = scheduleData.dates.flatMap((date) => date.games || []);
   const today = formatApiDate(new Date());
@@ -834,7 +1027,12 @@ function renderBaseball(standingsData, scheduleData, source = "live") {
   else renderNoDiamondbacksGame();
 
   document.querySelector("#sportsSource").textContent =
-    source === "live" ? "LIVE · OFFICIAL MLB" : "CACHED · MLB";
+    source === "live" ? "OFFICIAL MLB" : "CACHED MLB";
+  const timestamp = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(updatedAt));
+  document.querySelector("#sportsUpdatedAt").textContent = `updated ${timestamp}`;
 }
 
 function renderDiamondbacksGame(game) {
@@ -881,15 +1079,22 @@ function renderNoDiamondbacksGame() {
 }
 
 function renderBaseballError() {
-  document.querySelector("#sportsSource").textContent = "MLB DATA UNAVAILABLE";
-  document.querySelector("#wildCardStatus").textContent = "WILD CARD: UNAVAILABLE";
+  document.querySelector("#sportsSource").textContent = "MLB UNAVAILABLE";
+  document.querySelector("#sportsUpdatedAt").textContent = "will retry quietly";
+  document.querySelector("#wildCardStatus").textContent = "WC: UNAVAILABLE";
+  document.querySelector("#dbacksRank").textContent = "NL WEST · UNAVAILABLE";
+  document.querySelector("#dbacksWildCard").textContent = "—";
+  document.querySelector("#dbacksWildCardDetail").textContent = "wild-card position";
+  document.querySelector("#dbacksLastTen").textContent = "—";
+  document.querySelector("#dbacksStreak").textContent = "—";
+  document.querySelector("#dbacksWinPct").textContent = "—";
   document.querySelector("#standingsRows").innerHTML =
-    '<div class="standing-row standings-loading"><span>Could not reach MLB.</span><span>—</span><span>—</span></div>';
+    '<div class="standing-row standings-loading"><span>Could not reach MLB.</span><span>—</span><span>—</span><span>—</span></div>';
   document.querySelector("#gameOpponent").textContent = "MLB data unavailable";
   document.querySelector("#gameDetail").textContent = "Tap to open the official schedule.";
 }
 
-async function fetchLiveData(announce = false) {
+async function fetchLiveData() {
   if (liveRefreshInFlight) return;
   liveRefreshInFlight = true;
   const sync = document.querySelector("#syncState");
@@ -909,16 +1114,21 @@ async function fetchLiveData(announce = false) {
   const standingsUrl =
     `https://statsapi.mlb.com/api/v1/standings?leagueId=104&season=${season}` +
     "&standingsTypes=regularSeason&hydrate=team,division";
+  const wildCardUrl =
+    `https://statsapi.mlb.com/api/v1/standings?leagueId=104&season=${season}` +
+    "&standingsTypes=wildCard&hydrate=team,division";
   const scheduleUrl =
     `https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=109` +
     `&startDate=${formatApiDate(now)}&endDate=${formatApiDate(end)}` +
     "&hydrate=probablePitcher,team";
 
-  const [weatherResult, standingsResult, scheduleResult] = await Promise.allSettled([
-    fetchJson(weatherUrl),
-    fetchJson(standingsUrl),
-    fetchJson(scheduleUrl),
-  ]);
+  const [weatherResult, standingsResult, wildCardResult, scheduleResult] =
+    await Promise.allSettled([
+      fetchJson(weatherUrl),
+      fetchJson(standingsUrl),
+      fetchJson(wildCardUrl),
+      fetchJson(scheduleUrl),
+    ]);
 
   liveFeedCount = 0;
   if (weatherResult.status === "fulfilled") {
@@ -932,16 +1142,30 @@ async function fetchLiveData(announce = false) {
   }
 
   if (standingsResult.status === "fulfilled" && scheduleResult.status === "fulfilled") {
-    renderBaseball(standingsResult.value, scheduleResult.value);
+    const wildCardData =
+      wildCardResult.status === "fulfilled" ? wildCardResult.value : standingsResult.value;
+    renderBaseball(standingsResult.value, wildCardData, scheduleResult.value);
     writeLiveCache(BASEBALL_CACHE_KEY, {
-      standings: standingsResult.value,
+      divisionStandings: standingsResult.value,
+      wildCardStandings: wildCardData,
       schedule: scheduleResult.value,
     });
     liveFeedCount += 1;
   } else {
     const cached = readLiveCache(BASEBALL_CACHE_KEY);
-    if (cached?.data) renderBaseball(cached.data.standings, cached.data.schedule, "cached");
-    else renderBaseballError();
+    const cachedDivision = cached?.data?.divisionStandings || cached?.data?.standings;
+    const cachedWildCard = cached?.data?.wildCardStandings || cachedDivision;
+    if (cachedDivision && cached?.data?.schedule) {
+      renderBaseball(
+        cachedDivision,
+        cachedWildCard,
+        cached.data.schedule,
+        "cached",
+        cached.savedAt,
+      );
+    } else {
+      renderBaseballError();
+    }
   }
 
   lastRefreshAt = new Date();
@@ -950,14 +1174,7 @@ async function fetchLiveData(announce = false) {
   syncLabel.textContent = `${liveFeedCount}/2 live`;
   updateRefreshCountdown(lastRefreshAt);
   if (googleAccessToken && Date.now() < googleTokenExpiresAt) {
-    await loadGoogleData(false);
-  }
-  if (announce) {
-    showToast(
-      liveFeedCount === 2
-        ? "Weather and MLB data are current."
-        : `${liveFeedCount} of 2 live feeds updated.`,
-    );
+    await loadGoogleData();
   }
 }
 
@@ -1000,6 +1217,40 @@ function updateSprintProgress() {
   const percentage = Math.round((done / sprintInputs.length) * 100);
   document.querySelector("#sprintPercent").textContent = `${percentage}%`;
   document.querySelector("#sprintTrack").style.width = `${percentage}%`;
+}
+
+function renderWeeklyScorecard() {
+  const units = {
+    jobs: "actions",
+    veraya: "milestones",
+    writing: "sessions",
+    fitness: "sessions",
+    household: "tasks",
+  };
+
+  document.querySelectorAll("[data-score-key]").forEach((row) => {
+    const key = row.dataset.scoreKey;
+    const dots = row.querySelector(".score-dots");
+    const target = Number(dots.dataset.target);
+    const current = Math.max(0, Math.min(target, Number(state.weeklyScores[key]) || 0));
+    const label = row.querySelector("strong").textContent;
+    row.querySelector("small").textContent = `${current} of ${target} ${units[key]}`;
+    dots.setAttribute("aria-label", `${current} of ${target}`);
+    dots.replaceChildren();
+
+    for (let value = 1; value <= target; value += 1) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.classList.toggle("is-filled", value <= current);
+      button.setAttribute("aria-label", `Set ${label} to ${value} of ${target}`);
+      button.addEventListener("click", () => {
+        state.weeklyScores[key] = current === value ? value - 1 : value;
+        saveState();
+        renderWeeklyScorecard();
+      });
+      dots.append(button);
+    }
+  });
 }
 
 function hydrateDecisions() {
@@ -1107,10 +1358,14 @@ document.querySelector("#refreshBrief").addEventListener("click", async (event) 
   const button = event.currentTarget;
   button.classList.add("is-spinning");
   try {
-    await fetchLiveData(true);
+    await fetchLiveData();
   } finally {
     button.classList.remove("is-spinning");
   }
+});
+
+document.querySelectorAll("[data-standings-view]").forEach((button) => {
+  button.addEventListener("click", () => renderStandingsView(button.dataset.standingsView));
 });
 
 document.querySelector("#openApplicationDialog").addEventListener("click", () => {
@@ -1129,12 +1384,19 @@ applicationDialog.addEventListener("click", (event) => {
 applicationForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(applicationForm);
+  const rawUrl = String(formData.get("url") || "").trim();
+  const url = normalizeUrl(rawUrl);
+  if (rawUrl && !url) {
+    showToast("That listing link does not look valid yet.");
+    return;
+  }
   state.applications.unshift({
     id: `app-${Date.now()}`,
     organization: formData.get("organization").trim(),
     role: formData.get("role").trim(),
     status: formData.get("status"),
     nextStep: formData.get("nextStep").trim() || "Choose next step",
+    url,
   });
   saveState();
   renderApplications();
@@ -1145,6 +1407,14 @@ applicationForm.addEventListener("submit", (event) => {
 
 document.querySelectorAll("[data-open-capture]").forEach((button) => {
   button.addEventListener("click", () => openCaptureDialog("task"));
+});
+
+document.querySelectorAll("[data-open-reminder]").forEach((button) => {
+  button.addEventListener("click", () => openCaptureDialog("reminder"));
+});
+
+document.querySelectorAll("[data-open-job-capture]").forEach((button) => {
+  button.addEventListener("click", () => openCaptureDialog("job"));
 });
 
 document.querySelector("#openReadingCapture").addEventListener("click", () => {
@@ -1274,6 +1544,7 @@ hydrateDecisions();
 renderApplications();
 renderCaptureInbox();
 renderReadingQueue();
+renderWeeklyScorecard();
 updateLiveDay();
 updateSprintProgress();
 renderFocusRail();
@@ -1284,6 +1555,6 @@ window.setInterval(updateFocusTimer, 1000);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=7").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=8").catch(() => {});
   });
 }
