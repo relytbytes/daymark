@@ -209,11 +209,47 @@ a:focus-visible {
   background: rgba(251, 250, 246, 0.7);
 }
 
-.live-now {
+.live-date,
+.live-phase {
   display: flex;
   gap: 8px;
   align-items: center;
   min-width: 0;
+}
+
+.live-date {
+  gap: 5px;
+}
+
+.live-date strong,
+.live-date span,
+.live-strip > time {
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.live-date span {
+  color: var(--muted);
+}
+
+.live-phase {
+  justify-content: center;
+  color: var(--muted);
+}
+
+.live-phase strong {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-strip > time {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .live-pulse {
@@ -224,31 +260,6 @@ a:focus-visible {
   background: var(--coral);
   box-shadow: 0 0 0 5px rgba(255, 96, 61, 0.1);
   animation: breathe 1.2s ease-in-out infinite alternate;
-}
-
-.live-now > span:not(.live-pulse),
-.live-refresh {
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.live-now > span:not(.live-pulse) {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.live-now strong {
-  overflow: hidden;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.live-refresh {
-  white-space: nowrap;
 }
 
 .day-progress {
@@ -709,28 +720,31 @@ body[data-phase="night"] .day-progress i {
 .capture-row {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   min-height: 58px;
   padding: 10px 15px;
   border-bottom: 1px solid rgba(216, 211, 201, 0.65);
-  cursor: pointer;
 }
 
 .capture-row:last-child {
   border-bottom: 0;
 }
 
-.capture-row input {
+.capture-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.capture-toggle input {
   position: absolute;
   width: 1px;
   height: 1px;
   opacity: 0;
-}
-
-.capture-row .mini-check {
-  grid-row: 1;
 }
 
 .capture-row strong,
@@ -757,6 +771,25 @@ body[data-phase="night"] .day-progress i {
   border-color: var(--green);
   background: var(--green);
   color: white;
+}
+
+.item-archive,
+.item-edit {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.item-edit {
+  color: var(--blue);
+  font-size: 12px;
 }
 
 .action-card {
@@ -912,6 +945,18 @@ body[data-phase="night"] .day-progress i {
   font-size: 11px;
   font-weight: 800;
   background: transparent;
+}
+
+.section-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.text-button--muted {
+  color: var(--muted);
+  font-size: 8px;
 }
 
 .add-button {
@@ -1261,6 +1306,12 @@ body[data-phase="night"] .day-progress i {
   border-bottom: 1px solid #e4e0d8;
 }
 
+.application-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .application-row:last-child {
   border-bottom: 0;
   padding-bottom: 0;
@@ -1349,6 +1400,12 @@ body[data-phase="night"] .day-progress i {
 
 .status-button[data-status="Interested"] {
   color: var(--muted);
+}
+
+.status-button[data-status="Offer"] {
+  border-color: var(--green);
+  background: #eaf5ef;
+  color: #23664a;
 }
 
 .duke-watch {
@@ -1646,6 +1703,10 @@ body[data-phase="night"] .day-progress i {
   letter-spacing: 0.1em;
 }
 
+.sports-freshness.is-stale b {
+  color: var(--gold);
+}
+
 .sports-freshness small {
   margin-top: 3px;
   color: var(--muted);
@@ -1725,9 +1786,14 @@ body[data-phase="night"] .day-progress i {
 
 .weather-card {
   overflow: hidden;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: #bddbff;
   color: #142044;
+}
+
+.weather-card.is-stale {
+  border-color: rgba(216, 165, 43, 0.72);
 }
 
 .weather-top {
@@ -2607,15 +2673,27 @@ body[data-phase="night"] .day-progress i {
   white-space: nowrap;
 }
 
-.reading-queue-row > button {
+.reading-row-actions {
+  display: grid;
+  grid-template-columns: auto 34px;
+  border-left: 1px solid rgba(216, 211, 201, 0.7);
+}
+
+.reading-row-actions .reading-toggle {
   min-width: 52px;
   padding: 0 10px;
   border: 0;
-  border-left: 1px solid rgba(216, 211, 201, 0.7);
   background: transparent;
   color: var(--blue);
   font-size: 7px;
   font-weight: 850;
+}
+
+.reading-row-actions .item-archive {
+  align-self: center;
+  justify-self: center;
+  width: 26px;
+  height: 26px;
 }
 
 .reading-queue-row.is-read {

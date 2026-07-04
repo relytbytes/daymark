@@ -9,11 +9,11 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=8" />
+    <link rel="manifest" href="./manifest.webmanifest?v=9" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=8" />
-    <script src="./config.js?v=8"></script>
+    <link rel="stylesheet" href="./styles.css?v=9" />
+    <script src="./config.js?v=9"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -30,7 +30,7 @@
         <div class="topbar-actions">
           <span class="sync-state" id="syncState">
             <span class="sync-dot"></span>
-            <span class="sync-label">live</span>
+            <span class="sync-label">waiting</span>
           </span>
           <button class="icon-button capture-trigger" type="button" data-open-capture aria-label="Quick capture">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -46,13 +46,16 @@
       </header>
 
       <div class="live-wrap">
-        <div class="live-strip" aria-label="Live dashboard status">
-          <div class="live-now">
+        <div class="live-strip" aria-label="Current day, date, time and day phase">
+          <div class="live-date">
+            <strong id="stripDay">THURSDAY</strong>
+            <span id="stripDate">JULY 2</span>
+          </div>
+          <div class="live-phase">
             <span class="live-pulse" aria-hidden="true"></span>
-            <span id="currentTime">9:41 AM</span>
             <strong id="phaseLabel">Morning runway</strong>
           </div>
-          <span class="live-refresh" id="nextRefresh">refreshes in 15 min</span>
+          <time id="currentTime" datetime="">9:41 AM</time>
           <span class="day-progress" aria-hidden="true"><i id="dayProgress"></i></span>
         </div>
       </div>
@@ -114,9 +117,9 @@
                     <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
                   </span>
                   <span class="action-content">
-                    <span class="action-topline"><span>JOB SEARCH</span><time>by 10:00</time></span>
-                    <strong>Send Duke follow-up to Lena</strong>
-                    <small>Use the note from Tuesday; ask about the policy team opening.</small>
+                    <span class="action-topline"><span>JOB SEARCH</span><time>one move</time></span>
+                    <strong>Move one real application forward</strong>
+                    <small>Follow up, apply, or add the next concrete opportunity.</small>
                   </span>
                   <span class="action-arrow" aria-hidden="true">↗</span>
                 </label>
@@ -127,9 +130,9 @@
                     <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
                   </span>
                   <span class="action-content">
-                    <span class="action-topline"><span>VERAYA</span><time>90 min focus</time></span>
-                    <strong>Finish the pricing narrative</strong>
-                    <small>Decide the wedge. Draft the three-sentence customer story.</small>
+                    <span class="action-topline"><span>VERAYA</span><time>focus block</time></span>
+                    <strong>Advance the current Veraya milestone</strong>
+                    <small>Choose the smallest piece of evidence that changes the work.</small>
                   </span>
                   <span class="action-arrow" aria-hidden="true">↗</span>
                 </label>
@@ -140,9 +143,9 @@
                     <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg>
                   </span>
                   <span class="action-content">
-                    <span class="action-topline"><span>APPLICATION</span><time>by 16:00</time></span>
-                    <strong>Submit Public Affairs application</strong>
-                    <small>Final pass on the cover letter, then send. Good enough is done.</small>
+                    <span class="action-topline"><span>PRACTICAL</span><time>close one loop</time></span>
+                    <strong>Clear one captured loose end</strong>
+                    <small>Use your inbox below; choose the item that will keep resurfacing.</small>
                   </span>
                   <span class="action-arrow" aria-hidden="true">↗</span>
                 </label>
@@ -156,8 +159,8 @@
                   </span>
                   <span class="action-content">
                     <span class="action-topline"><span>JOB SEARCH</span><time>5 min</time></span>
-                    <strong>Log today’s Duke outreach</strong>
-                    <small>Capture the follow-up date so nothing lives in your head.</small>
+                    <strong>Update the job pipeline</strong>
+                    <small>Record what moved and the next follow-up date.</small>
                   </span>
                   <span class="action-arrow" aria-hidden="true">↗</span>
                 </label>
@@ -169,8 +172,8 @@
                   </span>
                   <span class="action-content">
                     <span class="action-topline"><span>VERAYA</span><time>10 min</time></span>
-                    <strong>Capture the pricing decision</strong>
-                    <small>Write the decision, why it won, and what would change your mind.</small>
+                    <strong>Capture today’s Veraya decision</strong>
+                    <small>Write what changed, why it changed, and the next test.</small>
                   </span>
                   <span class="action-arrow" aria-hidden="true">↗</span>
                 </label>
@@ -207,7 +210,10 @@
                   <p class="section-kicker" id="signalKicker">WHAT’S IN MOTION</p>
                   <h2 id="signalTitle">Calendar + priority mail</h2>
                 </div>
-                <button class="text-button" type="button" data-scroll="decisions">Decide next</button>
+                <div class="section-heading-actions">
+                  <button class="text-button text-button--muted" id="disconnectGoogle" type="button" hidden>End Google session</button>
+                  <button class="text-button" type="button" data-scroll="decisions">Decide next</button>
+                </div>
               </div>
 
               <div class="signal-grid">
@@ -283,8 +289,8 @@
             <section class="section-block" id="veraya">
               <div class="section-heading">
                 <div>
-                  <p class="section-kicker">VERAYA · SPRINT 04</p>
-                  <h2>Make the offer legible</h2>
+                  <p class="section-kicker">VERAYA · CURRENT SPRINT</p>
+                  <h2>Choose the next proof</h2>
                 </div>
                 <div class="sprint-score"><strong id="sprintPercent">50%</strong><span>complete</span></div>
               </div>
@@ -293,28 +299,28 @@
                 <div class="sprint-track" aria-hidden="true"><span id="sprintTrack"></span></div>
                 <div class="sprint-context">
                   <span>THIS WEEK</span>
-                  <p>Turn customer interviews into one clear offer and a testable price.</p>
+                  <p>Use this board as a lightweight weekly spine, not a fictional project report.</p>
                 </div>
                 <div class="sprint-tasks">
                   <label data-task="veraya-interviews">
-                    <input type="checkbox" class="task-check" checked />
+                    <input type="checkbox" class="task-check" />
                     <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
-                    <span><strong>Synthesize five interviews</strong><small>Done · 3 themes emerged</small></span>
+                    <span><strong>Define this week’s outcome</strong><small>Write one observable result</small></span>
                   </label>
                   <label data-task="veraya-draft">
-                    <input type="checkbox" class="task-check" checked />
+                    <input type="checkbox" class="task-check" />
                     <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
-                    <span><strong>Draft offer architecture</strong><small>Done · v2 in notes</small></span>
+                    <span><strong>Review the strongest evidence</strong><small>Customer, market, or product signal</small></span>
                   </label>
                   <label data-task="veraya-price">
                     <input type="checkbox" class="task-check" />
                     <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
-                    <span><strong>Choose a pricing wedge</strong><small>Next · needs one decision</small></span>
+                    <span><strong>Choose the next test</strong><small>Small, specific, and falsifiable</small></span>
                   </label>
                   <label data-task="veraya-page">
                     <input type="checkbox" class="task-check" />
                     <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
-                    <span><strong>Write the landing page spine</strong><small>Waiting on pricing</small></span>
+                    <span><strong>Publish or schedule the next move</strong><small>Give the sprint a finish line</small></span>
                   </label>
                 </div>
               </article>
@@ -346,11 +352,11 @@
                 <article class="decision-card" data-decision="duke-event">
                   <span class="decision-number">02</span>
                   <div>
-                    <strong>Create a Duke jobs alert?</strong>
-                    <small>Use the official careers site so new roles have a real source.</small>
+                    <strong>Open Duke’s alert setup?</strong>
+                    <small>Daymark cannot create the alert for you; use the official careers site.</small>
                     <div class="choice-row">
-                      <button type="button" data-choice="Yes">Yes</button>
-                      <button type="button" data-choice="No">No</button>
+                      <button type="button" data-choice="Open">Open</button>
+                      <button type="button" data-choice="Later">Later</button>
                       <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
                     </div>
                   </div>
@@ -358,10 +364,10 @@
                 <article class="decision-card" data-decision="housing-tour">
                   <span class="decision-number">03</span>
                   <div>
-                    <strong>Save a Durham housing search?</strong>
-                    <small>Choose your real filters before listing alerts appear here.</small>
+                    <strong>Open the Durham rental search?</strong>
+                    <small>Set and save your real filters on Zillow; Daymark will not invent listings.</small>
                     <div class="choice-row">
-                      <button type="button" data-choice="Save">Save</button>
+                      <button type="button" data-choice="Open">Open</button>
                       <button type="button" data-choice="Later">Later</button>
                       <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
                     </div>
@@ -510,7 +516,7 @@
                   <div class="standing-row standings-loading"><span>Fetching official standings…</span><span>—</span><span>—</span><span>—</span></div>
                 </div>
                 <div class="standings-source">
-                  <span>Official MLB data · refreshes every 15 min</span>
+                  <span>Official MLB data · 30 sec live / 60 sec otherwise</span>
                   <a href="https://www.mlb.com/standings" target="_blank" rel="noreferrer">Full standings ↗</a>
                 </div>
               </article>
@@ -582,7 +588,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day.</small>
+          <small>Daymark keeps the signal. You keep the day. · BUILD 9</small>
         </footer>
       </main>
 
@@ -615,7 +621,7 @@
         <div class="dialog-header">
           <div>
             <p class="section-kicker">JOB SEARCH</p>
-            <h2>Add an application</h2>
+            <h2 id="applicationDialogTitle">Add an application</h2>
           </div>
           <button class="dialog-close" type="button" id="closeApplicationDialog" aria-label="Close">×</button>
         </div>
@@ -638,13 +644,14 @@
             <option selected>Applied</option>
             <option>Follow-up</option>
             <option>Interview</option>
+            <option>Offer</option>
           </select>
         </label>
         <label>
           Next step
           <input name="nextStep" placeholder="Follow up Friday" />
         </label>
-        <button class="dialog-submit" value="default" type="submit">Add to tracker</button>
+        <button class="dialog-submit" id="applicationSubmit" value="default" type="submit">Add to tracker</button>
       </form>
     </dialog>
 
@@ -692,6 +699,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=8" defer></script>
+    <script src="./app.js?v=9" defer></script>
   </body>
 </html>

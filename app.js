@@ -1,19 +1,33 @@
 const STORAGE_KEY = "daymark-state-v1";
 const WEATHER_CACHE_KEY = "daymark-weather-cache-v1";
 const BASEBALL_CACHE_KEY = "daymark-baseball-cache-v1";
-const REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
+const STATE_SCHEMA_VERSION = 9;
+const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const BASEBALL_REFRESH_INTERVAL_MS = 60 * 1000;
+const BASEBALL_LIVE_REFRESH_INTERVAL_MS = 30 * 1000;
+const GOOGLE_REFRESH_INTERVAL_MS = 2 * 60 * 1000;
+const REFRESH_SCHEDULER_INTERVAL_MS = 15 * 1000;
 const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/gmail.readonly",
 ].join(" ");
 const DEMO_APPLICATION_IDS = new Set(["duke-policy", "public-affairs", "foundation", "dataworks"]);
+const DAILY_TASK_IDS = new Set([
+  "duke-followup",
+  "veraya-pricing",
+  "submit-application",
+  "log-duke",
+  "veraya-decision",
+  "tomorrow-first",
+]);
 const initialApplications = [];
 
 const defaultState = {
-  tasks: {
-    "veraya-interviews": true,
-    "veraya-draft": true,
-  },
+  schemaVersion: STATE_SCHEMA_VERSION,
+  dayKey: "",
+  weekKey: "",
+  tasks: {},
   decisions: {},
   applications: initialApplications,
   captures: [],
@@ -31,15 +45,21 @@ const defaultState = {
 
 let state = loadState();
 let toastTimer;
-let lastRefreshAt = new Date();
-let liveRefreshInFlight = false;
-let liveFeedCount = 0;
+let lastWeatherRefreshAt = 0;
+let lastBaseballRefreshAt = 0;
+let lastGoogleRefreshAt = 0;
+let weatherRefreshInFlight = false;
+let baseballRefreshInFlight = false;
+let publicFeedStatus = { weather: "checking", baseball: "checking" };
 let googleAccessToken = "";
 let googleTokenExpiresAt = 0;
 let focusCompletionAnnounced = false;
+let baseballGameIsLive = false;
 let currentStandingsView = "division";
 let divisionStandingsRecords = [];
 let wildCardStandingsRecords = [];
+let navScrollLockUntil = 0;
+let navScrollFrame = 0;
 
 const body = document.body;
 const taskInputs = [...document.querySelectorAll(".task-check")];
@@ -72,9 +92,10 @@ function getDayPhase(date = new Date()) {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return {
+    const hydrated = {
       ...defaultState,
       ...saved,
+      schemaVersion: STATE_SCHEMA_VERSION,
       tasks: { ...defaultState.tasks, ...(saved?.tasks || {}) },
       decisions: { ...defaultState.decisions, ...(saved?.decisions || {}) },
       applications: Array.isArray(saved?.applications)
@@ -89,13 +110,50 @@ function loadState() {
         ...(saved?.weeklyScores || {}),
       },
     };
+    return rollStatePeriods(hydrated, Number(saved?.schemaVersion) || 0);
   } catch {
-    return { ...defaultState };
+    return rollStatePeriods({ ...defaultState }, 0);
   }
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function getWeekKey(date = new Date()) {
+  const monday = new Date(date);
+  const day = monday.getDay();
+  monday.setDate(monday.getDate() - ((day + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  return formatApiDate(monday);
+}
+
+function rollStatePeriods(candidate, previousSchemaVersion = STATE_SCHEMA_VERSION) {
+  const todayKey = formatApiDate(new Date());
+  const weekKey = getWeekKey();
+
+  if (previousSchemaVersion < STATE_SCHEMA_VERSION) {
+    delete candidate.tasks["veraya-interviews"];
+    delete candidate.tasks["veraya-draft"];
+  }
+
+  if (candidate.dayKey !== todayKey) {
+    DAILY_TASK_IDS.forEach((id) => {
+      delete candidate.tasks[id];
+    });
+    candidate.captures = candidate.captures.filter((item) => !item.done && !item.archived);
+    candidate.focusTaskId = "";
+    candidate.focusEndsAt = 0;
+    candidate.dayKey = todayKey;
+  }
+
+  if (candidate.weekKey !== weekKey) {
+    candidate.weeklyScores = { ...defaultState.weeklyScores };
+    candidate.decisions = {};
+    candidate.weekKey = weekKey;
+  }
+
+  return candidate;
 }
 
 function normalizeUrl(value) {
@@ -128,7 +186,7 @@ function getOpenFocusItems() {
     });
 
   const capturedItems = state.captures
-    .filter((item) => !item.done)
+    .filter((item) => !item.done && !item.archived)
     .map((item) => ({
       id: `capture:${item.id}`,
       kind: "capture",
@@ -258,8 +316,9 @@ function toggleFocusTimer() {
 function renderCaptureInbox() {
   renderPracticalReminder();
   const container = document.querySelector("#captureItems");
+  const visibleCaptures = state.captures.filter((item) => !item.archived);
   container.replaceChildren();
-  if (!state.captures.length) {
+  if (!visibleCaptures.length) {
     const empty = document.createElement("p");
     empty.className = "capture-empty";
     empty.textContent = "Nothing waiting. Use Capture whenever a loose end appears.";
@@ -267,16 +326,19 @@ function renderCaptureInbox() {
     return;
   }
 
-  state.captures.forEach((item) => {
-    const row = document.createElement("label");
+  visibleCaptures.forEach((item) => {
+    const row = document.createElement("div");
     row.className = `capture-row${item.done ? " is-done" : ""}`;
     row.innerHTML = `
-      <input type="checkbox" ${item.done ? "checked" : ""} />
-      <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
-      <span>
-        <strong>${escapeHtml(item.title)}</strong>
-        <small>${escapeHtml(item.type === "reminder" ? "Reminder" : "Task")}${item.note ? ` · ${escapeHtml(item.note)}` : ""}</small>
-      </span>
+      <label class="capture-toggle">
+        <input type="checkbox" ${item.done ? "checked" : ""} />
+        <span class="mini-check"><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7" /></svg></span>
+        <span>
+          <strong>${escapeHtml(item.title)}</strong>
+          <small>${escapeHtml(item.type === "reminder" ? "Reminder" : "Task")}${item.note ? ` · ${escapeHtml(item.note)}` : ""}</small>
+        </span>
+      </label>
+      <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(item.title)}">×</button>
     `;
     row.querySelector("input").addEventListener("change", (event) => {
       item.done = event.target.checked;
@@ -286,12 +348,23 @@ function renderCaptureInbox() {
       renderFocusRail();
       updateBriefProgress();
     });
+    row.querySelector(".item-archive").addEventListener("click", () => {
+      item.archived = true;
+      if (state.focusTaskId === `capture:${item.id}`) state.focusTaskId = "";
+      saveState();
+      renderCaptureInbox();
+      renderFocusRail();
+      updateBriefProgress();
+      showToast("Archived. Your active list stays clean.");
+    });
     container.append(row);
   });
 }
 
 function renderPracticalReminder() {
-  const reminder = state.captures.find((item) => item.type === "reminder" && !item.done);
+  const reminder = state.captures.find(
+    (item) => item.type === "reminder" && !item.done && !item.archived,
+  );
   document.querySelector("#practicalReminderTitle").textContent =
     reminder?.title || "Add a practical reminder";
   document.querySelector("#practicalReminderNote").textContent =
@@ -303,12 +376,13 @@ function renderPracticalReminder() {
 
 function renderReadingQueue() {
   const container = document.querySelector("#readingQueueItems");
-  const openItems = state.readingQueue.filter((item) => !item.read);
+  const visibleItems = state.readingQueue.filter((item) => !item.archived);
+  const openItems = visibleItems.filter((item) => !item.read);
   document.querySelector("#readingQueueCount").textContent =
     `${openItems.length} saved`;
   container.replaceChildren();
 
-  if (!state.readingQueue.length) {
+  if (!visibleItems.length) {
     const empty = document.createElement("p");
     empty.className = "reading-queue-empty";
     empty.textContent = "Save an article here and it will wait without nagging you.";
@@ -316,7 +390,7 @@ function renderReadingQueue() {
     return;
   }
 
-  state.readingQueue.forEach((item) => {
+  visibleItems.forEach((item) => {
     const row = document.createElement("div");
     row.className = `reading-queue-row${item.read ? " is-read" : ""}`;
     const host = item.url ? new URL(item.url).hostname.replace(/^www\./, "") : "Saved note";
@@ -328,13 +402,22 @@ function renderReadingQueue() {
         </span>
         <span aria-hidden="true">↗</span>
       </a>
-      <button type="button">${item.read ? "Unread" : "Read"}</button>
+      <div class="reading-row-actions">
+        <button class="reading-toggle" type="button">${item.read ? "Unread" : "Read"}</button>
+        <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(item.title)}">×</button>
+      </div>
     `;
-    row.querySelector("button").addEventListener("click", () => {
+    row.querySelector(".reading-toggle").addEventListener("click", () => {
       item.read = !item.read;
       saveState();
       renderReadingQueue();
       showToast(item.read ? "Moved to read." : "Back in the reading queue.");
+    });
+    row.querySelector(".item-archive").addEventListener("click", () => {
+      item.archived = true;
+      saveState();
+      renderReadingQueue();
+      showToast("Article archived.");
     });
     container.append(row);
   });
@@ -363,8 +446,7 @@ function openCaptureDialog(type = "task") {
   window.setTimeout(() => captureForm.elements.title.focus(), 80);
 }
 
-function formatDate() {
-  const date = new Date();
+function formatDate(date = new Date()) {
   const label = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
@@ -373,6 +455,12 @@ function formatDate() {
     .format(date)
     .replace(",", " ·");
   document.querySelector("#dateLabel").textContent = label.toUpperCase();
+  document.querySelector("#stripDay").textContent =
+    new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date).toUpperCase();
+  document.querySelector("#stripDate").textContent =
+    new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" })
+      .format(date)
+      .toUpperCase();
 
   const tomorrow = new Date(date);
   tomorrow.setDate(date.getDate() + 1);
@@ -384,7 +472,37 @@ function formatDate() {
   document.querySelector("#weekLabel").textContent = `WEEK ${week}`;
 }
 
+function updateClock(date = new Date()) {
+  const currentTime = document.querySelector("#currentTime");
+  currentTime.textContent = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  currentTime.dateTime = date.toISOString();
+  document.querySelector("#stripDay").textContent =
+    new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date).toUpperCase();
+  document.querySelector("#stripDate").textContent =
+    new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" })
+      .format(date)
+      .toUpperCase();
+}
+
 function updateLiveDay(date = new Date()) {
+  const needsRollover =
+    state.dayKey !== formatApiDate(date) || state.weekKey !== getWeekKey(date);
+  if (needsRollover) {
+    state = rollStatePeriods(state);
+    saveState();
+    formatDate(date);
+    taskInputs.forEach((input) => {
+      const taskId = input.closest("[data-task]")?.dataset.task;
+      if (taskId) input.checked = Boolean(state.tasks[taskId]);
+    });
+    renderCaptureInbox();
+    renderWeeklyScorecard();
+    updateSprintProgress();
+  }
+
   const phase = getDayPhase(date);
   const phaseContent = {
     morning: {
@@ -438,10 +556,7 @@ function updateLiveDay(date = new Date()) {
   document.querySelector("#signalKicker").textContent = phaseContent.signalKicker;
   document.querySelector("#signalTitle").textContent = phaseContent.signalTitle;
   document.querySelector("#readingKicker").textContent = phaseContent.readingKicker;
-  document.querySelector("#currentTime").textContent = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
+  updateClock(date);
 
   const dayStart = new Date(date);
   dayStart.setHours(5, 0, 0, 0);
@@ -450,16 +565,8 @@ function updateLiveDay(date = new Date()) {
   const progress = Math.max(0, Math.min(100, ((date - dayStart) / (dayEnd - dayStart)) * 100));
   document.querySelector("#dayProgress").style.width = `${progress}%`;
 
-  updateRefreshCountdown(date);
   updateBriefProgress();
   renderFocusRail();
-}
-
-function updateRefreshCountdown(date = new Date()) {
-  const elapsed = date - lastRefreshAt;
-  if (elapsed >= REFRESH_INTERVAL_MS && !liveRefreshInFlight) fetchLiveData();
-  const nextMinutes = Math.max(1, Math.ceil((REFRESH_INTERVAL_MS - elapsed) / 60000));
-  document.querySelector("#nextRefresh").textContent = `refreshes in ${nextMinutes} min`;
 }
 
 function formatApiDate(date) {
@@ -510,6 +617,47 @@ function setGoogleButtonsDisabled(disabled) {
   });
 }
 
+function persistGoogleSession() {
+  try {
+    sessionStorage.setItem(
+      GOOGLE_SESSION_KEY,
+      JSON.stringify({
+        accessToken: googleAccessToken,
+        expiresAt: googleTokenExpiresAt,
+      }),
+    );
+  } catch {
+    // The live panels still work for the current page session.
+  }
+}
+
+function clearGoogleSession() {
+  googleAccessToken = "";
+  googleTokenExpiresAt = 0;
+  try {
+    sessionStorage.removeItem(GOOGLE_SESSION_KEY);
+  } catch {
+    // Nothing else to clear.
+  }
+  const disconnectButton = document.querySelector("#disconnectGoogle");
+  if (disconnectButton) disconnectButton.hidden = true;
+}
+
+function restoreGoogleSession() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(GOOGLE_SESSION_KEY));
+    if (saved?.accessToken && Number(saved.expiresAt) > Date.now() + 30000) {
+      googleAccessToken = saved.accessToken;
+      googleTokenExpiresAt = Number(saved.expiresAt);
+      return true;
+    }
+  } catch {
+    // Invalid or unavailable session storage means reconnecting manually.
+  }
+  clearGoogleSession();
+  return false;
+}
+
 function connectGoogle() {
   if (!hasGoogleClientId()) {
     showToast("Google OAuth setup is required first.");
@@ -539,6 +687,7 @@ function connectGoogle() {
       googleAccessToken = response.access_token;
       googleTokenExpiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
       localStorage.setItem("daymark-google-was-connected", "1");
+      persistGoogleSession();
       await loadGoogleData();
     },
     error_callback: () => {
@@ -547,19 +696,20 @@ function connectGoogle() {
     },
   });
 
-  tokenClient.requestAccessToken({ prompt: googleAccessToken ? "" : "consent" });
+  const wasConnected = localStorage.getItem("daymark-google-was-connected") === "1";
+  tokenClient.requestAccessToken({ prompt: wasConnected ? "" : "consent" });
 }
 
 async function fetchGoogleJson(url) {
   if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) {
-    googleAccessToken = "";
+    clearGoogleSession();
     throw new Error("Google access has expired.");
   }
   const response = await fetch(url, {
     cache: "no-store",
     headers: { Authorization: `Bearer ${googleAccessToken}` },
   });
-  if (response.status === 401) googleAccessToken = "";
+  if (response.status === 401) clearGoogleSession();
   if (!response.ok) throw new Error(`Google request failed: ${response.status}`);
   return await response.json();
 }
@@ -765,6 +915,27 @@ function renderGooglePanelError(type, message) {
   bindGoogleConnectButtons();
 }
 
+function renderGoogleDisconnected() {
+  document.querySelector("#calendarStatus").textContent = "NOT CONNECTED";
+  document.querySelector("#calendarStatus").classList.add("disconnected-status");
+  document.querySelector("#emailStatus").textContent = "NOT CONNECTED";
+  document.querySelector("#emailStatus").classList.add("disconnected-status");
+  document.querySelector("#calendarContent").innerHTML = googleConnectMarkup(
+    "Connect Google securely",
+    "Allow read-only access to your calendar.",
+  );
+  document.querySelector("#emailContent").innerHTML = googleConnectMarkup(
+    "Connect Google securely",
+    "Allow read-only access to priority email.",
+  );
+  bindGoogleConnectButtons();
+  formatDate();
+  document.querySelector("#tomorrowSummary").textContent =
+    "Connect Google and Daymark will build this from your real schedule.";
+  document.querySelector("#tomorrowFirstLabel").textContent = "FIRST EVENT";
+  document.querySelector("#tomorrowFirstValue").textContent = "NOT CONNECTED";
+}
+
 async function loadGoogleData() {
   document.querySelector("#calendarStatus").textContent = "SYNCING";
   document.querySelector("#emailStatus").textContent = "SYNCING";
@@ -779,6 +950,9 @@ async function loadGoogleData() {
   if (emailResult.status === "fulfilled") renderPriorityEmails(emailResult.value);
   else renderGooglePanelError("email", "Gmail access needs attention.");
 
+  lastGoogleRefreshAt = Date.now();
+  document.querySelector("#disconnectGoogle").hidden =
+    calendarResult.status !== "fulfilled" && emailResult.status !== "fulfilled";
   setGoogleButtonsDisabled(false);
 }
 
@@ -815,7 +989,18 @@ function weatherIcon(code) {
   return "●";
 }
 
-function renderWeather(data, source = "live") {
+function formatFreshness(updatedAt) {
+  const timestamp = new Date(updatedAt).getTime();
+  if (!Number.isFinite(timestamp)) return "unknown age";
+  const ageMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+  if (ageMinutes < 1) return "now";
+  if (ageMinutes < 60) return `${ageMinutes}m ago`;
+  const ageHours = Math.floor(ageMinutes / 60);
+  if (ageHours < 24) return `${ageHours}h ago`;
+  return `${Math.floor(ageHours / 24)}d ago`;
+}
+
+function renderWeather(data, source = "live", updatedAt = new Date()) {
   const current = Math.round(data.current.temperature_2m);
   const feelsLike = Math.round(data.current.apparent_temperature);
   const high = Math.round(data.daily.temperature_2m_max[0]);
@@ -830,12 +1015,16 @@ function renderWeather(data, source = "live") {
 
   document.querySelector("#heroWeather").innerHTML =
     `<i class="weather-glyph" aria-hidden="true">${weatherIcon(code)}</i> ${current}° · Durham`;
-  document.querySelector("#weatherSource").textContent = source === "live" ? "LIVE NOW" : "CACHED";
+  const freshness = formatFreshness(updatedAt);
+  document.querySelector("#weatherSource").textContent =
+    source === "live" ? `UPDATED ${freshness.toUpperCase()}` : `CACHED · ${freshness.toUpperCase()}`;
   document.querySelector("#weatherCurrent").textContent = `${current}°`;
   document.querySelector("#weatherSummary").textContent = `${description}${feelsText}`;
   document.querySelector("#weatherHigh").textContent = `${high}°`;
   document.querySelector("#weatherRain").textContent = `${rain}%`;
   document.querySelector("#weatherSunset").textContent = sunset;
+  const ageMinutes = Math.max(0, (Date.now() - new Date(updatedAt).getTime()) / 60000);
+  document.querySelector(".weather-card").classList.toggle("is-stale", ageMinutes > 15);
 }
 
 function renderWeatherError() {
@@ -843,6 +1032,7 @@ function renderWeatherError() {
     '<i class="weather-glyph" aria-hidden="true">!</i> Weather unavailable';
   document.querySelector("#weatherSource").textContent = "UNAVAILABLE";
   document.querySelector("#weatherSummary").textContent = "Could not reach the weather source.";
+  document.querySelector(".weather-card").classList.add("is-stale");
 }
 
 function getTeamDisplay(team) {
@@ -1028,11 +1218,11 @@ function renderBaseball(
 
   document.querySelector("#sportsSource").textContent =
     source === "live" ? "OFFICIAL MLB" : "CACHED MLB";
-  const timestamp = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(updatedAt));
-  document.querySelector("#sportsUpdatedAt").textContent = `updated ${timestamp}`;
+  const freshness = formatFreshness(updatedAt);
+  document.querySelector("#sportsUpdatedAt").textContent =
+    source === "live" ? `updated ${freshness}` : `cached ${freshness}`;
+  const ageMinutes = Math.max(0, (Date.now() - new Date(updatedAt).getTime()) / 60000);
+  document.querySelector(".sports-freshness").classList.toggle("is-stale", ageMinutes > 5);
 }
 
 function renderDiamondbacksGame(game) {
@@ -1050,6 +1240,7 @@ function renderDiamondbacksGame(game) {
     minute: "2-digit",
   }).format(gameDate);
   const gameState = game.status.abstractGameState;
+  baseballGameIsLive = gameState === "Live";
   const gameCard = document.querySelector("#diamondbacksGame");
 
   document.querySelector("#gameTime").textContent = `DIAMONDBACKS · ${dateLabel} ${timeLabel}`;
@@ -1072,6 +1263,7 @@ function renderDiamondbacksGame(game) {
 }
 
 function renderNoDiamondbacksGame() {
+  baseballGameIsLive = false;
   document.querySelector("#gameTime").textContent = "DIAMONDBACKS";
   document.querySelector("#gameOpponent").textContent = "No upcoming game found";
   document.querySelector("#gameDetail").textContent = "Open the official schedule for more.";
@@ -1079,8 +1271,10 @@ function renderNoDiamondbacksGame() {
 }
 
 function renderBaseballError() {
+  baseballGameIsLive = false;
   document.querySelector("#sportsSource").textContent = "MLB UNAVAILABLE";
   document.querySelector("#sportsUpdatedAt").textContent = "will retry quietly";
+  document.querySelector(".sports-freshness").classList.add("is-stale");
   document.querySelector("#wildCardStatus").textContent = "WC: UNAVAILABLE";
   document.querySelector("#dbacksRank").textContent = "NL WEST · UNAVAILABLE";
   document.querySelector("#dbacksWildCard").textContent = "—";
@@ -1094,23 +1288,41 @@ function renderBaseballError() {
   document.querySelector("#gameDetail").textContent = "Tap to open the official schedule.";
 }
 
-async function fetchLiveData() {
-  if (liveRefreshInFlight) return;
-  liveRefreshInFlight = true;
+function updateSyncState() {
   const sync = document.querySelector("#syncState");
   const syncLabel = sync.querySelector(".sync-label");
-  sync.classList.add("is-refreshing");
-  syncLabel.textContent = "updating";
+  const refreshing = weatherRefreshInFlight || baseballRefreshInFlight;
+  sync.classList.toggle("is-refreshing", refreshing);
+  if (refreshing) {
+    syncLabel.textContent = "updating";
+    return;
+  }
+  if (window.navigator?.onLine === false) {
+    syncLabel.textContent = "offline";
+    return;
+  }
+  const liveCount = Object.values(publicFeedStatus).filter((status) => status === "live").length;
+  const cachedCount = Object.values(publicFeedStatus).filter((status) => status === "cached").length;
+  if (liveCount === 2) syncLabel.textContent = "live";
+  else if (liveCount) syncLabel.textContent = `${liveCount}/2 live`;
+  else if (cachedCount) syncLabel.textContent = "cached";
+  else syncLabel.textContent = "waiting";
+}
 
+function getWeatherUrl() {
+  return (
+    "https://api.open-meteo.com/v1/forecast?latitude=35.9940&longitude=-78.8986" +
+    "&current=temperature_2m,apparent_temperature,weather_code" +
+    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset" +
+    "&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=2"
+  );
+}
+
+function getBaseballUrls() {
   const now = new Date();
   const end = new Date(now);
   end.setDate(now.getDate() + 10);
   const season = now.getFullYear();
-  const weatherUrl =
-    "https://api.open-meteo.com/v1/forecast?latitude=35.9940&longitude=-78.8986" +
-    "&current=temperature_2m,apparent_temperature,weather_code" +
-    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset" +
-    "&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=2";
   const standingsUrl =
     `https://statsapi.mlb.com/api/v1/standings?leagueId=104&season=${season}` +
     "&standingsTypes=regularSeason&hydrate=team,division";
@@ -1121,37 +1333,67 @@ async function fetchLiveData() {
     `https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=109` +
     `&startDate=${formatApiDate(now)}&endDate=${formatApiDate(end)}` +
     "&hydrate=probablePitcher,team";
+  return { standingsUrl, wildCardUrl, scheduleUrl };
+}
 
-  const [weatherResult, standingsResult, wildCardResult, scheduleResult] =
-    await Promise.allSettled([
-      fetchJson(weatherUrl),
+async function refreshWeather(force = false) {
+  if (weatherRefreshInFlight) return;
+  if (!force && Date.now() - lastWeatherRefreshAt < WEATHER_REFRESH_INTERVAL_MS) return;
+  weatherRefreshInFlight = true;
+  updateSyncState();
+
+  try {
+    const data = await fetchJson(getWeatherUrl());
+    const updatedAt = new Date();
+    renderWeather(data, "live", updatedAt);
+    writeLiveCache(WEATHER_CACHE_KEY, data);
+    publicFeedStatus.weather = "live";
+  } catch {
+    const cached = readLiveCache(WEATHER_CACHE_KEY);
+    if (cached?.data) {
+      renderWeather(cached.data, "cached", cached.savedAt);
+      publicFeedStatus.weather = "cached";
+    } else {
+      renderWeatherError();
+      publicFeedStatus.weather = "unavailable";
+    }
+  } finally {
+    lastWeatherRefreshAt = Date.now();
+    weatherRefreshInFlight = false;
+    updateSyncState();
+  }
+}
+
+async function refreshBaseball(force = false) {
+  if (baseballRefreshInFlight) return;
+  const interval = baseballGameIsLive
+    ? BASEBALL_LIVE_REFRESH_INTERVAL_MS
+    : BASEBALL_REFRESH_INTERVAL_MS;
+  if (!force && Date.now() - lastBaseballRefreshAt < interval) return;
+  baseballRefreshInFlight = true;
+  updateSyncState();
+  const { standingsUrl, wildCardUrl, scheduleUrl } = getBaseballUrls();
+
+  try {
+    const [standingsResult, wildCardResult, scheduleResult] = await Promise.allSettled([
       fetchJson(standingsUrl),
       fetchJson(wildCardUrl),
       fetchJson(scheduleUrl),
     ]);
-
-  liveFeedCount = 0;
-  if (weatherResult.status === "fulfilled") {
-    renderWeather(weatherResult.value);
-    writeLiveCache(WEATHER_CACHE_KEY, weatherResult.value);
-    liveFeedCount += 1;
-  } else {
-    const cached = readLiveCache(WEATHER_CACHE_KEY);
-    if (cached?.data) renderWeather(cached.data, "cached");
-    else renderWeatherError();
-  }
-
-  if (standingsResult.status === "fulfilled" && scheduleResult.status === "fulfilled") {
+    if (standingsResult.status !== "fulfilled" || scheduleResult.status !== "fulfilled") {
+      throw new Error("Official MLB data was incomplete.");
+    }
     const wildCardData =
       wildCardResult.status === "fulfilled" ? wildCardResult.value : standingsResult.value;
-    renderBaseball(standingsResult.value, wildCardData, scheduleResult.value);
+    const updatedAt = new Date();
+    renderBaseball(standingsResult.value, wildCardData, scheduleResult.value, "live", updatedAt);
     writeLiveCache(BASEBALL_CACHE_KEY, {
       divisionStandings: standingsResult.value,
       wildCardStandings: wildCardData,
       schedule: scheduleResult.value,
     });
-    liveFeedCount += 1;
-  } else {
+    publicFeedStatus.baseball = "live";
+  } catch {
     const cached = readLiveCache(BASEBALL_CACHE_KEY);
     const cachedDivision = cached?.data?.divisionStandings || cached?.data?.standings;
     const cachedWildCard = cached?.data?.wildCardStandings || cachedDivision;
@@ -1163,19 +1405,41 @@ async function fetchLiveData() {
         "cached",
         cached.savedAt,
       );
+      publicFeedStatus.baseball = "cached";
     } else {
       renderBaseballError();
+      publicFeedStatus.baseball = "unavailable";
     }
+  } finally {
+    lastBaseballRefreshAt = Date.now();
+    baseballRefreshInFlight = false;
+    updateSyncState();
   }
+}
 
-  lastRefreshAt = new Date();
-  liveRefreshInFlight = false;
-  sync.classList.remove("is-refreshing");
-  syncLabel.textContent = `${liveFeedCount}/2 live`;
-  updateRefreshCountdown(lastRefreshAt);
-  if (googleAccessToken && Date.now() < googleTokenExpiresAt) {
+async function refreshGoogleIfNeeded(force = false) {
+  if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) return;
+  if (!force && Date.now() - lastGoogleRefreshAt < GOOGLE_REFRESH_INTERVAL_MS) return;
+  try {
     await loadGoogleData();
+  } catch {
+    // Individual Google panels render their own reconnect states.
   }
+}
+
+async function refreshAllData(force = false) {
+  await Promise.all([
+    refreshWeather(force),
+    refreshBaseball(force),
+    refreshGoogleIfNeeded(force),
+  ]);
+}
+
+function runRefreshScheduler() {
+  if (document.visibilityState !== "visible") return;
+  refreshWeather(false);
+  refreshBaseball(false);
+  refreshGoogleIfNeeded(false);
 }
 
 function hydrateTasks() {
@@ -1205,7 +1469,7 @@ function updateBriefProgress() {
   const done = inputs.filter((input) => input.checked).length;
   const total = inputs.length || 1;
   const percentage = Math.round((done / total) * 100);
-  const capturedOpen = state.captures.filter((item) => !item.done).length;
+  const capturedOpen = state.captures.filter((item) => !item.done && !item.archived).length;
   document.querySelector("#briefPercent").textContent = `${percentage}%`;
   document.querySelector("#priorityCount").textContent = `${done}/${total}`;
   document.querySelector("#openCount").textContent = String(total - done + capturedOpen + 2);
@@ -1266,6 +1530,16 @@ function hydrateDecisions() {
           item.classList.toggle("is-selected", item === button);
         });
         card.classList.add("is-decided");
+        if (button.dataset.choice === "Open" && id === "duke-event") {
+          window.open("https://careers.duke.edu/", "_blank", "noopener,noreferrer");
+        }
+        if (button.dataset.choice === "Open" && id === "housing-tour") {
+          window.open(
+            "https://www.zillow.com/durham-nc/rentals/",
+            "_blank",
+            "noopener,noreferrer",
+          );
+        }
         showToast(`${button.dataset.choice} saved. Decision off your mind.`);
       });
     });
@@ -1275,16 +1549,17 @@ function hydrateDecisions() {
 
 function renderApplications() {
   const list = document.querySelector("#applicationList");
+  const visibleApplications = state.applications.filter((app) => !app.archived);
   list.replaceChildren();
 
-  if (state.applications.length === 0) {
+  if (visibleApplications.length === 0) {
     const empty = document.createElement("div");
     empty.className = "tracker-empty";
     empty.innerHTML = "<strong>No applications yet</strong><small>Add the first real role you want to track.</small>";
     list.append(empty);
   }
 
-  state.applications.forEach((app) => {
+  visibleApplications.forEach((app) => {
     const row = document.createElement("div");
     row.className = "application-row";
     const titleMarkup = app.url
@@ -1295,29 +1570,64 @@ function renderApplications() {
         ${titleMarkup}
         <small>${escapeHtml(app.organization)} · <span class="application-next">${escapeHtml(app.nextStep || "Choose next step")}</span></small>
       </div>
-      <button class="status-button" type="button" data-status="${escapeHtml(app.status)}" aria-label="Change status for ${escapeHtml(app.role)}">${escapeHtml(app.status)}</button>
+      <div class="application-actions">
+        <button class="status-button" type="button" data-status="${escapeHtml(app.status)}" aria-label="Change status for ${escapeHtml(app.role)}">${escapeHtml(app.status)}</button>
+        <button class="item-edit" type="button" aria-label="Edit ${escapeHtml(app.role)}">✎</button>
+        <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(app.role)}">×</button>
+      </div>
     `;
     row.querySelector(".status-button").addEventListener("click", () => cycleApplicationStatus(app.id));
+    row.querySelector(".item-edit").addEventListener("click", () => openApplicationEditor(app));
+    row.querySelector(".item-archive").addEventListener("click", () => {
+      app.archived = true;
+      saveState();
+      renderApplications();
+      showToast("Application archived.");
+    });
     list.append(row);
   });
 
-  const active = state.applications.length;
-  const followups = state.applications.filter((app) => app.status === "Follow-up").length;
-  const interviews = state.applications.filter((app) => app.status === "Interview").length;
+  const active = visibleApplications.length;
+  const followups = visibleApplications.filter((app) => app.status === "Follow-up").length;
+  const interviews = visibleApplications.filter((app) => app.status === "Interview").length;
   document.querySelector("#activeApps").textContent = String(active);
   document.querySelector("#followupApps").textContent = String(followups);
   document.querySelector("#interviewApps").textContent = String(interviews);
-  const stageWeight = { Interested: 20, Applied: 45, "Follow-up": 65, Interview: 90 };
+  const stageWeight = { Interested: 20, Applied: 45, "Follow-up": 65, Interview: 90, Offer: 100 };
   const averageProgress = active
     ? Math.round(
-        state.applications.reduce((sum, app) => sum + (stageWeight[app.status] || 0), 0) / active,
+        visibleApplications.reduce((sum, app) => sum + (stageWeight[app.status] || 0), 0) / active,
       )
     : 0;
   document.querySelector(".tracker-progress-fill").style.width = `${averageProgress}%`;
 }
 
+function openApplicationEditor(app = null) {
+  applicationForm.reset();
+  applicationDialog.dataset.editId = app?.id || "";
+  document.querySelector("#applicationDialogTitle").textContent =
+    app ? "Edit application" : "Add an application";
+  document.querySelector("#applicationSubmit").textContent =
+    app ? "Save changes" : "Add to tracker";
+  if (app) {
+    applicationForm.elements.organization.value = app.organization || "";
+    applicationForm.elements.role.value = app.role || "";
+    applicationForm.elements.url.value = app.url || "";
+    applicationForm.elements.status.value = app.status || "Interested";
+    applicationForm.elements.nextStep.value = app.nextStep || "";
+  }
+  applicationDialog.showModal();
+  window.setTimeout(() => applicationForm.elements.organization.focus(), 80);
+}
+
+function closeApplicationEditor() {
+  applicationDialog.close();
+  applicationDialog.dataset.editId = "";
+  applicationForm.reset();
+}
+
 function cycleApplicationStatus(id) {
-  const order = ["Interested", "Applied", "Follow-up", "Interview"];
+  const order = ["Interested", "Applied", "Follow-up", "Interview", "Offer"];
   const app = state.applications.find((item) => item.id === id);
   if (!app) return;
   const index = order.indexOf(app.status);
@@ -1349,7 +1659,9 @@ document.querySelectorAll("[data-scroll]").forEach((button) => {
     const id = button.dataset.scroll;
     document.querySelector(`#${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (button.classList.contains("nav-button")) {
+      navScrollLockUntil = Date.now() + 1200;
       navButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+      window.setTimeout(updateActiveNavigation, 1250);
     }
   });
 });
@@ -1358,10 +1670,16 @@ document.querySelector("#refreshBrief").addEventListener("click", async (event) 
   const button = event.currentTarget;
   button.classList.add("is-spinning");
   try {
-    await fetchLiveData();
+    await refreshAllData(true);
   } finally {
     button.classList.remove("is-spinning");
   }
+});
+
+document.querySelector("#disconnectGoogle").addEventListener("click", () => {
+  clearGoogleSession();
+  renderGoogleDisconnected();
+  showToast("Google session ended on this device.");
 });
 
 document.querySelectorAll("[data-standings-view]").forEach((button) => {
@@ -1369,16 +1687,15 @@ document.querySelectorAll("[data-standings-view]").forEach((button) => {
 });
 
 document.querySelector("#openApplicationDialog").addEventListener("click", () => {
-  applicationDialog.showModal();
-  window.setTimeout(() => applicationForm.elements.organization.focus(), 80);
+  openApplicationEditor();
 });
 
 document.querySelector("#closeApplicationDialog").addEventListener("click", () => {
-  applicationDialog.close();
+  closeApplicationEditor();
 });
 
 applicationDialog.addEventListener("click", (event) => {
-  if (event.target === applicationDialog) applicationDialog.close();
+  if (event.target === applicationDialog) closeApplicationEditor();
 });
 
 applicationForm.addEventListener("submit", (event) => {
@@ -1390,19 +1707,29 @@ applicationForm.addEventListener("submit", (event) => {
     showToast("That listing link does not look valid yet.");
     return;
   }
-  state.applications.unshift({
-    id: `app-${Date.now()}`,
+  const editId = applicationDialog.dataset.editId;
+  const existing = state.applications.find((app) => app.id === editId);
+  const values = {
     organization: formData.get("organization").trim(),
     role: formData.get("role").trim(),
     status: formData.get("status"),
     nextStep: formData.get("nextStep").trim() || "Choose next step",
     url,
-  });
+  };
+  if (existing) {
+    Object.assign(existing, values, { updatedAt: new Date().toISOString() });
+  } else {
+    state.applications.unshift({
+      id: `app-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      ...values,
+      archived: false,
+    });
+  }
   saveState();
   renderApplications();
-  applicationForm.reset();
-  applicationDialog.close();
-  showToast("Application added to your tracker.");
+  closeApplicationEditor();
+  showToast(existing ? "Application updated." : "Application added to your tracker.");
 });
 
 document.querySelectorAll("[data-open-capture]").forEach((button) => {
@@ -1455,32 +1782,38 @@ captureForm.addEventListener("submit", (event) => {
   if (type === "job") {
     state.applications.unshift({
       id: `app-${Date.now()}`,
+      createdAt: new Date().toISOString(),
       organization: note || "Captured lead",
       role: title,
       status: "Interested",
       nextStep: url ? "Open saved listing" : "Review opportunity",
       url,
+      archived: false,
     });
     renderApplications();
     showToast("Job lead added to Applications.");
   } else if (type === "reading") {
     state.readingQueue.unshift({
       id: `read-${Date.now()}`,
+      createdAt: new Date().toISOString(),
       title,
       url,
       note,
       read: false,
+      archived: false,
     });
     renderReadingQueue();
     showToast("Saved to your reading queue.");
   } else {
     state.captures.unshift({
       id: `capture-${Date.now()}`,
+      createdAt: new Date().toISOString(),
       type,
       title,
       note,
       url,
       done: false,
+      archived: false,
     });
     renderCaptureInbox();
     renderFocusRail();
@@ -1516,28 +1849,40 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-const sectionObserver = new IntersectionObserver(
-  (entries) => {
-    const visible = entries
-      .filter((entry) => entry.isIntersecting)
-      .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-    if (!visible) return;
-    const map = { today: "today", jobs: "jobs", veraya: "jobs", durham: "durham", sports: "sports" };
-    const activeTarget = map[visible.target.id];
-    if (!activeTarget) return;
-    navButtons.forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.scroll === activeTarget);
+function updateActiveNavigation() {
+  if (Date.now() < navScrollLockUntil) return;
+  const anchor = 165;
+  const sections = [
+    { id: "today", nav: "today" },
+    { id: "jobs", nav: "jobs" },
+    { id: "veraya", nav: "jobs" },
+    { id: "durham", nav: "durham" },
+    { id: "sports", nav: "sports" },
+  ];
+  let active = "today";
+  sections.forEach((item) => {
+    const section = document.querySelector(`#${item.id}`);
+    if (section && section.getBoundingClientRect().top <= anchor) active = item.nav;
+  });
+  navButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.scroll === active);
+  });
+}
+
+window.addEventListener(
+  "scroll",
+  () => {
+    if (navScrollFrame) return;
+    navScrollFrame = window.requestAnimationFrame(() => {
+      navScrollFrame = 0;
+      updateActiveNavigation();
     });
   },
-  { rootMargin: "-20% 0px -65% 0px", threshold: [0, 0.2, 0.5] },
+  { passive: true },
 );
 
-["today", "jobs", "veraya", "durham", "sports"].forEach((id) => {
-  const section = document.querySelector(`#${id}`);
-  if (section) sectionObserver.observe(section);
-});
-
 formatDate();
+saveState();
 bindGoogleConnectButtons();
 hydrateTasks();
 hydrateDecisions();
@@ -1549,12 +1894,26 @@ updateLiveDay();
 updateSprintProgress();
 renderFocusRail();
 updateFocusTimer();
-fetchLiveData();
+restoreGoogleSession();
+refreshAllData(true);
+window.setInterval(() => {
+  updateClock();
+  updateFocusTimer();
+}, 1000);
 window.setInterval(() => updateLiveDay(), 30000);
-window.setInterval(updateFocusTimer, 1000);
+window.setInterval(runRefreshScheduler, REFRESH_SCHEDULER_INTERVAL_MS);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  updateLiveDay();
+  refreshAllData(true);
+});
+
+window.addEventListener("online", () => refreshAllData(true));
+window.addEventListener("offline", updateSyncState);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=8").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=9").catch(() => {});
   });
 }

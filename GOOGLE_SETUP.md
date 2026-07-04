@@ -1,6 +1,6 @@
 # Connect Daymark to Google Calendar and Gmail
 
-Daymark uses Google Identity Services and requests read-only access. The access token remains in the open browser session; it is not written to the repository or browser storage.
+Daymark uses Google Identity Services and requests read-only access. The temporary access token is kept in session storage so a page reload can reconnect during the same browser session. It is never written to the repository or permanent local storage, and Google will require reconnection after the token expires or the session ends.
 
 ## 1. Create a Google Cloud project
 
@@ -49,6 +49,6 @@ Do not create or publish a client secret. This browser integration needs only th
 4. Commit the change.
 5. Wait for GitHub Pages to redeploy, then open:
 
-   https://relytbytes.github.io/daymark/?v=8
+   https://relytbytes.github.io/daymark/?v=9
 
 6. Tap **Connect Google securely** and approve read-only Calendar and Gmail access.
