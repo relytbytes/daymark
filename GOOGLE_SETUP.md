@@ -1,6 +1,6 @@
 # Connect Daymark to Google Calendar and Gmail
 
-Daymark uses Google Identity Services and requests read-only access. The temporary access token is kept in session storage so a page reload can reconnect during the same browser session. It is never written to the repository or permanent local storage, and Google will require reconnection after the token expires or the session ends.
+Daymark uses Google Identity Services. Calendar access is read-only. Gmail access can list priority unread messages and remove the `UNREAD` label when you tap **Mark read**; Daymark cannot send, delete, or archive mail. The temporary access token is kept in session storage so a page reload can reconnect during the same browser session. It is never written to the repository or permanent local storage, and Google will require reconnection after the token expires or the session ends.
 
 ## 1. Create a Google Cloud project
 
@@ -23,9 +23,9 @@ In **APIs & Services → Library**, enable:
 5. Add your own Google account as a test user.
 6. Under **Data Access**, add:
    - `https://www.googleapis.com/auth/calendar.readonly`
-   - `https://www.googleapis.com/auth/gmail.readonly`
+   - `https://www.googleapis.com/auth/gmail.modify`
 
-Gmail read-only is a restricted scope. Keep the app in testing and use only your own account unless you later complete Google's verification requirements.
+Gmail modify is a restricted scope. Keep the app in testing and use only your own account unless you later complete Google's verification requirements.
 
 ## 4. Create the OAuth client
 
@@ -49,6 +49,8 @@ Do not create or publish a client secret. This browser integration needs only th
 4. Commit the change.
 5. Wait for GitHub Pages to redeploy, then open:
 
-   https://relytbytes.github.io/daymark/?v=9
+   https://relytbytes.github.io/daymark/?v=11
 
-6. Tap **Connect Google securely** and approve read-only Calendar and Gmail access.
+6. Tap **Connect Google securely** and approve Calendar access plus the updated Gmail permission.
+
+If you connected an earlier Daymark build, Google will ask once more because build 10 adds the ability to mark a message read. **Clear here** never changes Gmail; it only removes that row from Daymark on this device.

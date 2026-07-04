@@ -2,15 +2,28 @@ const STORAGE_KEY = "daymark-state-v1";
 const WEATHER_CACHE_KEY = "daymark-weather-cache-v1";
 const BASEBALL_CACHE_KEY = "daymark-baseball-cache-v1";
 const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
-const STATE_SCHEMA_VERSION = 9;
+const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
+const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
+const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
+const STATE_SCHEMA_VERSION = 11;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const BASEBALL_REFRESH_INTERVAL_MS = 60 * 1000;
 const BASEBALL_LIVE_REFRESH_INTERVAL_MS = 30 * 1000;
 const GOOGLE_REFRESH_INTERVAL_MS = 2 * 60 * 1000;
+const SPOTIFY_REFRESH_INTERVAL_MS = 15 * 1000;
+const SPOTIFY_LIBRARY_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const REFRESH_SCHEDULER_INTERVAL_MS = 15 * 1000;
 const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
-  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.modify",
+].join(" ");
+const SPOTIFY_SCOPES = [
+  "user-read-private",
+  "user-read-currently-playing",
+  "user-read-playback-state",
+  "user-read-recently-played",
+  "user-top-read",
+  "user-modify-playback-state",
 ].join(" ");
 const DEMO_APPLICATION_IDS = new Set(["duke-policy", "public-affairs", "foundation", "dataworks"]);
 const DAILY_TASK_IDS = new Set([
@@ -32,6 +45,7 @@ const defaultState = {
   applications: initialApplications,
   captures: [],
   readingQueue: [],
+  clearedMailIds: [],
   focusTaskId: "",
   focusEndsAt: 0,
   weeklyScores: {
@@ -48,16 +62,29 @@ let toastTimer;
 let lastWeatherRefreshAt = 0;
 let lastBaseballRefreshAt = 0;
 let lastGoogleRefreshAt = 0;
+let lastSpotifyRefreshAt = 0;
+let lastSpotifyLibraryRefreshAt = 0;
 let weatherRefreshInFlight = false;
 let baseballRefreshInFlight = false;
 let publicFeedStatus = { weather: "checking", baseball: "checking" };
 let googleAccessToken = "";
 let googleTokenExpiresAt = 0;
+let spotifyAccessToken = "";
+let spotifyRefreshToken = "";
+let spotifyTokenExpiresAt = 0;
+let spotifyRefreshInFlight = false;
+let spotifyLibraryView = "recent";
+let lastSpotifyData = { playback: null, queue: [], recent: [], top: [], profile: null };
+let spotifyProgressBaseMs = 0;
+let spotifyProgressFetchedAt = 0;
+let spotifyDurationMs = 0;
+let spotifyIsPlaying = false;
 let focusCompletionAnnounced = false;
 let baseballGameIsLive = false;
 let currentStandingsView = "division";
 let divisionStandingsRecords = [];
 let wildCardStandingsRecords = [];
+let lastPriorityEmailMessages = [];
 let navScrollLockUntil = 0;
 let navScrollFrame = 0;
 
@@ -73,7 +100,10 @@ document.addEventListener(
   "error",
   (event) => {
     if (!(event.target instanceof HTMLImageElement)) return;
-    if (!event.target.src.includes("mlbstatic.com/team-logos")) return;
+    if (
+      !event.target.hasAttribute("data-team-logo") &&
+      !event.target.src.includes("mlbstatic.com/team-logos")
+    ) return;
     const shell = event.target.closest("[data-abbr]");
     if (shell) shell.classList.add("is-missing");
     event.target.remove();
@@ -103,6 +133,7 @@ function loadState() {
         : initialApplications,
       captures: Array.isArray(saved?.captures) ? saved.captures : [],
       readingQueue: Array.isArray(saved?.readingQueue) ? saved.readingQueue : [],
+      clearedMailIds: Array.isArray(saved?.clearedMailIds) ? saved.clearedMailIds : [],
       focusTaskId: typeof saved?.focusTaskId === "string" ? saved.focusTaskId : "",
       focusEndsAt: Number(saved?.focusEndsAt) || 0,
       weeklyScores: {
@@ -165,6 +196,35 @@ function normalizeUrl(value) {
   } catch {
     return "";
   }
+}
+
+function openMapSearch(query) {
+  const terms = String(query || "").trim();
+  if (!terms) {
+    document.querySelector("#mapSearchInput").focus();
+    showToast("What should Maps find near Durham?");
+    return;
+  }
+  const locationQuery = `${terms}, Durham NC`;
+  window.open(
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
+}
+
+function openYouTubeSearch(query) {
+  const terms = String(query || "").trim();
+  if (!terms) {
+    document.querySelector("#youtubeSearchInput").focus();
+    showToast("What do you want to watch?");
+    return;
+  }
+  window.open(
+    `https://www.youtube.com/results?search_query=${encodeURIComponent(terms)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 
 function getOpenFocusItems() {
@@ -624,6 +684,7 @@ function persistGoogleSession() {
       JSON.stringify({
         accessToken: googleAccessToken,
         expiresAt: googleTokenExpiresAt,
+        scopeVersion: GOOGLE_SCOPE_VERSION,
       }),
     );
   } catch {
@@ -646,7 +707,11 @@ function clearGoogleSession() {
 function restoreGoogleSession() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(GOOGLE_SESSION_KEY));
-    if (saved?.accessToken && Number(saved.expiresAt) > Date.now() + 30000) {
+    if (
+      saved?.accessToken &&
+      saved.scopeVersion === GOOGLE_SCOPE_VERSION &&
+      Number(saved.expiresAt) > Date.now() + 30000
+    ) {
       googleAccessToken = saved.accessToken;
       googleTokenExpiresAt = Number(saved.expiresAt);
       return true;
@@ -687,6 +752,7 @@ function connectGoogle() {
       googleAccessToken = response.access_token;
       googleTokenExpiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
       localStorage.setItem("daymark-google-was-connected", "1");
+      localStorage.setItem("daymark-google-scope-version", GOOGLE_SCOPE_VERSION);
       persistGoogleSession();
       await loadGoogleData();
     },
@@ -696,8 +762,9 @@ function connectGoogle() {
     },
   });
 
-  const wasConnected = localStorage.getItem("daymark-google-was-connected") === "1";
-  tokenClient.requestAccessToken({ prompt: wasConnected ? "" : "consent" });
+  const hasCurrentScope =
+    localStorage.getItem("daymark-google-scope-version") === GOOGLE_SCOPE_VERSION;
+  tokenClient.requestAccessToken({ prompt: hasCurrentScope ? "" : "consent" });
 }
 
 async function fetchGoogleJson(url) {
@@ -711,6 +778,28 @@ async function fetchGoogleJson(url) {
   });
   if (response.status === 401) clearGoogleSession();
   if (!response.ok) throw new Error(`Google request failed: ${response.status}`);
+  return await response.json();
+}
+
+async function modifyGmailMessage(messageId, body) {
+  if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) {
+    clearGoogleSession();
+    throw new Error("Google access has expired.");
+  }
+  const response = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${googleAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  if (response.status === 401) clearGoogleSession();
+  if (!response.ok) throw new Error(`Gmail update failed: ${response.status}`);
   return await response.json();
 }
 
@@ -802,11 +891,16 @@ function renderCalendar(data) {
   renderTomorrowFromCalendar(data.items || []);
 
   if (events.length === 0) {
+    document.querySelector("#widgetNext").textContent = "Open day";
+    document.querySelector("#widgetNextNote").textContent = "No remaining events";
     document.querySelector("#calendarContent").innerHTML =
       '<div class="google-empty">No remaining events on your primary calendar.</div>';
     return;
   }
 
+  document.querySelector("#widgetNext").textContent = formatCalendarTime(events[0]);
+  document.querySelector("#widgetNextNote").textContent =
+    events[0].summary || "Untitled event";
   document.querySelector("#calendarContent").innerHTML = `
     <div class="timeline">
       ${events
@@ -850,9 +944,9 @@ function getSenderInitials(sender) {
 
 async function fetchPriorityEmailData() {
   const query =
-    "in:inbox newer_than:7d (is:important OR is:starred) -category:promotions -category:social";
+    "in:inbox is:unread newer_than:7d (is:important OR is:starred) -category:promotions -category:social";
   const list = await fetchGoogleJson(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=4&q=${encodeURIComponent(query)}`,
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=6&q=${encodeURIComponent(query)}`,
   );
   const messages = list.messages || [];
   return await Promise.all(
@@ -866,17 +960,25 @@ async function fetchPriorityEmailData() {
 }
 
 function renderPriorityEmails(messages) {
-  document.querySelector("#emailStatus").textContent = `LIVE · ${messages.length}`;
+  lastPriorityEmailMessages = messages;
+  const cleared = new Set(state.clearedMailIds);
+  const visibleMessages = messages.filter((message) => !cleared.has(message.id));
+  document.querySelector("#emailStatus").textContent = `UNREAD · ${visibleMessages.length}`;
   document.querySelector("#emailStatus").classList.remove("disconnected-status");
+  document.querySelector("#refreshMail").hidden = false;
+  document.querySelector("#widgetMail").textContent =
+    visibleMessages.length ? `${visibleMessages.length} unread` : "All clear";
+  document.querySelector("#widgetMailNote").textContent =
+    visibleMessages.length ? "Priority inbox" : "Nothing needs action";
 
-  if (messages.length === 0) {
+  if (visibleMessages.length === 0) {
     document.querySelector("#emailContent").innerHTML =
-      '<div class="google-empty">No recent priority messages matched.</div>';
+      '<div class="google-empty">No unread priority messages need action.</div>';
     return;
   }
 
   document.querySelector("#emailContent").innerHTML = `
-    ${messages
+    ${visibleMessages
       .map((message, index) => {
         const sender = getSenderName(getMessageHeader(message, "From"));
         const subject = getMessageHeader(message, "Subject") || "(No subject)";
@@ -890,19 +992,67 @@ function renderPriorityEmails(messages) {
               minute: "2-digit",
             }).format(sentAt);
         return `
-          <a class="mail-item" href="https://mail.google.com/mail/u/0/#inbox/${escapeHtml(message.threadId)}" target="_blank" rel="noreferrer">
+          <div class="mail-item">
             <span class="sender-avatar${index % 2 ? " sender-avatar--blue" : ""}">${escapeHtml(getSenderInitials(sender))}</span>
-            <span class="mail-copy">
-              <span><strong>${escapeHtml(sender)}</strong><time>${escapeHtml(time)}</time></span>
-              <b>${escapeHtml(subject)}</b>
-              <small>${escapeHtml(message.snippet || "Open in Gmail")}</small>
+            <a class="mail-main" href="https://mail.google.com/mail/u/0/#inbox/${escapeHtml(message.threadId)}" target="_blank" rel="noreferrer">
+              <span class="mail-copy">
+                <span><strong>${escapeHtml(sender)}</strong><time>${escapeHtml(time)}</time></span>
+                <b>${escapeHtml(subject)}</b>
+                <small>${escapeHtml(message.snippet || "Open in Gmail")}</small>
+              </span>
+            </a>
+            <span class="mail-actions">
+              <button type="button" data-mail-read="${escapeHtml(message.id)}">Mark read</button>
+              <button type="button" data-mail-clear="${escapeHtml(message.id)}">Clear here</button>
             </span>
-          </a>
+          </div>
         `;
       })
       .join("")}
-    <div class="mail-summary">Read-only · Google Gmail</div>
+    <div class="mail-summary">Read updates Gmail · Clear only hides it in Daymark</div>
   `;
+  bindPriorityMailActions();
+}
+
+function bindPriorityMailActions() {
+  document.querySelectorAll("[data-mail-read]").forEach((button) => {
+    button.addEventListener("click", () => markPriorityEmailRead(button.dataset.mailRead, button));
+  });
+  document.querySelectorAll("[data-mail-clear]").forEach((button) => {
+    button.addEventListener("click", () => clearPriorityEmail(button.dataset.mailClear));
+  });
+}
+
+function clearPriorityEmail(messageId) {
+  if (!state.clearedMailIds.includes(messageId)) {
+    state.clearedMailIds.unshift(messageId);
+    state.clearedMailIds = state.clearedMailIds.slice(0, 150);
+    saveState();
+  }
+  renderPriorityEmails(lastPriorityEmailMessages);
+  showToast("Cleared from Daymark. Gmail was not changed.");
+}
+
+async function markPriorityEmailRead(messageId, button) {
+  const actions = button.closest(".mail-actions");
+  actions?.querySelectorAll("button").forEach((item) => {
+    item.disabled = true;
+  });
+  button.textContent = "Updating…";
+  try {
+    await modifyGmailMessage(messageId, { removeLabelIds: ["UNREAD"] });
+    lastPriorityEmailMessages = lastPriorityEmailMessages.filter(
+      (message) => message.id !== messageId,
+    );
+    renderPriorityEmails(lastPriorityEmailMessages);
+    showToast("Marked read in Gmail.");
+  } catch {
+    button.textContent = "Try again";
+    actions?.querySelectorAll("button").forEach((item) => {
+      item.disabled = false;
+    });
+    showToast("Gmail could not update that message.");
+  }
 }
 
 function renderGooglePanelError(type, message) {
@@ -911,6 +1061,14 @@ function renderGooglePanelError(type, message) {
   const content = document.querySelector(isCalendar ? "#calendarContent" : "#emailContent");
   status.textContent = "CONNECT AGAIN";
   status.classList.add("disconnected-status");
+  if (isCalendar) {
+    document.querySelector("#widgetNext").textContent = "Reconnect";
+    document.querySelector("#widgetNextNote").textContent = "Calendar needs attention";
+  } else {
+    document.querySelector("#refreshMail").hidden = true;
+    document.querySelector("#widgetMail").textContent = "Reconnect";
+    document.querySelector("#widgetMailNote").textContent = "Gmail needs attention";
+  }
   content.innerHTML = googleConnectMarkup("Reconnect Google", message);
   bindGoogleConnectButtons();
 }
@@ -920,13 +1078,18 @@ function renderGoogleDisconnected() {
   document.querySelector("#calendarStatus").classList.add("disconnected-status");
   document.querySelector("#emailStatus").textContent = "NOT CONNECTED";
   document.querySelector("#emailStatus").classList.add("disconnected-status");
+  document.querySelector("#refreshMail").hidden = true;
+  document.querySelector("#widgetNext").textContent = "Calendar";
+  document.querySelector("#widgetNextNote").textContent = "Not connected";
+  document.querySelector("#widgetMail").textContent = "Connect";
+  document.querySelector("#widgetMailNote").textContent = "Priority unread";
   document.querySelector("#calendarContent").innerHTML = googleConnectMarkup(
     "Connect Google securely",
     "Allow read-only access to your calendar.",
   );
   document.querySelector("#emailContent").innerHTML = googleConnectMarkup(
     "Connect Google securely",
-    "Allow read-only access to priority email.",
+    "See unread priority mail and mark messages read.",
   );
   bindGoogleConnectButtons();
   formatDate();
@@ -954,6 +1117,506 @@ async function loadGoogleData() {
   document.querySelector("#disconnectGoogle").hidden =
     calendarResult.status !== "fulfilled" && emailResult.status !== "fulfilled";
   setGoogleButtonsDisabled(false);
+}
+
+async function refreshPriorityMail() {
+  if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) {
+    clearGoogleSession();
+    renderGoogleDisconnected();
+    return;
+  }
+  const button = document.querySelector("#refreshMail");
+  button.classList.add("is-spinning");
+  document.querySelector("#emailStatus").textContent = "SYNCING";
+  try {
+    renderPriorityEmails(await fetchPriorityEmailData());
+    lastGoogleRefreshAt = Date.now();
+  } catch {
+    renderGooglePanelError("email", "Gmail access needs attention.");
+  } finally {
+    button.classList.remove("is-spinning");
+  }
+}
+
+function hasSpotifyClientId() {
+  const clientId = window.DAYMARK_CONFIG?.spotifyClientId?.trim() || "";
+  return Boolean(clientId && !clientId.startsWith("PASTE_") && /^[a-z0-9]+$/i.test(clientId));
+}
+
+function getSpotifyRedirectUri() {
+  return new URL("./", window.location.href).href;
+}
+
+function generateSpotifyRandomString(length = 64) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const values = crypto.getRandomValues(new Uint8Array(length));
+  return [...values].map((value) => alphabet[value % alphabet.length]).join("");
+}
+
+function base64UrlEncode(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    .replaceAll("=", "")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_");
+}
+
+async function getSpotifyCodeChallenge(verifier) {
+  const encoded = new TextEncoder().encode(verifier);
+  return base64UrlEncode(await crypto.subtle.digest("SHA-256", encoded));
+}
+
+function persistSpotifySession() {
+  try {
+    sessionStorage.setItem(
+      SPOTIFY_SESSION_KEY,
+      JSON.stringify({
+        accessToken: spotifyAccessToken,
+        refreshToken: spotifyRefreshToken,
+        expiresAt: spotifyTokenExpiresAt,
+      }),
+    );
+  } catch {
+    // Spotify remains connected until this page closes.
+  }
+}
+
+function clearSpotifySession() {
+  spotifyAccessToken = "";
+  spotifyRefreshToken = "";
+  spotifyTokenExpiresAt = 0;
+  spotifyIsPlaying = false;
+  lastSpotifyRefreshAt = 0;
+  lastSpotifyLibraryRefreshAt = 0;
+  lastSpotifyData = { playback: null, queue: [], recent: [], top: [], profile: null };
+  try {
+    sessionStorage.removeItem(SPOTIFY_SESSION_KEY);
+    sessionStorage.removeItem(SPOTIFY_PKCE_KEY);
+  } catch {
+    // Nothing else to clear.
+  }
+}
+
+function restoreSpotifySession() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(SPOTIFY_SESSION_KEY));
+    if (saved?.accessToken && (Number(saved.expiresAt) > Date.now() + 30000 || saved.refreshToken)) {
+      spotifyAccessToken = saved.accessToken;
+      spotifyRefreshToken = saved.refreshToken || "";
+      spotifyTokenExpiresAt = Number(saved.expiresAt) || 0;
+      return true;
+    }
+  } catch {
+    // Invalid or unavailable session storage means reconnecting manually.
+  }
+  clearSpotifySession();
+  return false;
+}
+
+function cleanupSpotifyCallbackUrl() {
+  const cleanUrl = new URL(window.location.href);
+  ["code", "state", "error"].forEach((key) => cleanUrl.searchParams.delete(key));
+  window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+}
+
+async function requestSpotifyConnection() {
+  if (!hasSpotifyClientId()) {
+    showToast("Spotify setup is required first.");
+    window.open(
+      new URL("./SPOTIFY_SETUP.md", window.location.href).href,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    return;
+  }
+
+  const button = document.querySelector("#connectSpotify");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Opening Spotify…";
+  }
+
+  const verifier = generateSpotifyRandomString(64);
+  const oauthState = generateSpotifyRandomString(32);
+  const challenge = await getSpotifyCodeChallenge(verifier);
+  sessionStorage.setItem(
+    SPOTIFY_PKCE_KEY,
+    JSON.stringify({ verifier, oauthState, createdAt: Date.now() }),
+  );
+  const params = new URLSearchParams({
+    client_id: window.DAYMARK_CONFIG.spotifyClientId.trim(),
+    response_type: "code",
+    redirect_uri: getSpotifyRedirectUri(),
+    scope: SPOTIFY_SCOPES,
+    code_challenge_method: "S256",
+    code_challenge: challenge,
+    state: oauthState,
+  });
+  window.location.assign(`https://accounts.spotify.com/authorize?${params}`);
+}
+
+async function requestSpotifyToken(parameters) {
+  const response = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(parameters),
+  });
+  if (!response.ok) throw new Error(`Spotify authorization failed: ${response.status}`);
+  return await response.json();
+}
+
+function setSpotifyTokens(data) {
+  spotifyAccessToken = data.access_token || spotifyAccessToken;
+  spotifyRefreshToken = data.refresh_token || spotifyRefreshToken;
+  spotifyTokenExpiresAt = Date.now() + Number(data.expires_in || 3600) * 1000;
+  persistSpotifySession();
+}
+
+async function handleSpotifyCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const error = params.get("error");
+  if (!code && !error) return false;
+
+  if (error) {
+    cleanupSpotifyCallbackUrl();
+    showToast("Spotify connection was not completed.");
+    return false;
+  }
+
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(SPOTIFY_PKCE_KEY));
+    if (
+      !saved?.verifier ||
+      !saved.oauthState ||
+      saved.oauthState !== params.get("state") ||
+      Date.now() - Number(saved.createdAt) > 10 * 60 * 1000
+    ) {
+      throw new Error("Spotify authorization state did not match.");
+    }
+    const tokenData = await requestSpotifyToken({
+      client_id: window.DAYMARK_CONFIG.spotifyClientId.trim(),
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: getSpotifyRedirectUri(),
+      code_verifier: saved.verifier,
+    });
+    setSpotifyTokens(tokenData);
+    sessionStorage.removeItem(SPOTIFY_PKCE_KEY);
+    cleanupSpotifyCallbackUrl();
+    showToast("Spotify connected.");
+    return true;
+  } catch {
+    clearSpotifySession();
+    cleanupSpotifyCallbackUrl();
+    showToast("Spotify could not finish connecting.");
+    return false;
+  }
+}
+
+async function refreshSpotifyAccessToken() {
+  if (!spotifyRefreshToken || !hasSpotifyClientId()) {
+    clearSpotifySession();
+    throw new Error("Spotify session has expired.");
+  }
+  const data = await requestSpotifyToken({
+    client_id: window.DAYMARK_CONFIG.spotifyClientId.trim(),
+    grant_type: "refresh_token",
+    refresh_token: spotifyRefreshToken,
+  });
+  setSpotifyTokens(data);
+}
+
+async function fetchSpotify(path, options = {}, retry = true) {
+  if (!spotifyAccessToken) throw new Error("Spotify is not connected.");
+  if (Date.now() >= spotifyTokenExpiresAt - 30000) {
+    await refreshSpotifyAccessToken();
+  }
+  const response = await fetch(`https://api.spotify.com${path}`, {
+    ...options,
+    cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${spotifyAccessToken}`,
+      ...(options.headers || {}),
+    },
+  });
+  if (response.status === 401 && retry && spotifyRefreshToken) {
+    await refreshSpotifyAccessToken();
+    return await fetchSpotify(path, options, false);
+  }
+  if (response.status === 204) return null;
+  if (!response.ok) {
+    const requestError = new Error(`Spotify request failed: ${response.status}`);
+    requestError.status = response.status;
+    throw requestError;
+  }
+  return await response.json();
+}
+
+function getSpotifyArtwork(item) {
+  return item?.album?.images?.[0]?.url || item?.images?.[0]?.url || "";
+}
+
+function getSpotifyByline(item) {
+  if (item?.artists?.length) return item.artists.map((artist) => artist.name).join(", ");
+  return item?.show?.name || item?.type || "Spotify";
+}
+
+function getSpotifyUrl(item) {
+  return item?.external_urls?.spotify || "https://open.spotify.com/";
+}
+
+function formatSpotifyTime(milliseconds) {
+  const seconds = Math.max(0, Math.floor(Number(milliseconds || 0) / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function renderSpotifyLibrary() {
+  const items =
+    spotifyLibraryView === "top"
+      ? lastSpotifyData.top
+      : lastSpotifyData.recent.map((entry) => entry.track).filter(Boolean);
+  const list = document.querySelector("#spotifyLibraryList");
+  if (!list) return;
+  if (!items.length) {
+    list.innerHTML = '<div class="spotify-list-empty">No listening history is available yet.</div>';
+  } else {
+    list.innerHTML = items
+      .slice(0, 4)
+      .map((item) => {
+        const artwork = getSpotifyArtwork(item);
+        return `
+          <a class="spotify-list-row" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">
+            ${artwork ? `<img src="${escapeHtml(artwork)}" alt="" loading="lazy" width="34" height="34" />` : '<span class="spotify-list-placeholder"></span>'}
+            <span><strong>${escapeHtml(item.name || "Untitled")}</strong><small>${escapeHtml(getSpotifyByline(item))}</small></span>
+            <span aria-hidden="true">↗</span>
+          </a>
+        `;
+      })
+      .join("");
+  }
+  document.querySelectorAll("[data-spotify-view]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.spotifyView === spotifyLibraryView);
+  });
+}
+
+function bindSpotifyPanelActions() {
+  document.querySelector("#spotifyPrevious")?.addEventListener("click", () => controlSpotify("previous"));
+  document.querySelector("#spotifyPlay")?.addEventListener("click", () => controlSpotify("toggle"));
+  document.querySelector("#spotifyNext")?.addEventListener("click", () => controlSpotify("next"));
+  document.querySelectorAll("[data-spotify-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      spotifyLibraryView = button.dataset.spotifyView;
+      renderSpotifyLibrary();
+    });
+  });
+}
+
+function renderSpotifyPanel(data = lastSpotifyData) {
+  lastSpotifyData = data;
+  const playback = data.playback;
+  const item = playback?.item || null;
+  const product = data.profile?.product?.toUpperCase() || "CONNECTED";
+  const heading = document.querySelector("#spotifyHeadingStatus");
+  heading.textContent = `LIVE · ${product}`;
+  heading.classList.add("is-live");
+  document.querySelector("#disconnectSpotify").hidden = false;
+
+  spotifyIsPlaying = Boolean(playback?.is_playing);
+  spotifyProgressBaseMs = Number(playback?.progress_ms) || 0;
+  spotifyProgressFetchedAt = Date.now();
+  spotifyDurationMs = Number(item?.duration_ms) || 0;
+
+  const currentMarkup = item
+    ? `
+      <div class="spotify-now">
+        <a class="spotify-cover" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">
+          ${getSpotifyArtwork(item) ? `<img src="${escapeHtml(getSpotifyArtwork(item))}" alt="" width="88" height="88" />` : ""}
+        </a>
+        <div class="spotify-track-copy">
+          <small>${spotifyIsPlaying ? "NOW PLAYING" : "PAUSED"}${playback.device?.name ? ` · ${escapeHtml(playback.device.name)}` : ""}</small>
+          <strong>${escapeHtml(item.name || "Untitled")}</strong>
+          <span>${escapeHtml(getSpotifyByline(item))}</span>
+          <div class="spotify-progress" aria-hidden="true"><i id="spotifyProgressFill"></i></div>
+          <time class="spotify-progress-time" id="spotifyProgressTime">0:00 / ${formatSpotifyTime(spotifyDurationMs)}</time>
+        </div>
+      </div>
+      <div class="spotify-controls">
+        <button id="spotifyPrevious" type="button" aria-label="Previous track">↤</button>
+        <button class="spotify-play" id="spotifyPlay" type="button" aria-label="${spotifyIsPlaying ? "Pause" : "Play"}">${spotifyIsPlaying ? "Ⅱ" : "▶"}</button>
+        <button id="spotifyNext" type="button" aria-label="Next track">↦</button>
+        <a class="spotify-open" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">OPEN IN SPOTIFY ↗</a>
+      </div>
+      ${
+        data.queue[0]
+          ? `<div class="spotify-up-next"><b>UP NEXT</b><span>${escapeHtml(data.queue[0].name || "Untitled")} · ${escapeHtml(getSpotifyByline(data.queue[0]))}</span></div>`
+          : ""
+      }
+    `
+    : `
+      <div class="spotify-idle">
+        <strong>Nothing is playing right now.</strong>
+        <p>Start something on your phone, computer or speaker; Daymark will pick it up automatically.</p>
+        <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify ↗</a>
+      </div>
+    `;
+
+  document.querySelector("#spotifyContent").innerHTML = `
+    ${currentMarkup}
+    <div class="spotify-library">
+      <div class="spotify-library-head">
+        <span>YOUR ROTATION</span>
+        <div class="spotify-tabs">
+          <button class="${spotifyLibraryView === "recent" ? "is-active" : ""}" type="button" data-spotify-view="recent">RECENT</button>
+          <button class="${spotifyLibraryView === "top" ? "is-active" : ""}" type="button" data-spotify-view="top">TOP THIS MONTH</button>
+        </div>
+      </div>
+      <div class="spotify-list" id="spotifyLibraryList"></div>
+    </div>
+  `;
+  renderSpotifyLibrary();
+  bindSpotifyPanelActions();
+  updateSpotifyProgress();
+}
+
+function bindSpotifyConnectButton() {
+  const button = document.querySelector("#connectSpotify");
+  if (!button || button.dataset.bound === "true") return;
+  button.dataset.bound = "true";
+  button.addEventListener("click", requestSpotifyConnection);
+}
+
+function renderSpotifyDisconnected(message = "Bring the current track into Daymark") {
+  const heading = document.querySelector("#spotifyHeadingStatus");
+  heading.textContent = "NOT CONNECTED";
+  heading.classList.remove("is-live");
+  document.querySelector("#disconnectSpotify").hidden = true;
+  document.querySelector("#spotifyContent").innerHTML = `
+    <div class="spotify-connect-state">
+      <span class="spotify-record" aria-hidden="true"><i></i></span>
+      <strong>${escapeHtml(message)}</strong>
+      <p>See what is playing, recent listening and your short-term favorites. Control the active Spotify device without leaving the brief.</p>
+      <button id="connectSpotify" type="button">Connect Spotify</button>
+      <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify instead ↗</a>
+    </div>
+  `;
+  bindSpotifyConnectButton();
+}
+
+function renderSpotifyLoading() {
+  document.querySelector("#spotifyHeadingStatus").textContent = "CONNECTING";
+  document.querySelector("#spotifyContent").innerHTML =
+    '<div class="spotify-loading">Tuning into your Spotify session…</div>';
+}
+
+async function controlSpotify(action) {
+  const commands = {
+    previous: { path: "/v1/me/player/previous", method: "POST" },
+    next: { path: "/v1/me/player/next", method: "POST" },
+    toggle: {
+      path: spotifyIsPlaying ? "/v1/me/player/pause" : "/v1/me/player/play",
+      method: "PUT",
+    },
+  };
+  const command = commands[action];
+  if (!command) return;
+  const buttons = document.querySelectorAll(".spotify-controls button");
+  buttons.forEach((button) => {
+    button.disabled = true;
+  });
+  try {
+    await fetchSpotify(command.path, { method: command.method });
+    if (action === "toggle") spotifyIsPlaying = !spotifyIsPlaying;
+    showToast(
+      action === "next" ? "Skipping forward." : action === "previous" ? "Going back." : spotifyIsPlaying ? "Playing." : "Paused.",
+    );
+    window.setTimeout(() => refreshSpotify(true), 500);
+  } catch (error) {
+    buttons.forEach((button) => {
+      button.disabled = false;
+    });
+    showToast(
+      [403, 404].includes(error.status)
+        ? "Open Spotify on a device, then try again."
+        : "Spotify could not update playback.",
+    );
+  }
+}
+
+function updateSpotifyProgress() {
+  const fill = document.querySelector("#spotifyProgressFill");
+  const time = document.querySelector("#spotifyProgressTime");
+  if (!fill || !time || !spotifyDurationMs) return;
+  const elapsed = spotifyIsPlaying ? Date.now() - spotifyProgressFetchedAt : 0;
+  const progress = Math.min(spotifyDurationMs, spotifyProgressBaseMs + elapsed);
+  fill.style.width = `${Math.max(0, (progress / spotifyDurationMs) * 100)}%`;
+  time.textContent = `${formatSpotifyTime(progress)} / ${formatSpotifyTime(spotifyDurationMs)}`;
+}
+
+async function refreshSpotify(force = false) {
+  if (!spotifyAccessToken || spotifyRefreshInFlight) return;
+  if (!force && Date.now() - lastSpotifyRefreshAt < SPOTIFY_REFRESH_INTERVAL_MS) return;
+  spotifyRefreshInFlight = true;
+  document.querySelector("#spotifyHeadingStatus").textContent = "UPDATING";
+
+  try {
+    const refreshLibrary =
+      force ||
+      !lastSpotifyData.profile ||
+      Date.now() - lastSpotifyLibraryRefreshAt >= SPOTIFY_LIBRARY_REFRESH_INTERVAL_MS;
+    const requests = [
+      fetchSpotify("/v1/me/player"),
+      fetchSpotify("/v1/me/player/queue"),
+      refreshLibrary ? fetchSpotify("/v1/me/player/recently-played?limit=4") : Promise.resolve(null),
+      refreshLibrary
+        ? fetchSpotify("/v1/me/top/tracks?time_range=short_term&limit=4")
+        : Promise.resolve(null),
+      refreshLibrary ? fetchSpotify("/v1/me") : Promise.resolve(null),
+    ];
+    const [playbackResult, queueResult, recentResult, topResult, profileResult] =
+      await Promise.allSettled(requests);
+
+    if (playbackResult.status === "rejected" && !lastSpotifyData.profile) {
+      throw playbackResult.reason;
+    }
+    if (playbackResult.status === "fulfilled") {
+      lastSpotifyData.playback = playbackResult.value;
+    }
+    if (queueResult.status === "fulfilled") {
+      lastSpotifyData.queue = queueResult.value?.queue || [];
+    }
+    if (recentResult.status === "fulfilled" && recentResult.value) {
+      lastSpotifyData.recent = recentResult.value.items || [];
+    }
+    if (topResult.status === "fulfilled" && topResult.value) {
+      lastSpotifyData.top = topResult.value.items || [];
+    }
+    if (profileResult.status === "fulfilled" && profileResult.value) {
+      lastSpotifyData.profile = profileResult.value;
+    }
+    if (refreshLibrary) lastSpotifyLibraryRefreshAt = Date.now();
+    renderSpotifyPanel(lastSpotifyData);
+  } catch (error) {
+    if (!spotifyRefreshToken && Date.now() >= spotifyTokenExpiresAt) {
+      clearSpotifySession();
+      renderSpotifyDisconnected("Reconnect Spotify");
+    } else {
+      document.querySelector("#spotifyHeadingStatus").textContent = "RETRYING";
+    }
+  } finally {
+    lastSpotifyRefreshAt = Date.now();
+    spotifyRefreshInFlight = false;
+  }
+}
+
+async function initializeSpotify() {
+  const callbackHandled = await handleSpotifyCallback();
+  if (callbackHandled || restoreSpotifySession()) {
+    renderSpotifyLoading();
+    await refreshSpotify(true);
+  } else {
+    renderSpotifyDisconnected();
+  }
 }
 
 function writeLiveCache(key, data) {
@@ -1023,6 +1686,8 @@ function renderWeather(data, source = "live", updatedAt = new Date()) {
   document.querySelector("#weatherHigh").textContent = `${high}°`;
   document.querySelector("#weatherRain").textContent = `${rain}%`;
   document.querySelector("#weatherSunset").textContent = sunset;
+  document.querySelector("#widgetWeather").textContent = `${current}° · ${description}`;
+  document.querySelector("#widgetWeatherNote").textContent = `High ${high}° · Rain ${rain}%`;
   const ageMinutes = Math.max(0, (Date.now() - new Date(updatedAt).getTime()) / 60000);
   document.querySelector(".weather-card").classList.toggle("is-stale", ageMinutes > 15);
 }
@@ -1032,6 +1697,8 @@ function renderWeatherError() {
     '<i class="weather-glyph" aria-hidden="true">!</i> Weather unavailable';
   document.querySelector("#weatherSource").textContent = "UNAVAILABLE";
   document.querySelector("#weatherSummary").textContent = "Could not reach the weather source.";
+  document.querySelector("#widgetWeather").textContent = "Unavailable";
+  document.querySelector("#widgetWeatherNote").textContent = "Will retry quietly";
   document.querySelector(".weather-card").classList.add("is-stale");
 }
 
@@ -1246,6 +1913,9 @@ function renderDiamondbacksGame(game) {
   document.querySelector("#gameTime").textContent = `DIAMONDBACKS · ${dateLabel} ${timeLabel}`;
   document.querySelector("#gameOpponent").textContent = `${dbacksHome ? "vs." : "at"} ${opponent}`;
   document.querySelector("#gameStatus").textContent = game.status.detailedState.toUpperCase();
+  document.querySelector("#widgetGame").textContent = `${dbacksHome ? "vs." : "at"} ${opponent}`;
+  document.querySelector("#widgetGameNote").textContent =
+    `${dateLabel} ${timeLabel} · ${game.status.detailedState}`;
   gameCard.href = `https://www.mlb.com/gameday/${game.gamePk}`;
 
   if (gameState === "Final") {
@@ -1268,6 +1938,8 @@ function renderNoDiamondbacksGame() {
   document.querySelector("#gameOpponent").textContent = "No upcoming game found";
   document.querySelector("#gameDetail").textContent = "Open the official schedule for more.";
   document.querySelector("#gameStatus").textContent = "MLB";
+  document.querySelector("#widgetGame").textContent = "No game found";
+  document.querySelector("#widgetGameNote").textContent = "Open official schedule";
 }
 
 function renderBaseballError() {
@@ -1282,6 +1954,8 @@ function renderBaseballError() {
   document.querySelector("#dbacksLastTen").textContent = "—";
   document.querySelector("#dbacksStreak").textContent = "—";
   document.querySelector("#dbacksWinPct").textContent = "—";
+  document.querySelector("#widgetGame").textContent = "MLB unavailable";
+  document.querySelector("#widgetGameNote").textContent = "Will retry quietly";
   document.querySelector("#standingsRows").innerHTML =
     '<div class="standing-row standings-loading"><span>Could not reach MLB.</span><span>—</span><span>—</span><span>—</span></div>';
   document.querySelector("#gameOpponent").textContent = "MLB data unavailable";
@@ -1291,7 +1965,7 @@ function renderBaseballError() {
 function updateSyncState() {
   const sync = document.querySelector("#syncState");
   const syncLabel = sync.querySelector(".sync-label");
-  const refreshing = weatherRefreshInFlight || baseballRefreshInFlight;
+  const refreshing = weatherRefreshInFlight || baseballRefreshInFlight || spotifyRefreshInFlight;
   sync.classList.toggle("is-refreshing", refreshing);
   if (refreshing) {
     syncLabel.textContent = "updating";
@@ -1432,6 +2106,7 @@ async function refreshAllData(force = false) {
     refreshWeather(force),
     refreshBaseball(force),
     refreshGoogleIfNeeded(force),
+    refreshSpotify(force),
   ]);
 }
 
@@ -1440,6 +2115,7 @@ function runRefreshScheduler() {
   refreshWeather(false);
   refreshBaseball(false);
   refreshGoogleIfNeeded(false);
+  refreshSpotify(false);
 }
 
 function hydrateTasks() {
@@ -1535,7 +2211,7 @@ function hydrateDecisions() {
         }
         if (button.dataset.choice === "Open" && id === "housing-tour") {
           window.open(
-            "https://www.zillow.com/durham-nc/rentals/",
+            "https://www.redfin.com/city/4909/NC/Durham/filter/max-price=450k",
             "_blank",
             "noopener,noreferrer",
           );
@@ -1676,10 +2352,36 @@ document.querySelector("#refreshBrief").addEventListener("click", async (event) 
   }
 });
 
+document.querySelector("#refreshMail").addEventListener("click", refreshPriorityMail);
+
+document.querySelector("#mapSearchForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  openMapSearch(new FormData(event.currentTarget).get("query"));
+});
+
+document.querySelectorAll("[data-map-query]").forEach((button) => {
+  button.addEventListener("click", () => openMapSearch(button.dataset.mapQuery));
+});
+
+document.querySelector("#youtubeSearchForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  openYouTubeSearch(new FormData(event.currentTarget).get("query"));
+});
+
+document.querySelectorAll("[data-youtube-query]").forEach((button) => {
+  button.addEventListener("click", () => openYouTubeSearch(button.dataset.youtubeQuery));
+});
+
 document.querySelector("#disconnectGoogle").addEventListener("click", () => {
   clearGoogleSession();
   renderGoogleDisconnected();
   showToast("Google session ended on this device.");
+});
+
+document.querySelector("#disconnectSpotify").addEventListener("click", () => {
+  clearSpotifySession();
+  renderSpotifyDisconnected();
+  showToast("Spotify session ended on this device.");
 });
 
 document.querySelectorAll("[data-standings-view]").forEach((button) => {
@@ -1895,10 +2597,12 @@ updateSprintProgress();
 renderFocusRail();
 updateFocusTimer();
 restoreGoogleSession();
+initializeSpotify();
 refreshAllData(true);
 window.setInterval(() => {
   updateClock();
   updateFocusTimer();
+  updateSpotifyProgress();
 }, 1000);
 window.setInterval(() => updateLiveDay(), 30000);
 window.setInterval(runRefreshScheduler, REFRESH_SCHEDULER_INTERVAL_MS);
@@ -1914,6 +2618,6 @@ window.addEventListener("offline", updateSyncState);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=9").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=11").catch(() => {});
   });
 }

@@ -9,11 +9,11 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=9" />
+    <link rel="manifest" href="./manifest.webmanifest?v=11" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=9" />
-    <script src="./config.js?v=9"></script>
+    <link rel="stylesheet" href="./styles.css?v=11" />
+    <script src="./config.js?v=11"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -97,6 +97,27 @@
             <button class="focus-next" id="focusNextButton" type="button" aria-label="Show next open action">↻</button>
           </div>
           <span class="focus-progress" aria-hidden="true"><i id="focusProgress"></i></span>
+        </section>
+
+        <section class="glance-widget" aria-label="Daymark glance">
+          <button type="button" data-scroll="durham">
+            <span class="glance-icon glance-icon--weather" aria-hidden="true">☼</span>
+            <span><small>WEATHER</small><strong id="widgetWeather">Checking</strong><em id="widgetWeatherNote">Durham</em></span>
+          </button>
+          <button type="button" data-scroll="signals">
+            <span class="glance-icon glance-icon--calendar" aria-hidden="true">12</span>
+            <span><small>NEXT</small><strong id="widgetNext">Calendar</strong><em id="widgetNextNote">Not connected</em></span>
+          </button>
+          <button type="button" data-scroll="signals">
+            <span class="glance-icon glance-icon--mail" aria-hidden="true">↗</span>
+            <span><small>MAIL</small><strong id="widgetMail">Connect</strong><em id="widgetMailNote">Priority unread</em></span>
+          </button>
+          <button type="button" data-scroll="sports">
+            <span class="glance-icon glance-icon--dbacks" aria-hidden="true">
+              <img src="https://www.mlbstatic.com/team-logos/109.svg" alt="" width="24" height="24" data-team-logo />
+            </span>
+            <span><small>DBACKS</small><strong id="widgetGame">Checking</strong><em id="widgetGameNote">Official MLB</em></span>
+          </button>
         </section>
 
         <div class="content-grid">
@@ -236,13 +257,16 @@
                   <div class="panel-label">
                     <span class="panel-icon panel-icon--coral" aria-hidden="true"></span>
                     PRIORITY MAIL
-                    <span class="panel-status disconnected-status" id="emailStatus">NOT CONNECTED</span>
+                    <span class="panel-tools">
+                      <button class="panel-refresh" id="refreshMail" type="button" aria-label="Refresh priority mail" hidden>↻</button>
+                      <span class="panel-status disconnected-status" id="emailStatus">NOT CONNECTED</span>
+                    </span>
                   </div>
                   <div id="emailContent">
                     <button class="connection-empty google-connect-button" type="button" data-google-connect>
                       <span aria-hidden="true">＋</span>
                       <strong>Connect Google securely</strong>
-                      <p>Allow read-only access to priority email.</p>
+                      <p>See unread priority mail and mark messages read.</p>
                     </button>
                   </div>
                 </article>
@@ -364,8 +388,8 @@
                 <article class="decision-card" data-decision="housing-tour">
                   <span class="decision-number">03</span>
                   <div>
-                    <strong>Open the Durham rental search?</strong>
-                    <small>Set and save your real filters on Zillow; Daymark will not invent listings.</small>
+                    <strong>Open the Durham home search?</strong>
+                    <small>Browse homes for sale around your $450,000 ceiling.</small>
                     <div class="choice-row">
                       <button type="button" data-choice="Open">Open</button>
                       <button type="button" data-choice="Later">Later</button>
@@ -439,15 +463,36 @@
                   <span class="local-icon local-icon--event" aria-hidden="true">✦</span>
                   <div><small>LOCAL EVENTS · LIVE SEARCH</small><strong>Browse Durham events</strong><p>Open the current Discover Durham calendar. ↗</p></div>
                 </a>
-                <a href="https://www.zillow.com/durham-nc/rentals/" target="_blank" rel="noreferrer">
+                <a href="https://nasher.duke.edu/events/" target="_blank" rel="noreferrer">
+                  <span class="local-icon local-icon--nasher" aria-hidden="true">N</span>
+                  <div><small>THE NASHER · OFFICIAL CALENDAR</small><strong>Exhibitions, talks and events</strong><p>See what is happening at Duke’s art museum. ↗</p></div>
+                </a>
+                <a href="https://www.redfin.com/city/4909/NC/Durham/filter/max-price=450k" target="_blank" rel="noreferrer">
                   <span class="local-icon local-icon--home" aria-hidden="true">⌂</span>
-                  <div><small>HOUSING · LIVE SEARCH</small><strong>Browse Durham rentals</strong><p>Open current Zillow listings. ↗</p></div>
+                  <div><small>HOMES FOR SALE · UP TO $450K</small><strong>Browse current Durham listings</strong><p>Open the filtered Redfin market. ↗</p></div>
                 </a>
                 <button class="local-reminder" id="practicalReminder" type="button" data-open-reminder>
                   <span class="local-icon local-icon--bell" aria-hidden="true">!</span>
                   <div><small>PRACTICAL · YOURS</small><strong id="practicalReminderTitle">Add a practical reminder</strong><p id="practicalReminderNote">Tap to capture the thing that cannot slip. ↗</p></div>
                 </button>
               </div>
+
+              <article class="search-card map-search-card">
+                <div class="search-card-heading">
+                  <span class="search-mark search-mark--maps" aria-hidden="true">⌖</span>
+                  <div><small>GOOGLE MAPS</small><strong>Find it around Durham</strong></div>
+                </div>
+                <form class="search-form" id="mapSearchForm">
+                  <label class="sr-only" for="mapSearchInput">Search Google Maps near Durham</label>
+                  <input id="mapSearchInput" name="query" type="search" placeholder="Coffee, open houses, trails…" autocomplete="off" />
+                  <button type="submit">Search</button>
+                </form>
+                <div class="search-chips" aria-label="Quick map searches">
+                  <button type="button" data-map-query="open houses under $450,000">Open houses</button>
+                  <button type="button" data-map-query="Nasher Museum of Art">Nasher</button>
+                  <button type="button" data-map-query="coffee shops">Coffee</button>
+                </div>
+              </article>
             </section>
 
             <section class="section-block" id="sports">
@@ -522,11 +567,67 @@
               </article>
 
               <div class="team-ticker">
-                <a href="https://www.chelseafc.com/en/matches/mens-fixtures-and-results" target="_blank" rel="noreferrer"><span class="mini-team mini-team--chelsea">C</span><div><small>CHELSEA</small><strong>Open official fixtures ↗</strong></div></a>
-                <a href="https://arizonawildcats.com/calendar" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cats">A</span><div><small>ARIZONA</small><strong>Open official calendar ↗</strong></div></a>
-                <a href="https://www.nba.com/suns/schedule" target="_blank" rel="noreferrer"><span class="mini-team mini-team--suns">PHX</span><div><small>SUNS</small><strong>Open official schedule ↗</strong></div></a>
-                <a href="https://www.azcardinals.com/schedule/" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cards">AZ</span><div><small>CARDINALS</small><strong>Open official schedule ↗</strong></div></a>
+                <a href="https://www.chelseafc.com/en/matches/mens-fixtures-and-results" target="_blank" rel="noreferrer"><span class="mini-team mini-team--chelsea" data-abbr="CFC"><img src="https://a.espncdn.com/i/teamlogos/soccer/500/363.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>CHELSEA</small><strong>Open official fixtures ↗</strong></div></a>
+                <a href="https://arizonawildcats.com/calendar" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cats" data-abbr="UA"><img src="https://a.espncdn.com/i/teamlogos/ncaa/500/12.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>ARIZONA</small><strong>Open official calendar ↗</strong></div></a>
+                <a href="https://www.nba.com/suns/schedule" target="_blank" rel="noreferrer"><span class="mini-team mini-team--suns" data-abbr="PHX"><img src="https://a.espncdn.com/i/teamlogos/nba/500/phx.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>SUNS</small><strong>Open official schedule ↗</strong></div></a>
+                <a href="https://www.azcardinals.com/schedule/" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cards" data-abbr="AZ"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/ari.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>CARDINALS</small><strong>Open official schedule ↗</strong></div></a>
               </div>
+            </section>
+
+            <section class="section-block" id="watch">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">WATCH WITH INTENT</p>
+                  <h2>YouTube discovery</h2>
+                </div>
+              </div>
+
+              <article class="search-card youtube-card">
+                <div class="search-card-heading">
+                  <span class="search-mark search-mark--youtube" aria-hidden="true">▶</span>
+                  <div><small>YOUTUBE</small><strong>Choose a lane, then explore</strong></div>
+                </div>
+                <form class="search-form" id="youtubeSearchForm">
+                  <label class="sr-only" for="youtubeSearchInput">Search YouTube</label>
+                  <input id="youtubeSearchInput" name="query" type="search" placeholder="History, Chelsea, design…" autocomplete="off" />
+                  <button type="submit">Watch</button>
+                </form>
+                <div class="search-chips" aria-label="Quick YouTube searches">
+                  <button type="button" data-youtube-query="democratic socialism long form">Socialism</button>
+                  <button type="button" data-youtube-query="Chelsea FC analysis">Chelsea</button>
+                  <button type="button" data-youtube-query="Arizona Diamondbacks analysis">D-backs</button>
+                  <button type="button" data-youtube-query="modern product design documentary">Design</button>
+                </div>
+                <a class="youtube-home" href="https://www.youtube.com/" target="_blank" rel="noreferrer">Open my personalized YouTube Home ↗</a>
+                <p class="search-note">YouTube keeps its recommendation feed out of the public API; Home shows it when you are signed in, while these lanes open live searches.</p>
+              </article>
+            </section>
+
+            <section class="section-block" id="listen">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">SOUNDTRACK THE MOMENT</p>
+                  <h2>Spotify, within reach</h2>
+                </div>
+                <span class="spotify-heading-status" id="spotifyHeadingStatus">NOT CONNECTED</span>
+              </div>
+
+              <article class="spotify-card" id="spotifyCard">
+                <div class="spotify-brand-row">
+                  <span class="spotify-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <div><small>SPOTIFY PREMIUM</small><strong>Your listening, without the detour</strong></div>
+                  <button class="spotify-disconnect" id="disconnectSpotify" type="button" hidden>Disconnect</button>
+                </div>
+                <div id="spotifyContent">
+                  <div class="spotify-connect-state">
+                    <span class="spotify-record" aria-hidden="true"><i></i></span>
+                    <strong>Bring the current track into Daymark</strong>
+                    <p>See what is playing, recent listening and your short-term favorites. Control the active Spotify device without leaving the brief.</p>
+                    <button id="connectSpotify" type="button">Connect Spotify</button>
+                    <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify instead ↗</a>
+                  </div>
+                </div>
+              </article>
             </section>
 
             <section class="section-block reading-section" id="reading">
@@ -588,7 +689,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 9</small>
+          <small>Daymark keeps the signal. You keep the day. · BUILD 11</small>
         </footer>
       </main>
 
@@ -699,6 +800,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=9" defer></script>
+    <script src="./app.js?v=11" defer></script>
   </body>
 </html>

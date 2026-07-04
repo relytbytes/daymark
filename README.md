@@ -29,7 +29,8 @@ The web app manifest, offline cache, standalone display mode, safe-area spacing,
 - Cached public data always shows its age, and stale cards are visually marked instead of being presented as current.
 - Baseball now includes official MLB team marks, a Diamondbacks team-focus card, richer form data, and switchable NL West / Wild Card tables.
 - Source-oriented cards link to their real destination. Unconnected feeds are labeled rather than populated with invented updates.
-- Google Calendar and Gmail can be connected with read-only OAuth access after completing `GOOGLE_SETUP.md`.
+- Google Calendar and priority Gmail can be connected after completing `GOOGLE_SETUP.md`. Calendar stays read-only; Gmail can mark a selected message read but cannot send, delete, or archive mail.
+- Spotify Premium can be connected with browser-safe PKCE after completing `SPOTIFY_SETUP.md`. Daymark can show current/recent listening and control an active device without storing a client secret.
 - Tasks, decisions, sprint progress, applications, quick captures, focus sessions, and saved reading are stored on the device.
 - The **Now** rail pulls one open action forward and includes a persistent 25-minute focus timer.
 - **Quick Capture** can add a task, reminder, job lead, or read-later link from anywhere in the app.
