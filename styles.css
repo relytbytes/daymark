@@ -235,7 +235,7 @@ a:focus-visible {
 .live-date strong,
 .live-date span,
 .live-strip > time {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 850;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -253,7 +253,7 @@ a:focus-visible {
 
 .live-phase strong {
   overflow: hidden;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -424,7 +424,7 @@ body[data-phase="night"] .day-progress i {
   flex-direction: column;
   align-items: center;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -518,7 +518,7 @@ body[data-phase="night"] .day-progress i {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 5px;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.12em;
 }
@@ -538,7 +538,7 @@ body[data-phase="night"] .day-progress i {
   margin: 4px 0 0;
   overflow: hidden;
   color: rgba(24, 26, 28, 0.58);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -555,7 +555,7 @@ body[data-phase="night"] .day-progress i {
   min-height: 41px;
   border: 1px solid rgba(24, 26, 28, 0.15);
   border-radius: 12px;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 850;
 }
 
@@ -580,7 +580,7 @@ body[data-phase="night"] .day-progress i {
 
 .focus-play {
   color: var(--acid);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .focus-start.is-running .focus-play {
@@ -672,7 +672,7 @@ body[data-phase="night"] .day-progress i {
 .glance-widget small {
   margin-bottom: 4px;
   color: rgba(255, 255, 255, 0.48);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.12em;
 }
@@ -687,7 +687,7 @@ body[data-phase="night"] .day-progress i {
 .glance-widget em {
   margin-top: 3px;
   color: rgba(255, 255, 255, 0.55);
-  font-size: 7px;
+  font-size: 9px;
   font-style: normal;
 }
 
@@ -805,7 +805,7 @@ body[data-phase="night"] .day-progress i {
   display: block;
   margin-bottom: 3px;
   color: var(--coral);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.12em;
 }
@@ -821,7 +821,7 @@ body[data-phase="night"] .day-progress i {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--card);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 850;
 }
 
@@ -830,7 +830,7 @@ body[data-phase="night"] .day-progress i {
   margin: 0;
   padding: 16px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -876,7 +876,7 @@ body[data-phase="night"] .day-progress i {
 
 .capture-row small {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .capture-row.is-done strong {
@@ -1004,7 +1004,7 @@ body[data-phase="night"] .day-progress i {
   gap: 10px;
   margin-bottom: 8px;
   color: var(--coral);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -1073,7 +1073,7 @@ body[data-phase="night"] .day-progress i {
 
 .text-button--muted {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .add-button {
@@ -1101,7 +1101,7 @@ body[data-phase="night"] .day-progress i {
 .connection-note {
   margin: 9px 4px 0;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   line-height: 1.45;
 }
 
@@ -1143,7 +1143,7 @@ body[data-phase="night"] .day-progress i {
 .panel-status {
   margin-left: auto;
   color: var(--ink);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.05em;
 }
 
@@ -1216,7 +1216,7 @@ body[data-phase="night"] .day-progress i {
 .connection-empty p {
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .connection-empty:active,
@@ -1340,7 +1340,7 @@ body[data-phase="night"] .day-progress i {
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1389,7 +1389,7 @@ body[data-phase="night"] .day-progress i {
 
 .mail-copy time {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .mail-copy b,
@@ -1461,7 +1461,7 @@ body[data-phase="night"] .day-progress i {
 
 .tracker-summary span {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1526,7 +1526,7 @@ body[data-phase="night"] .day-progress i {
 
 .tracker-empty small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .application-row strong,
@@ -1569,7 +1569,7 @@ body[data-phase="night"] .day-progress i {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1647,7 +1647,7 @@ body[data-phase="night"] .day-progress i {
   border-radius: 5px;
   background: var(--acid);
   color: #273208;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .duke-copy strong,
@@ -1665,7 +1665,7 @@ body[data-phase="night"] .day-progress i {
 .duke-copy small {
   margin: 2px 0 8px;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .round-arrow {
@@ -1714,7 +1714,7 @@ body[data-phase="night"] .day-progress i {
 
 .sprint-score span {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1747,7 +1747,7 @@ body[data-phase="night"] .day-progress i {
 
 .sprint-context span {
   color: var(--blue);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.09em;
 }
@@ -1792,7 +1792,7 @@ body[data-phase="night"] .day-progress i {
 
 .sprint-tasks small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .decision-stack {
@@ -1822,7 +1822,7 @@ body[data-phase="night"] .day-progress i {
   border-radius: 50%;
   background: var(--paper-deep);
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -1839,7 +1839,7 @@ body[data-phase="night"] .day-progress i {
 
 .decision-card small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.4;
 }
 
@@ -1856,7 +1856,7 @@ body[data-phase="night"] .day-progress i {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -1873,7 +1873,7 @@ body[data-phase="night"] .day-progress i {
 .week-label,
 .quiet-label {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.09em;
 }
@@ -1887,7 +1887,7 @@ body[data-phase="night"] .day-progress i {
 
 .sports-freshness b {
   color: var(--green);
-  font-size: 7px;
+  font-size: 9px;
   letter-spacing: 0.1em;
 }
 
@@ -1898,7 +1898,7 @@ body[data-phase="night"] .day-progress i {
 .sports-freshness small {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .scorecard {
@@ -1930,7 +1930,7 @@ body[data-phase="night"] .day-progress i {
 
 .score-row small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .score-dots {
@@ -1999,7 +1999,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .weather-top span {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.1em;
 }
@@ -2075,7 +2075,7 @@ body[data-phase="night"] .day-progress i {
 
 .weather-detail small {
   margin-bottom: 3px;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.1em;
 }
@@ -2092,7 +2092,7 @@ body[data-phase="night"] .day-progress i {
   padding-top: 9px;
   border-top: 1px solid var(--line);
   color: var(--blue);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-decoration: none;
@@ -2186,7 +2186,7 @@ body[data-phase="night"] .day-progress i {
 
 .local-list small {
   color: var(--coral);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.1em;
 }
@@ -2199,7 +2199,7 @@ body[data-phase="night"] .day-progress i {
 .local-list p {
   margin: 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .search-card {
@@ -2225,7 +2225,7 @@ body[data-phase="night"] .day-progress i {
 .search-card-heading small {
   margin-bottom: 3px;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.1em;
 }
@@ -2286,7 +2286,7 @@ body[data-phase="night"] .day-progress i {
   border-radius: 12px;
   background: var(--ink);
   color: white;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 850;
 }
 
@@ -2310,7 +2310,7 @@ body[data-phase="night"] .day-progress i {
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
 }
 
@@ -2319,7 +2319,7 @@ body[data-phase="night"] .day-progress i {
   padding-top: 10px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1.45;
 }
 
@@ -2327,7 +2327,7 @@ body[data-phase="night"] .day-progress i {
   display: inline-flex;
   margin-top: 12px;
   color: #d52d20;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 850;
   text-decoration: none;
 }
@@ -2363,7 +2363,7 @@ body[data-phase="night"] .day-progress i {
 .durham-sports-heading small {
   margin-bottom: 4px;
   color: var(--coral);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.1em;
 }
@@ -2377,7 +2377,7 @@ body[data-phase="night"] .day-progress i {
 
 .durham-sports-heading > span {
   color: var(--muted);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.07em;
 }
@@ -2432,7 +2432,7 @@ body[data-phase="night"] .day-progress i {
 .bulls-logo.is-missing::after {
   color: #082d44;
   content: attr(data-abbr);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 900;
 }
 
@@ -2454,7 +2454,7 @@ body[data-phase="night"] .day-progress i {
 .bulls-game-copy small {
   margin-bottom: 5px;
   color: #f99b70;
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.08em;
 }
@@ -2470,7 +2470,7 @@ body[data-phase="night"] .day-progress i {
 .bulls-game-copy > span {
   margin-top: 5px;
   color: rgba(255, 255, 255, 0.56);
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .bulls-game-card > b {
@@ -2481,7 +2481,7 @@ body[data-phase="night"] .day-progress i {
   max-width: 64px;
   overflow: hidden;
   color: rgba(255, 255, 255, 0.55);
-  font-size: 6px;
+  font-size: 9px;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -2526,7 +2526,7 @@ body[data-phase="night"] .day-progress i {
 .durham-team-logo.is-missing::after {
   color: var(--ink);
   content: attr(data-abbr);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 900;
 }
 
@@ -2541,13 +2541,13 @@ body[data-phase="night"] .day-progress i {
 .durham-team-grid small {
   margin-bottom: 4px;
   color: var(--muted);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.06em;
 }
 
 .durham-team-grid strong {
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .spotify-heading-status {
@@ -2555,7 +2555,7 @@ body[data-phase="night"] .day-progress i {
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.07em;
 }
@@ -2594,7 +2594,7 @@ body[data-phase="night"] .day-progress i {
 .spotify-brand-row small {
   margin-bottom: 3px;
   color: #1ed760;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.1em;
 }
@@ -2638,8 +2638,27 @@ body[data-phase="night"] .day-progress i {
   border: 0;
   background: transparent;
   color: rgba(255, 255, 255, 0.46);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
+}
+
+.spotify-brand-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.spotify-brand-actions button {
+  padding: 4px 0 4px 8px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.spotify-brand-actions #repairSpotify {
+  color: #1ed760;
 }
 
 .spotify-connect-state {
@@ -2683,7 +2702,7 @@ body[data-phase="night"] .day-progress i {
   max-width: 360px;
   margin: 8px 0 17px;
   color: rgba(255, 255, 255, 0.56);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.5;
 }
 
@@ -2694,14 +2713,14 @@ body[data-phase="night"] .day-progress i {
   border-radius: 999px;
   background: #1ed760;
   color: #101010;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 900;
 }
 
 .spotify-connect-state a {
   margin-top: 12px;
   color: rgba(255, 255, 255, 0.55);
-  font-size: 8px;
+  font-size: 10px;
   text-decoration: none;
 }
 
@@ -2710,7 +2729,7 @@ body[data-phase="night"] .day-progress i {
   min-height: 280px;
   place-items: center;
   color: rgba(255, 255, 255, 0.58);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .spotify-now {
@@ -2760,7 +2779,7 @@ body[data-phase="night"] .day-progress i {
   margin-bottom: 6px;
   overflow: hidden;
   color: #1ed760;
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.1em;
   text-overflow: ellipsis;
@@ -2785,7 +2804,7 @@ body[data-phase="night"] .day-progress i {
 .spotify-track-copy > span {
   margin-top: 4px;
   color: rgba(255, 255, 255, 0.58);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .spotify-progress {
@@ -2807,7 +2826,7 @@ body[data-phase="night"] .day-progress i {
 .spotify-progress-time {
   margin-top: 4px;
   color: rgba(255, 255, 255, 0.4);
-  font-size: 7px;
+  font-size: 9px;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -2848,10 +2867,22 @@ body[data-phase="night"] .day-progress i {
   opacity: 0.4;
 }
 
+.spotify-control-status {
+  margin: -6px 16px 13px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.spotify-control-status.has-warning {
+  color: #ffc8b8;
+}
+
 .spotify-open {
   justify-content: center;
   color: rgba(255, 255, 255, 0.62);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 850;
 }
 
@@ -2866,13 +2897,13 @@ body[data-phase="night"] .day-progress i {
   border-radius: 11px;
   background: rgba(255, 255, 255, 0.035);
   color: rgba(255, 255, 255, 0.5);
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .spotify-up-next b {
   flex: 0 0 auto;
   color: #1ed760;
-  font-size: 6px;
+  font-size: 9px;
   letter-spacing: 0.08em;
 }
 
@@ -2897,12 +2928,12 @@ body[data-phase="night"] .day-progress i {
 .spotify-idle p {
   margin: 6px 0 13px;
   color: rgba(255, 255, 255, 0.52);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .spotify-idle a {
   color: #1ed760;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   text-decoration: none;
 }
@@ -2912,15 +2943,14 @@ body[data-phase="night"] .day-progress i {
 }
 
 .spotify-library-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  gap: 9px;
   padding: 14px 16px 9px;
 }
 
 .spotify-library-head > span {
   color: rgba(255, 255, 255, 0.5);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.08em;
 }
@@ -2928,16 +2958,24 @@ body[data-phase="night"] .day-progress i {
 .spotify-tabs {
   display: flex;
   gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.spotify-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .spotify-tabs button {
   min-height: 25px;
+  flex: 0 0 auto;
   padding: 0 9px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   background: transparent;
   color: rgba(255, 255, 255, 0.45);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 850;
 }
 
@@ -2951,10 +2989,17 @@ body[data-phase="night"] .day-progress i {
   padding: 0 16px 12px;
 }
 
+.spotify-view-note {
+  padding: 8px 0 12px;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
 .spotify-list-empty {
   padding: 18px 0 22px;
   color: rgba(255, 255, 255, 0.45);
-  font-size: 8px;
+  font-size: 10px;
   text-align: center;
 }
 
@@ -2975,8 +3020,8 @@ body[data-phase="night"] .day-progress i {
 
 .spotify-list-row img,
 .spotify-list-placeholder {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 8px;
   background: #242424;
   object-fit: cover;
@@ -2991,18 +3036,177 @@ body[data-phase="night"] .day-progress i {
 }
 
 .spotify-list-row strong {
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .spotify-list-row small {
   margin-top: 3px;
   color: rgba(255, 255, 255, 0.43);
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .spotify-list-row > span:last-child {
   color: rgba(255, 255, 255, 0.35);
   font-size: 10px;
+}
+
+.spotify-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 3px 0 12px;
+}
+
+.spotify-stat-grid > span {
+  min-height: 74px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.spotify-stat-grid strong,
+.spotify-stat-grid small {
+  display: block;
+}
+
+.spotify-stat-grid strong {
+  color: #1ed760;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.spotify-stat-grid small {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+}
+
+.spotify-stat-highlight {
+  margin-bottom: 10px;
+  padding: 13px;
+  border-radius: 12px;
+  background: #1ed760;
+  color: #111;
+}
+
+.spotify-stat-highlight small,
+.spotify-stat-highlight strong {
+  display: block;
+}
+
+.spotify-stat-highlight small {
+  margin-bottom: 5px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+
+.spotify-stat-highlight strong {
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 19px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spotify-period-list {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+.spotify-period-list a {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 3px 9px;
+  min-height: 56px;
+  align-content: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: white;
+  text-decoration: none;
+}
+
+.spotify-period-list a:last-child {
+  border-bottom: 0;
+}
+
+.spotify-period-list small {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: #1ed760;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+}
+
+.spotify-period-list strong,
+.spotify-period-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spotify-period-list strong {
+  font-size: 11px;
+}
+
+.spotify-period-list span {
+  color: rgba(255, 255, 255, 0.43);
+  font-size: 9px;
+}
+
+.spotify-artist-cloud {
+  margin-top: 12px;
+}
+
+.spotify-artist-cloud > small {
+  color: rgba(255, 255, 255, 0.43);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.spotify-artist-cloud > div {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.spotify-artist-cloud > div::-webkit-scrollbar {
+  display: none;
+}
+
+.spotify-artist-cloud a {
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border: 1px solid rgba(30, 215, 96, 0.3);
+  border-radius: 999px;
+  color: #1ed760;
+  font-size: 9px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.spotify-home-link {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  border: 1px solid rgba(30, 215, 96, 0.28);
+  border-radius: 12px;
+  color: #1ed760;
+  font-size: 10px;
+  font-weight: 850;
+  text-decoration: none;
 }
 
 .sports-lead {
@@ -3059,7 +3263,7 @@ body[data-phase="night"] .day-progress i {
 
 .sports-lead small {
   color: #e8a6b4;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.1em;
 }
@@ -3074,7 +3278,7 @@ body[data-phase="night"] .day-progress i {
 .sports-lead p {
   margin: 0;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .broadcast {
@@ -3082,7 +3286,7 @@ body[data-phase="night"] .day-progress i {
   right: 14px;
   bottom: 12px;
   color: rgba(255, 255, 255, 0.38);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
 }
 
@@ -3105,7 +3309,7 @@ body[data-phase="night"] .day-progress i {
   display: block;
   margin-bottom: 3px;
   color: var(--coral);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.1em;
 }
@@ -3157,7 +3361,7 @@ body[data-phase="night"] .day-progress i {
   overflow: hidden;
   margin-top: 2px;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3190,7 +3394,7 @@ body[data-phase="night"] .day-progress i {
   max-width: 72px;
   margin-top: 3px;
   color: var(--muted);
-  font-size: 6px;
+  font-size: 9px;
   line-height: 1.2;
 }
 
@@ -3217,7 +3421,7 @@ body[data-phase="night"] .day-progress i {
 .dbacks-form small {
   margin-bottom: 3px;
   color: var(--muted);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
@@ -3242,7 +3446,7 @@ body[data-phase="night"] .day-progress i {
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 850;
 }
 
@@ -3261,7 +3465,7 @@ body[data-phase="night"] .day-progress i {
   margin: 0 15px;
   border-bottom: 1px solid #e4e0d8;
   color: var(--ink);
-  font-size: 9px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   text-decoration: none;
 }
@@ -3277,7 +3481,7 @@ body[data-phase="night"] .day-progress i {
 .standing-head {
   min-height: 28px;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
@@ -3307,7 +3511,7 @@ body[data-phase="night"] .day-progress i {
 
 .standing-team > b {
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   text-align: center;
 }
 
@@ -3331,7 +3535,7 @@ body[data-phase="night"] .day-progress i {
 .standing-logo.is-missing::after {
   color: #7a1c38;
   content: attr(data-abbr);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 900;
 }
 
@@ -3342,7 +3546,7 @@ body[data-phase="night"] .day-progress i {
 
 .standing-team strong {
   overflow: hidden;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3350,7 +3554,7 @@ body[data-phase="night"] .day-progress i {
 .standing-team small {
   margin-top: 1px;
   color: var(--muted);
-  font-size: 6px;
+  font-size: 9px;
 }
 
 .standings-loading span:first-child {
@@ -3368,12 +3572,12 @@ body[data-phase="night"] .day-progress i {
   padding: 0 15px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 6px;
+  font-size: 9px;
 }
 
 .standings-source a {
   color: var(--blue);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
   text-decoration: none;
   text-transform: uppercase;
@@ -3410,7 +3614,7 @@ body[data-phase="night"] .day-progress i {
   place-items: center;
   border-radius: 9px;
   color: white;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 900;
 }
 
@@ -3428,7 +3632,7 @@ body[data-phase="night"] .day-progress i {
 .mini-team.is-missing::after {
   color: var(--ink);
   content: attr(data-abbr);
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .team-ticker small,
@@ -3439,13 +3643,13 @@ body[data-phase="night"] .day-progress i {
 .team-ticker small {
   margin-bottom: 3px;
   color: var(--muted);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
 .team-ticker strong {
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1.25;
 }
 
@@ -3515,7 +3719,7 @@ body[data-phase="night"] .day-progress i {
 
 .reading-copy small {
   color: var(--acid);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.1em;
 }
@@ -3547,7 +3751,7 @@ body[data-phase="night"] .day-progress i {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   background: transparent;
   color: white;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -3590,7 +3794,7 @@ body[data-phase="night"] .day-progress i {
 .reading-list small {
   margin-bottom: 4px;
   color: var(--muted);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
@@ -3605,7 +3809,7 @@ body[data-phase="night"] .day-progress i {
 .add-button--quiet {
   min-height: 32px;
   padding: 0 10px;
-  font-size: 8px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -3631,7 +3835,7 @@ body[data-phase="night"] .day-progress i {
 
 .reading-queue-head small {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .reading-queue-row {
@@ -3668,7 +3872,7 @@ body[data-phase="night"] .day-progress i {
 .reading-queue-row small {
   margin-bottom: 4px;
   color: var(--coral);
-  font-size: 6px;
+  font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.09em;
 }
@@ -3694,7 +3898,7 @@ body[data-phase="night"] .day-progress i {
   border: 0;
   background: transparent;
   color: var(--blue);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 850;
 }
 
@@ -3722,7 +3926,7 @@ body[data-phase="night"] .day-progress i {
 
 .tomorrow-label {
   color: rgba(255, 255, 255, 0.6);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.12em;
 }
@@ -3752,7 +3956,7 @@ body[data-phase="night"] .day-progress i {
   display: block;
   margin-top: 14px;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   text-align: right;
   text-decoration: none;
@@ -3781,7 +3985,7 @@ footer p {
 
 footer small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .bottom-nav {
@@ -3814,7 +4018,7 @@ footer small {
   border-radius: 16px;
   background: transparent;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
 }
 
@@ -3939,7 +4143,7 @@ body[data-phase="night"] #eveningActions {
   display: grid;
   gap: 7px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3949,7 +4153,7 @@ body[data-phase="night"] #eveningActions {
   display: grid;
   gap: 7px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3957,7 +4161,7 @@ body[data-phase="night"] #eveningActions {
 
 .capture-dialog form > label > span {
   color: #a7a49c;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 650;
 }
 
@@ -4022,7 +4226,7 @@ body[data-phase="night"] #eveningActions {
   border-radius: 11px;
   background: white;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 850;
 }
 
@@ -4044,7 +4248,7 @@ body[data-phase="night"] #eveningActions {
   width: 100%;
   margin: 4px 0 1px;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.11em;
 }
@@ -4055,7 +4259,7 @@ body[data-phase="night"] #eveningActions {
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
 }
 

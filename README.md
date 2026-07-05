@@ -32,6 +32,7 @@ The web app manifest, offline cache, standalone display mode, safe-area spacing,
 - Google Calendar and priority Gmail can be connected after completing `GOOGLE_SETUP.md`. Calendar stays read-only; Gmail can mark a selected message read but cannot send, delete, or archive mail.
 - Spotify Premium can be connected with browser-safe PKCE after completing `SPOTIFY_SETUP.md`. Daymark can show current/recent listening and control an active device without storing a client secret.
 - Durham sports includes a live official Durham Bulls schedule card plus direct Duke and NCCU all-sport calendars.
+- Spotify listening includes a 50-play history, multi-period top-track statistics, top artists, rediscovery suggestions, device-targeted controls, and visible control diagnostics.
 - Tasks, decisions, sprint progress, applications, quick captures, focus sessions, and saved reading are stored on the device.
 - The **Now** rail pulls one open action forward and includes a persistent 25-minute focus timer.
 - **Quick Capture** can add a task, reminder, job lead, or read-later link from anywhere in the app.

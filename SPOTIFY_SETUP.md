@@ -42,7 +42,7 @@ window.DAYMARK_CONFIG = Object.freeze({
 5. Commit the change.
 6. Wait for GitHub Pages to redeploy, then open:
 
-   https://relytbytes.github.io/daymark/?v=12
+   https://relytbytes.github.io/daymark/?v=13
 
 7. Tap **Connect Spotify** and approve the requested playback permissions.
 
@@ -56,3 +56,5 @@ window.DAYMARK_CONFIG = Object.freeze({
 Daymark cannot edit playlists, change your saved library, follow artists, or access your Spotify password.
 
 If playback controls say to open Spotify first, start playing something in the Spotify app on your phone, computer or speaker, then return to Daymark.
+
+If the current track appears but playback buttons fail, tap **Repair controls** in the Spotify card and approve the playback permission again. Daymark v13 targets the active Spotify device directly and shows Spotify’s returned error beneath the controls.

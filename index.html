@@ -9,11 +9,11 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=12" />
+    <link rel="manifest" href="./manifest.webmanifest?v=13" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=12" />
-    <script src="./config.js?v=12"></script>
+    <link rel="stylesheet" href="./styles.css?v=13" />
+    <script src="./config.js?v=13"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -647,7 +647,10 @@
                 <div class="spotify-brand-row">
                   <span class="spotify-mark" aria-hidden="true"><i></i><i></i><i></i></span>
                   <div><small>SPOTIFY PREMIUM</small><strong>Your listening, without the detour</strong></div>
-                  <button class="spotify-disconnect" id="disconnectSpotify" type="button" hidden>Disconnect</button>
+                  <span class="spotify-brand-actions">
+                    <button id="repairSpotify" type="button" hidden>Repair controls</button>
+                    <button class="spotify-disconnect" id="disconnectSpotify" type="button" hidden>Disconnect</button>
+                  </span>
                 </div>
                 <div id="spotifyContent">
                   <div class="spotify-connect-state">
@@ -720,7 +723,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 12</small>
+          <small>Daymark keeps the signal. You keep the day. · BUILD 13</small>
         </footer>
       </main>
 
@@ -831,6 +834,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=12" defer></script>
+    <script src="./app.js?v=13" defer></script>
   </body>
 </html>

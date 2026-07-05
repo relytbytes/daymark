@@ -6,7 +6,7 @@ const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
 const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
 const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
 const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
-const STATE_SCHEMA_VERSION = 12;
+const STATE_SCHEMA_VERSION = 13;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const BASEBALL_REFRESH_INTERVAL_MS = 60 * 1000;
 const BASEBALL_LIVE_REFRESH_INTERVAL_MS = 30 * 1000;
@@ -76,9 +76,20 @@ let googleTokenExpiresAt = 0;
 let spotifyAccessToken = "";
 let spotifyRefreshToken = "";
 let spotifyTokenExpiresAt = 0;
+let spotifyGrantedScopes = "";
 let spotifyRefreshInFlight = false;
 let spotifyLibraryView = "recent";
-let lastSpotifyData = { playback: null, queue: [], recent: [], top: [], profile: null };
+let lastSpotifyData = {
+  playback: null,
+  devices: [],
+  queue: [],
+  recent: [],
+  top: [],
+  topMedium: [],
+  topLong: [],
+  topArtists: [],
+  profile: null,
+};
 let spotifyProgressBaseMs = 0;
 let spotifyProgressFetchedAt = 0;
 let spotifyDurationMs = 0;
@@ -1177,6 +1188,7 @@ function persistSpotifySession() {
         accessToken: spotifyAccessToken,
         refreshToken: spotifyRefreshToken,
         expiresAt: spotifyTokenExpiresAt,
+        scope: spotifyGrantedScopes,
       }),
     );
   } catch {
@@ -1188,10 +1200,21 @@ function clearSpotifySession() {
   spotifyAccessToken = "";
   spotifyRefreshToken = "";
   spotifyTokenExpiresAt = 0;
+  spotifyGrantedScopes = "";
   spotifyIsPlaying = false;
   lastSpotifyRefreshAt = 0;
   lastSpotifyLibraryRefreshAt = 0;
-  lastSpotifyData = { playback: null, queue: [], recent: [], top: [], profile: null };
+  lastSpotifyData = {
+    playback: null,
+    devices: [],
+    queue: [],
+    recent: [],
+    top: [],
+    topMedium: [],
+    topLong: [],
+    topArtists: [],
+    profile: null,
+  };
   try {
     localStorage.removeItem(SPOTIFY_SESSION_KEY);
     sessionStorage.removeItem(SPOTIFY_PKCE_KEY);
@@ -1207,6 +1230,7 @@ function restoreSpotifySession() {
       spotifyAccessToken = saved.accessToken;
       spotifyRefreshToken = saved.refreshToken || "";
       spotifyTokenExpiresAt = Number(saved.expiresAt) || 0;
+      spotifyGrantedScopes = saved.scope || "";
       return true;
     }
   } catch {
@@ -1272,6 +1296,7 @@ async function requestSpotifyToken(parameters) {
 function setSpotifyTokens(data) {
   spotifyAccessToken = data.access_token || spotifyAccessToken;
   spotifyRefreshToken = data.refresh_token || spotifyRefreshToken;
+  spotifyGrantedScopes = data.scope || spotifyGrantedScopes;
   spotifyTokenExpiresAt = Date.now() + Number(data.expires_in || 3600) * 1000;
   persistSpotifySession();
 }
@@ -1350,8 +1375,16 @@ async function fetchSpotify(path, options = {}, retry = true) {
   }
   if (response.status === 204) return null;
   if (!response.ok) {
+    let detail = "";
+    try {
+      const payload = await response.json();
+      detail = payload?.error?.message || payload?.error_description || payload?.error || "";
+    } catch {
+      detail = "";
+    }
     const requestError = new Error(`Spotify request failed: ${response.status}`);
     requestError.status = response.status;
+    requestError.spotifyMessage = String(detail || "");
     throw requestError;
   }
   return await response.json();
@@ -1375,30 +1408,169 @@ function formatSpotifyTime(milliseconds) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function formatSpotifyPlayedAt(value) {
+  const playedAt = new Date(value);
+  if (Number.isNaN(playedAt.getTime())) return "Recently";
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const dayKey = formatApiDate(playedAt);
+  const prefix =
+    dayKey === formatApiDate(now)
+      ? "Today"
+      : dayKey === formatApiDate(yesterday)
+        ? "Yesterday"
+        : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(playedAt);
+  const time = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(playedAt);
+  return `${prefix} · ${time}`;
+}
+
+function spotifyTrackRow(item, detail = getSpotifyByline(item)) {
+  const artwork = getSpotifyArtwork(item);
+  return `
+    <a class="spotify-list-row" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">
+      ${artwork ? `<img src="${escapeHtml(artwork)}" alt="" loading="lazy" width="38" height="38" />` : '<span class="spotify-list-placeholder"></span>'}
+      <span><strong>${escapeHtml(item?.name || "Untitled")}</strong><small>${escapeHtml(detail)}</small></span>
+      <span aria-hidden="true">↗</span>
+    </a>
+  `;
+}
+
+function getSpotifyListeningStats() {
+  const tracks = lastSpotifyData.recent.map((entry) => entry.track).filter(Boolean);
+  const uniqueTrackIds = new Set(tracks.map((track) => track.id || track.uri));
+  const artistCounts = new Map();
+  tracks.forEach((track) => {
+    (track.artists || []).forEach((artist) => {
+      artistCounts.set(artist.name, (artistCounts.get(artist.name) || 0) + 1);
+    });
+  });
+  const topArtist =
+    [...artistCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "Not enough data";
+  const totalMinutes = Math.round(
+    tracks.reduce((sum, track) => sum + Number(track.duration_ms || 0), 0) / 60000,
+  );
+  const repeatRate = tracks.length
+    ? Math.round(((tracks.length - uniqueTrackIds.size) / tracks.length) * 100)
+    : 0;
+  return {
+    plays: tracks.length,
+    minutes: totalMinutes,
+    artists: artistCounts.size,
+    repeatRate,
+    topArtist,
+  };
+}
+
+function getSpotifyRediscoveryTracks() {
+  const recentIds = new Set(
+    lastSpotifyData.recent.map((entry) => entry.track?.id).filter(Boolean),
+  );
+  const shortIds = new Set(lastSpotifyData.top.map((track) => track.id).filter(Boolean));
+  const candidates = [...lastSpotifyData.topLong, ...lastSpotifyData.topMedium];
+  const unique = new Map();
+  candidates.forEach((track) => {
+    if (!track?.id || recentIds.has(track.id) || shortIds.has(track.id)) return;
+    if (!unique.has(track.id)) unique.set(track.id, track);
+  });
+  if (!unique.size) {
+    lastSpotifyData.topLong.forEach((track) => {
+      if (track?.id && !unique.has(track.id)) unique.set(track.id, track);
+    });
+  }
+  return [...unique.values()].slice(0, 8);
+}
+
+function renderSpotifyStats() {
+  const stats = getSpotifyListeningStats();
+  const periods = [
+    ["4 WEEKS", lastSpotifyData.top[0]],
+    ["6 MONTHS", lastSpotifyData.topMedium[0]],
+    ["AROUND A YEAR", lastSpotifyData.topLong[0]],
+  ];
+  return `
+    <div class="spotify-stat-grid">
+      <span><strong>${stats.plays}</strong><small>recent plays</small></span>
+      <span><strong>${stats.minutes}</strong><small>minutes sampled</small></span>
+      <span><strong>${stats.artists}</strong><small>unique artists</small></span>
+      <span><strong>${stats.repeatRate}%</strong><small>repeat rate</small></span>
+    </div>
+    <div class="spotify-stat-highlight"><small>MOST HEARD RECENTLY</small><strong>${escapeHtml(stats.topArtist)}</strong></div>
+    <div class="spotify-period-list">
+      ${periods
+        .map(
+          ([label, track]) => `
+            <a href="${escapeHtml(getSpotifyUrl(track))}" target="_blank" rel="noreferrer">
+              <small>${label}</small>
+              <strong>${escapeHtml(track?.name || "No data yet")}</strong>
+              <span>${escapeHtml(track ? getSpotifyByline(track) : "Keep listening")}</span>
+            </a>
+          `,
+        )
+        .join("")}
+    </div>
+    <div class="spotify-artist-cloud">
+      <small>TOP ARTISTS · LAST 4 WEEKS</small>
+      <div>
+        ${lastSpotifyData.topArtists
+          .slice(0, 8)
+          .map(
+            (artist) =>
+              `<a href="${escapeHtml(getSpotifyUrl(artist))}" target="_blank" rel="noreferrer">${escapeHtml(artist.name || "Artist")}</a>`,
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
 function renderSpotifyLibrary() {
-  const items =
-    spotifyLibraryView === "top"
-      ? lastSpotifyData.top
-      : lastSpotifyData.recent.map((entry) => entry.track).filter(Boolean);
   const list = document.querySelector("#spotifyLibraryList");
   if (!list) return;
-  if (!items.length) {
-    list.innerHTML = '<div class="spotify-list-empty">No listening history is available yet.</div>';
+  const recent = lastSpotifyData.recent;
+
+  if (spotifyLibraryView === "history") {
+    list.innerHTML = recent.length
+      ? `
+        <div class="spotify-view-note">Your latest ${recent.length} completed plays, newest first.</div>
+        ${recent
+          .map((entry) =>
+            spotifyTrackRow(
+              entry.track,
+              `${getSpotifyByline(entry.track)} · ${formatSpotifyPlayedAt(entry.played_at)}`,
+            ),
+          )
+          .join("")}
+      `
+      : '<div class="spotify-list-empty">No listening history is available yet.</div>';
+  } else if (spotifyLibraryView === "stats") {
+    list.innerHTML = renderSpotifyStats();
+  } else if (spotifyLibraryView === "rediscover") {
+    const rediscovery = getSpotifyRediscoveryTracks();
+    list.innerHTML = rediscovery.length
+      ? `
+        <div class="spotify-view-note">Older favorites missing from your recent rotation—Daymark’s honest alternative to a recommendation feed.</div>
+        ${rediscovery.map((track) => spotifyTrackRow(track)).join("")}
+        <a class="spotify-home-link" href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify’s personalized Home ↗</a>
+      `
+      : '<div class="spotify-list-empty">Keep listening and Daymark will find something worth rediscovering.</div>';
   } else {
-    list.innerHTML = items
-      .slice(0, 4)
-      .map((item) => {
-        const artwork = getSpotifyArtwork(item);
-        return `
-          <a class="spotify-list-row" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">
-            ${artwork ? `<img src="${escapeHtml(artwork)}" alt="" loading="lazy" width="34" height="34" />` : '<span class="spotify-list-placeholder"></span>'}
-            <span><strong>${escapeHtml(item.name || "Untitled")}</strong><small>${escapeHtml(getSpotifyByline(item))}</small></span>
-            <span aria-hidden="true">↗</span>
-          </a>
-        `;
-      })
-      .join("");
+    const tracks = recent.slice(0, 8);
+    list.innerHTML = tracks.length
+      ? tracks
+          .map((entry) =>
+            spotifyTrackRow(
+              entry.track,
+              `${getSpotifyByline(entry.track)} · ${formatSpotifyPlayedAt(entry.played_at)}`,
+            ),
+          )
+          .join("")
+      : '<div class="spotify-list-empty">No listening history is available yet.</div>';
   }
+
   document.querySelectorAll("[data-spotify-view]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.spotifyView === spotifyLibraryView);
   });
@@ -1416,6 +1588,14 @@ function bindSpotifyPanelActions() {
   });
 }
 
+function getActiveSpotifyDevice() {
+  return (
+    lastSpotifyData.playback?.device ||
+    lastSpotifyData.devices.find((device) => device.is_active) ||
+    null
+  );
+}
+
 function renderSpotifyPanel(data = lastSpotifyData) {
   lastSpotifyData = data;
   const playback = data.playback;
@@ -1425,11 +1605,24 @@ function renderSpotifyPanel(data = lastSpotifyData) {
   heading.textContent = `LIVE · ${product}`;
   heading.classList.add("is-live");
   document.querySelector("#disconnectSpotify").hidden = false;
+  document.querySelector("#repairSpotify").hidden = false;
 
   spotifyIsPlaying = Boolean(playback?.is_playing);
   spotifyProgressBaseMs = Number(playback?.progress_ms) || 0;
   spotifyProgressFetchedAt = Date.now();
   spotifyDurationMs = Number(item?.duration_ms) || 0;
+  const activeDevice = getActiveSpotifyDevice();
+  const hasControlScope =
+    !spotifyGrantedScopes ||
+    spotifyGrantedScopes.split(/\s+/).includes("user-modify-playback-state");
+  const controlsUnavailable = Boolean(activeDevice?.is_restricted || !hasControlScope);
+  const controlNote = !hasControlScope
+    ? "Reconnect once to grant playback controls."
+    : activeDevice?.is_restricted
+      ? `${activeDevice.name || "This device"} does not accept Spotify Web API controls.`
+      : activeDevice
+        ? `Ready to control ${activeDevice.name}.`
+        : "Start Spotify on a device, then refresh.";
 
   const currentMarkup = item
     ? `
@@ -1446,11 +1639,12 @@ function renderSpotifyPanel(data = lastSpotifyData) {
         </div>
       </div>
       <div class="spotify-controls">
-        <button id="spotifyPrevious" type="button" aria-label="Previous track">↤</button>
-        <button class="spotify-play" id="spotifyPlay" type="button" aria-label="${spotifyIsPlaying ? "Pause" : "Play"}">${spotifyIsPlaying ? "Ⅱ" : "▶"}</button>
-        <button id="spotifyNext" type="button" aria-label="Next track">↦</button>
+        <button id="spotifyPrevious" type="button" aria-label="Previous track"${controlsUnavailable ? " disabled" : ""}>↤</button>
+        <button class="spotify-play" id="spotifyPlay" type="button" aria-label="${spotifyIsPlaying ? "Pause" : "Play"}"${controlsUnavailable ? " disabled" : ""}>${spotifyIsPlaying ? "Ⅱ" : "▶"}</button>
+        <button id="spotifyNext" type="button" aria-label="Next track"${controlsUnavailable ? " disabled" : ""}>↦</button>
         <a class="spotify-open" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">OPEN IN SPOTIFY ↗</a>
       </div>
+      <div class="spotify-control-status${controlsUnavailable ? " has-warning" : ""}" id="spotifyControlStatus">${escapeHtml(controlNote)}</div>
       ${
         data.queue[0]
           ? `<div class="spotify-up-next"><b>UP NEXT</b><span>${escapeHtml(data.queue[0].name || "Untitled")} · ${escapeHtml(getSpotifyByline(data.queue[0]))}</span></div>`
@@ -1472,7 +1666,9 @@ function renderSpotifyPanel(data = lastSpotifyData) {
         <span>YOUR ROTATION</span>
         <div class="spotify-tabs">
           <button class="${spotifyLibraryView === "recent" ? "is-active" : ""}" type="button" data-spotify-view="recent">RECENT</button>
-          <button class="${spotifyLibraryView === "top" ? "is-active" : ""}" type="button" data-spotify-view="top">TOP THIS MONTH</button>
+          <button class="${spotifyLibraryView === "history" ? "is-active" : ""}" type="button" data-spotify-view="history">HISTORY</button>
+          <button class="${spotifyLibraryView === "stats" ? "is-active" : ""}" type="button" data-spotify-view="stats">STATS</button>
+          <button class="${spotifyLibraryView === "rediscover" ? "is-active" : ""}" type="button" data-spotify-view="rediscover">REDISCOVER</button>
         </div>
       </div>
       <div class="spotify-list" id="spotifyLibraryList"></div>
@@ -1495,6 +1691,7 @@ function renderSpotifyDisconnected(message = "Bring the current track into Dayma
   heading.textContent = "NOT CONNECTED";
   heading.classList.remove("is-live");
   document.querySelector("#disconnectSpotify").hidden = true;
+  document.querySelector("#repairSpotify").hidden = true;
   document.querySelector("#spotifyContent").innerHTML = `
     <div class="spotify-connect-state">
       <span class="spotify-record" aria-hidden="true"><i></i></span>
@@ -1513,12 +1710,35 @@ function renderSpotifyLoading() {
     '<div class="spotify-loading">Tuning into your Spotify session…</div>';
 }
 
+function setSpotifyControlStatus(message, warning = false) {
+  const status = document.querySelector("#spotifyControlStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("has-warning", warning);
+}
+
 async function controlSpotify(action) {
+  const device = getActiveSpotifyDevice();
+  if (device?.is_restricted) {
+    setSpotifyControlStatus(
+      `${device.name || "This device"} blocks remote Spotify controls. Open Spotify directly or switch devices.`,
+      true,
+    );
+    return;
+  }
+  if (
+    spotifyGrantedScopes &&
+    !spotifyGrantedScopes.split(/\s+/).includes("user-modify-playback-state")
+  ) {
+    setSpotifyControlStatus("Playback permission is missing. Tap Repair controls above.", true);
+    return;
+  }
+  const deviceQuery = device?.id ? `?device_id=${encodeURIComponent(device.id)}` : "";
   const commands = {
-    previous: { path: "/v1/me/player/previous", method: "POST" },
-    next: { path: "/v1/me/player/next", method: "POST" },
+    previous: { path: `/v1/me/player/previous${deviceQuery}`, method: "POST" },
+    next: { path: `/v1/me/player/next${deviceQuery}`, method: "POST" },
     toggle: {
-      path: spotifyIsPlaying ? "/v1/me/player/pause" : "/v1/me/player/play",
+      path: `/v1/me/player/${spotifyIsPlaying ? "pause" : "play"}${deviceQuery}`,
       method: "PUT",
     },
   };
@@ -1528,22 +1748,37 @@ async function controlSpotify(action) {
   buttons.forEach((button) => {
     button.disabled = true;
   });
+  setSpotifyControlStatus(`Sending to ${device?.name || "your active Spotify device"}…`);
   try {
-    await fetchSpotify(command.path, { method: command.method });
+    const options = { method: command.method };
+    if (action === "toggle" && !spotifyIsPlaying) {
+      options.headers = { "Content-Type": "application/json" };
+      options.body = "{}";
+    }
+    await fetchSpotify(command.path, options);
     if (action === "toggle") spotifyIsPlaying = !spotifyIsPlaying;
-    showToast(
-      action === "next" ? "Skipping forward." : action === "previous" ? "Going back." : spotifyIsPlaying ? "Playing." : "Paused.",
-    );
-    window.setTimeout(() => refreshSpotify(true), 500);
+    const successMessage =
+      action === "next"
+        ? `Skipped on ${device?.name || "Spotify"}.`
+        : action === "previous"
+          ? `Went back on ${device?.name || "Spotify"}.`
+          : `${spotifyIsPlaying ? "Playing" : "Paused"} on ${device?.name || "Spotify"}.`;
+    setSpotifyControlStatus(successMessage);
+    showToast(successMessage);
+    window.setTimeout(() => refreshSpotify(true), 750);
   } catch (error) {
     buttons.forEach((button) => {
       button.disabled = false;
     });
-    showToast(
-      [403, 404].includes(error.status)
-        ? "Open Spotify on a device, then try again."
-        : "Spotify could not update playback.",
-    );
+    const fallback =
+      error.status === 403
+        ? "Spotify refused playback control. Tap Repair controls, then approve playback access."
+        : error.status === 404
+          ? "No controllable device was found. Open Spotify and start playing something."
+          : "Spotify could not update playback.";
+    const message = error.spotifyMessage || fallback;
+    setSpotifyControlStatus(message, true);
+    showToast(fallback);
   }
 }
 
@@ -1570,21 +1805,43 @@ async function refreshSpotify(force = false) {
       Date.now() - lastSpotifyLibraryRefreshAt >= SPOTIFY_LIBRARY_REFRESH_INTERVAL_MS;
     const requests = [
       fetchSpotify("/v1/me/player"),
+      fetchSpotify("/v1/me/player/devices"),
       fetchSpotify("/v1/me/player/queue"),
-      refreshLibrary ? fetchSpotify("/v1/me/player/recently-played?limit=4") : Promise.resolve(null),
+      refreshLibrary ? fetchSpotify("/v1/me/player/recently-played?limit=50") : Promise.resolve(null),
       refreshLibrary
-        ? fetchSpotify("/v1/me/top/tracks?time_range=short_term&limit=4")
+        ? fetchSpotify("/v1/me/top/tracks?time_range=short_term&limit=10")
+        : Promise.resolve(null),
+      refreshLibrary
+        ? fetchSpotify("/v1/me/top/tracks?time_range=medium_term&limit=10")
+        : Promise.resolve(null),
+      refreshLibrary
+        ? fetchSpotify("/v1/me/top/tracks?time_range=long_term&limit=10")
+        : Promise.resolve(null),
+      refreshLibrary
+        ? fetchSpotify("/v1/me/top/artists?time_range=short_term&limit=8")
         : Promise.resolve(null),
       refreshLibrary ? fetchSpotify("/v1/me") : Promise.resolve(null),
     ];
-    const [playbackResult, queueResult, recentResult, topResult, profileResult] =
-      await Promise.allSettled(requests);
+    const [
+      playbackResult,
+      devicesResult,
+      queueResult,
+      recentResult,
+      topResult,
+      topMediumResult,
+      topLongResult,
+      topArtistsResult,
+      profileResult,
+    ] = await Promise.allSettled(requests);
 
     if (playbackResult.status === "rejected" && !lastSpotifyData.profile) {
       throw playbackResult.reason;
     }
     if (playbackResult.status === "fulfilled") {
       lastSpotifyData.playback = playbackResult.value;
+    }
+    if (devicesResult.status === "fulfilled") {
+      lastSpotifyData.devices = devicesResult.value?.devices || [];
     }
     if (queueResult.status === "fulfilled") {
       lastSpotifyData.queue = queueResult.value?.queue || [];
@@ -1594,6 +1851,15 @@ async function refreshSpotify(force = false) {
     }
     if (topResult.status === "fulfilled" && topResult.value) {
       lastSpotifyData.top = topResult.value.items || [];
+    }
+    if (topMediumResult.status === "fulfilled" && topMediumResult.value) {
+      lastSpotifyData.topMedium = topMediumResult.value.items || [];
+    }
+    if (topLongResult.status === "fulfilled" && topLongResult.value) {
+      lastSpotifyData.topLong = topLongResult.value.items || [];
+    }
+    if (topArtistsResult.status === "fulfilled" && topArtistsResult.value) {
+      lastSpotifyData.topArtists = topArtistsResult.value.items || [];
     }
     if (profileResult.status === "fulfilled" && profileResult.value) {
       lastSpotifyData.profile = profileResult.value;
@@ -2500,6 +2766,11 @@ document.querySelector("#disconnectSpotify").addEventListener("click", () => {
   showToast("Spotify session ended on this device.");
 });
 
+document.querySelector("#repairSpotify").addEventListener("click", () => {
+  clearSpotifySession();
+  requestSpotifyConnection();
+});
+
 document.querySelectorAll("[data-standings-view]").forEach((button) => {
   button.addEventListener("click", () => renderStandingsView(button.dataset.standingsView));
 });
@@ -2734,6 +3005,6 @@ window.addEventListener("offline", updateSyncState);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=12").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=13").catch(() => {});
   });
 }
