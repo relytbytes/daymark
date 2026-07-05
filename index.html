@@ -9,11 +9,11 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=11" />
+    <link rel="manifest" href="./manifest.webmanifest?v=12" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=11" />
-    <script src="./config.js?v=11"></script>
+    <link rel="stylesheet" href="./styles.css?v=12" />
+    <script src="./config.js?v=12"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -271,6 +271,7 @@
                   </div>
                 </article>
               </div>
+              <p class="connection-note">Spotify can renew its session on this device. Google requires a quick reconnect when its short-lived browser access expires.</p>
             </section>
 
             <section class="section-block" id="jobs">
@@ -493,6 +494,36 @@
                   <button type="button" data-map-query="coffee shops">Coffee</button>
                 </div>
               </article>
+
+              <article class="durham-sports-card">
+                <div class="durham-sports-heading">
+                  <div><small>THE BULL CITY</small><strong>Durham sports</strong></div>
+                  <span id="durhamSportsSource">CHECKING</span>
+                </div>
+
+                <a class="bulls-game-card" id="durhamBullsGame" href="https://www.milb.com/durham/schedule" target="_blank" rel="noreferrer">
+                  <span class="bulls-logo" data-abbr="DB">
+                    <img src="https://www.mlbstatic.com/team-logos/234.svg" alt="" width="54" height="54" data-team-logo />
+                  </span>
+                  <span class="bulls-game-copy">
+                    <small id="bullsGameTime">DURHAM BULLS · CHECKING SCHEDULE</small>
+                    <strong id="bullsGameOpponent">Loading official MiLB data…</strong>
+                    <span id="bullsGameDetail">Current game information will appear here.</span>
+                  </span>
+                  <b id="bullsGameStatus">MiLB</b>
+                </a>
+
+                <div class="durham-team-grid">
+                  <a href="https://goduke.com/calendar" target="_blank" rel="noreferrer">
+                    <span class="durham-team-logo" data-abbr="DUKE"><img src="https://a.espncdn.com/i/teamlogos/ncaa/500/150.png" alt="" loading="lazy" width="38" height="38" data-team-logo /></span>
+                    <span><small>DUKE BLUE DEVILS</small><strong>All-sport calendar ↗</strong></span>
+                  </a>
+                  <a href="https://nccueaglepride.com/calendar" target="_blank" rel="noreferrer">
+                    <span class="durham-team-logo" data-abbr="NCCU"><img src="https://a.espncdn.com/i/teamlogos/ncaa/500/2428.png" alt="" loading="lazy" width="38" height="38" data-team-logo /></span>
+                    <span><small>NCCU EAGLES</small><strong>All-sport calendar ↗</strong></span>
+                  </a>
+                </div>
+              </article>
             </section>
 
             <section class="section-block" id="sports">
@@ -689,7 +720,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 11</small>
+          <small>Daymark keeps the signal. You keep the day. · BUILD 12</small>
         </footer>
       </main>
 
@@ -800,6 +831,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=11" defer></script>
+    <script src="./app.js?v=12" defer></script>
   </body>
 </html>

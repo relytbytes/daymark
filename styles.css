@@ -1098,6 +1098,13 @@ body[data-phase="night"] .day-progress i {
   gap: 12px;
 }
 
+.connection-note {
+  margin: 9px 4px 0;
+  color: var(--muted);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
 .panel {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -2330,6 +2337,217 @@ body[data-phase="night"] .day-progress i {
   background:
     radial-gradient(circle at 100% 0, rgba(255, 96, 61, 0.1), transparent 38%),
     var(--card);
+}
+
+.durham-sports-card {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.durham-sports-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 16px 12px;
+}
+
+.durham-sports-heading small,
+.durham-sports-heading strong {
+  display: block;
+}
+
+.durham-sports-heading small {
+  margin-bottom: 4px;
+  color: var(--coral);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.durham-sports-heading strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.durham-sports-heading > span {
+  color: var(--muted);
+  font-size: 6px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+}
+
+.bulls-game-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 13px;
+  min-height: 112px;
+  align-items: center;
+  margin: 0 10px;
+  padding: 16px;
+  overflow: hidden;
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 101, 42, 0.25), transparent 42%),
+    #082d44;
+  color: white;
+  text-decoration: none;
+}
+
+.bulls-game-card::after {
+  position: absolute;
+  right: -40px;
+  bottom: -65px;
+  width: 135px;
+  height: 135px;
+  border: 22px solid rgba(255, 255, 255, 0.035);
+  border-radius: 50%;
+  content: "";
+}
+
+.bulls-logo {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 62px;
+  height: 66px;
+  place-items: center;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+}
+
+.bulls-logo img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.bulls-logo.is-missing::after {
+  color: #082d44;
+  content: attr(data-abbr);
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.bulls-game-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.bulls-game-copy small,
+.bulls-game-copy strong,
+.bulls-game-copy > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulls-game-copy small {
+  margin-bottom: 5px;
+  color: #f99b70;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.bulls-game-copy strong {
+  padding-right: 42px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+.bulls-game-copy > span {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 7px;
+}
+
+.bulls-game-card > b {
+  position: absolute;
+  z-index: 2;
+  top: 15px;
+  right: 14px;
+  max-width: 64px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 6px;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.durham-team-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px;
+}
+
+.durham-team-grid > a {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  min-height: 64px;
+  align-items: center;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.durham-team-logo {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: #f3f3f1;
+}
+
+.durham-team-logo img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.durham-team-logo.is-missing::after {
+  color: var(--ink);
+  content: attr(data-abbr);
+  font-size: 6px;
+  font-weight: 900;
+}
+
+.durham-team-grid small,
+.durham-team-grid strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.durham-team-grid small {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 6px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+}
+
+.durham-team-grid strong {
+  font-size: 8px;
 }
 
 .spotify-heading-status {

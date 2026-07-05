@@ -2,7 +2,7 @@
 
 Daymark uses Spotify’s Authorization Code flow with PKCE, the recommended approach for a browser app that cannot safely hold a client secret. Daymark requests permission to read your current playback, queue, recent tracks and short-term top tracks, and to control playback on an active Spotify device.
 
-Tokens stay in this browser’s session storage. They are never committed to GitHub. Closing the browser session may require reconnecting Spotify later.
+The refresh token stays in local storage on this device so Daymark can obtain new short-lived access tokens after the app closes. It is never committed to GitHub or synced by Daymark. Tap **Disconnect** in the Spotify card to remove it from the device. Spotify refresh tokens currently expire after six months, so occasional reauthorization is still expected.
 
 ## 1. Create a Spotify app
 
@@ -42,7 +42,7 @@ window.DAYMARK_CONFIG = Object.freeze({
 5. Commit the change.
 6. Wait for GitHub Pages to redeploy, then open:
 
-   https://relytbytes.github.io/daymark/?v=11
+   https://relytbytes.github.io/daymark/?v=12
 
 7. Tap **Connect Spotify** and approve the requested playback permissions.
 

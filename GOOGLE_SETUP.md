@@ -49,8 +49,12 @@ Do not create or publish a client secret. This browser integration needs only th
 4. Commit the change.
 5. Wait for GitHub Pages to redeploy, then open:
 
-   https://relytbytes.github.io/daymark/?v=11
+   https://relytbytes.github.io/daymark/?v=12
 
 6. Tap **Connect Google securely** and approve Calendar access plus the updated Gmail permission.
 
 If you connected an earlier Daymark build, Google will ask once more because build 10 adds the ability to mark a message read. **Clear here** never changes Gmail; it only removes that row from Daymark on this device.
+
+## Why Google occasionally asks to reconnect
+
+Google’s browser authorization issues a short-lived access token and requires a user-driven action to obtain a new one after expiration. A static GitHub Pages app cannot safely receive or store Google’s long-lived refresh token. Truly persistent Google access would require a small secure backend using Google’s offline authorization flow.

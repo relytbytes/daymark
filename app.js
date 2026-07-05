@@ -1,14 +1,16 @@
 const STORAGE_KEY = "daymark-state-v1";
 const WEATHER_CACHE_KEY = "daymark-weather-cache-v1";
 const BASEBALL_CACHE_KEY = "daymark-baseball-cache-v1";
+const DURHAM_SPORTS_CACHE_KEY = "daymark-durham-sports-cache-v1";
 const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
 const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
 const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
 const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
-const STATE_SCHEMA_VERSION = 11;
+const STATE_SCHEMA_VERSION = 12;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const BASEBALL_REFRESH_INTERVAL_MS = 60 * 1000;
 const BASEBALL_LIVE_REFRESH_INTERVAL_MS = 30 * 1000;
+const DURHAM_SPORTS_REFRESH_INTERVAL_MS = 60 * 1000;
 const GOOGLE_REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 const SPOTIFY_REFRESH_INTERVAL_MS = 15 * 1000;
 const SPOTIFY_LIBRARY_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -61,12 +63,14 @@ let state = loadState();
 let toastTimer;
 let lastWeatherRefreshAt = 0;
 let lastBaseballRefreshAt = 0;
+let lastDurhamSportsRefreshAt = 0;
 let lastGoogleRefreshAt = 0;
 let lastSpotifyRefreshAt = 0;
 let lastSpotifyLibraryRefreshAt = 0;
 let weatherRefreshInFlight = false;
 let baseballRefreshInFlight = false;
-let publicFeedStatus = { weather: "checking", baseball: "checking" };
+let durhamSportsRefreshInFlight = false;
+let publicFeedStatus = { weather: "checking", baseball: "checking", durhamSports: "checking" };
 let googleAccessToken = "";
 let googleTokenExpiresAt = 0;
 let spotifyAccessToken = "";
@@ -1167,7 +1171,7 @@ async function getSpotifyCodeChallenge(verifier) {
 
 function persistSpotifySession() {
   try {
-    sessionStorage.setItem(
+    localStorage.setItem(
       SPOTIFY_SESSION_KEY,
       JSON.stringify({
         accessToken: spotifyAccessToken,
@@ -1176,7 +1180,7 @@ function persistSpotifySession() {
       }),
     );
   } catch {
-    // Spotify remains connected until this page closes.
+    // Spotify remains connected until this page closes if persistent storage is unavailable.
   }
 }
 
@@ -1189,7 +1193,7 @@ function clearSpotifySession() {
   lastSpotifyLibraryRefreshAt = 0;
   lastSpotifyData = { playback: null, queue: [], recent: [], top: [], profile: null };
   try {
-    sessionStorage.removeItem(SPOTIFY_SESSION_KEY);
+    localStorage.removeItem(SPOTIFY_SESSION_KEY);
     sessionStorage.removeItem(SPOTIFY_PKCE_KEY);
   } catch {
     // Nothing else to clear.
@@ -1198,7 +1202,7 @@ function clearSpotifySession() {
 
 function restoreSpotifySession() {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(SPOTIFY_SESSION_KEY));
+    const saved = JSON.parse(localStorage.getItem(SPOTIFY_SESSION_KEY));
     if (saved?.accessToken && (Number(saved.expiresAt) > Date.now() + 30000 || saved.refreshToken)) {
       spotifyAccessToken = saved.accessToken;
       spotifyRefreshToken = saved.refreshToken || "";
@@ -1206,7 +1210,7 @@ function restoreSpotifySession() {
       return true;
     }
   } catch {
-    // Invalid or unavailable session storage means reconnecting manually.
+    // Invalid or unavailable local storage means reconnecting manually.
   }
   clearSpotifySession();
   return false;
@@ -1965,7 +1969,11 @@ function renderBaseballError() {
 function updateSyncState() {
   const sync = document.querySelector("#syncState");
   const syncLabel = sync.querySelector(".sync-label");
-  const refreshing = weatherRefreshInFlight || baseballRefreshInFlight || spotifyRefreshInFlight;
+  const refreshing =
+    weatherRefreshInFlight ||
+    baseballRefreshInFlight ||
+    durhamSportsRefreshInFlight ||
+    spotifyRefreshInFlight;
   sync.classList.toggle("is-refreshing", refreshing);
   if (refreshing) {
     syncLabel.textContent = "updating";
@@ -1977,8 +1985,9 @@ function updateSyncState() {
   }
   const liveCount = Object.values(publicFeedStatus).filter((status) => status === "live").length;
   const cachedCount = Object.values(publicFeedStatus).filter((status) => status === "cached").length;
-  if (liveCount === 2) syncLabel.textContent = "live";
-  else if (liveCount) syncLabel.textContent = `${liveCount}/2 live`;
+  const feedCount = Object.keys(publicFeedStatus).length;
+  if (liveCount === feedCount) syncLabel.textContent = "live";
+  else if (liveCount) syncLabel.textContent = `${liveCount}/${feedCount} live`;
   else if (cachedCount) syncLabel.textContent = "cached";
   else syncLabel.textContent = "waiting";
 }
@@ -2010,6 +2019,80 @@ function getBaseballUrls() {
   return { standingsUrl, wildCardUrl, scheduleUrl };
 }
 
+function getDurhamBullsScheduleUrl() {
+  const now = new Date();
+  const end = new Date(now);
+  end.setDate(now.getDate() + 10);
+  return (
+    "https://statsapi.mlb.com/api/v1/schedule?sportId=11&teamId=234" +
+    `&startDate=${formatApiDate(now)}&endDate=${formatApiDate(end)}&hydrate=team`
+  );
+}
+
+function renderDurhamBulls(data, source = "live", updatedAt = new Date()) {
+  const games = (data?.dates || []).flatMap((date) => date.games || []);
+  const now = new Date();
+  const today = formatApiDate(now);
+  const game =
+    games.find((item) => item.officialDate === today) ||
+    games.find((item) => new Date(item.gameDate) >= now);
+  const sourceLabel = source === "live" ? "OFFICIAL MiLB" : "CACHED MiLB";
+  document.querySelector("#durhamSportsSource").textContent =
+    `${sourceLabel} · ${formatFreshness(updatedAt)}`.toUpperCase();
+
+  if (!game) {
+    document.querySelector("#bullsGameTime").textContent = "DURHAM BULLS";
+    document.querySelector("#bullsGameOpponent").textContent = "No upcoming game found";
+    document.querySelector("#bullsGameDetail").textContent = "Open the official schedule for more.";
+    document.querySelector("#bullsGameStatus").textContent = "MiLB";
+    return;
+  }
+
+  const bullsHome = game.teams.home.team.id === 234;
+  const bullsSide = bullsHome ? game.teams.home : game.teams.away;
+  const opponentSide = bullsHome ? game.teams.away : game.teams.home;
+  const opponent =
+    opponentSide.team.shortName || opponentSide.team.teamName || opponentSide.team.name;
+  const gameDate = new Date(game.gameDate);
+  const dateLabel =
+    game.officialDate === today
+      ? "TODAY"
+      : new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" })
+          .format(gameDate)
+          .toUpperCase();
+  const timeLabel = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(gameDate);
+  const gameState = game.status.abstractGameState;
+
+  document.querySelector("#bullsGameTime").textContent =
+    `DURHAM BULLS · ${dateLabel} ${timeLabel}`;
+  document.querySelector("#bullsGameOpponent").textContent =
+    `${bullsHome ? "vs." : "at"} ${opponent}`;
+  document.querySelector("#bullsGameStatus").textContent =
+    game.status.detailedState || "MiLB";
+
+  if (gameState === "Final") {
+    document.querySelector("#bullsGameDetail").textContent =
+      `Durham ${bullsSide.score ?? "—"} · ${opponent} ${opponentSide.score ?? "—"} · Final`;
+  } else if (gameState === "Live") {
+    document.querySelector("#bullsGameDetail").textContent =
+      `Durham ${bullsSide.score ?? 0}–${opponentSide.score ?? 0} · ${game.status.detailedState}`;
+  } else {
+    document.querySelector("#bullsGameDetail").textContent =
+      `${bullsHome ? "Goodmon Field" : opponentSide.team.venue?.name || "Away"} · Official schedule`;
+  }
+}
+
+function renderDurhamBullsError() {
+  document.querySelector("#durhamSportsSource").textContent = "MiLB UNAVAILABLE";
+  document.querySelector("#bullsGameTime").textContent = "DURHAM BULLS";
+  document.querySelector("#bullsGameOpponent").textContent = "Schedule unavailable";
+  document.querySelector("#bullsGameDetail").textContent = "Tap to open the official Bulls schedule.";
+  document.querySelector("#bullsGameStatus").textContent = "RETRYING";
+}
+
 async function refreshWeather(force = false) {
   if (weatherRefreshInFlight) return;
   if (!force && Date.now() - lastWeatherRefreshAt < WEATHER_REFRESH_INTERVAL_MS) return;
@@ -2034,6 +2117,37 @@ async function refreshWeather(force = false) {
   } finally {
     lastWeatherRefreshAt = Date.now();
     weatherRefreshInFlight = false;
+    updateSyncState();
+  }
+}
+
+async function refreshDurhamSports(force = false) {
+  if (durhamSportsRefreshInFlight) return;
+  if (
+    !force &&
+    Date.now() - lastDurhamSportsRefreshAt < DURHAM_SPORTS_REFRESH_INTERVAL_MS
+  ) return;
+  durhamSportsRefreshInFlight = true;
+  updateSyncState();
+
+  try {
+    const data = await fetchJson(getDurhamBullsScheduleUrl());
+    const updatedAt = new Date();
+    renderDurhamBulls(data, "live", updatedAt);
+    writeLiveCache(DURHAM_SPORTS_CACHE_KEY, data);
+    publicFeedStatus.durhamSports = "live";
+  } catch {
+    const cached = readLiveCache(DURHAM_SPORTS_CACHE_KEY);
+    if (cached?.data) {
+      renderDurhamBulls(cached.data, "cached", cached.savedAt);
+      publicFeedStatus.durhamSports = "cached";
+    } else {
+      renderDurhamBullsError();
+      publicFeedStatus.durhamSports = "unavailable";
+    }
+  } finally {
+    lastDurhamSportsRefreshAt = Date.now();
+    durhamSportsRefreshInFlight = false;
     updateSyncState();
   }
 }
@@ -2105,6 +2219,7 @@ async function refreshAllData(force = false) {
   await Promise.all([
     refreshWeather(force),
     refreshBaseball(force),
+    refreshDurhamSports(force),
     refreshGoogleIfNeeded(force),
     refreshSpotify(force),
   ]);
@@ -2114,6 +2229,7 @@ function runRefreshScheduler() {
   if (document.visibilityState !== "visible") return;
   refreshWeather(false);
   refreshBaseball(false);
+  refreshDurhamSports(false);
   refreshGoogleIfNeeded(false);
   refreshSpotify(false);
 }
@@ -2618,6 +2734,6 @@ window.addEventListener("offline", updateSyncState);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=11").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=12").catch(() => {});
   });
 }
