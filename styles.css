@@ -579,12 +579,15 @@ body[data-phase="night"] .day-progress i {
 }
 
 .focus-play {
-  color: var(--acid);
-  font-size: 10px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid var(--acid);
 }
 
 .focus-start.is-running .focus-play {
-  color: var(--coral);
+  border-left-color: var(--coral);
 }
 
 .focus-done,
@@ -704,6 +707,19 @@ body[data-phase="night"] .day-progress i {
 
 .glance-icon--weather {
   background: var(--acid);
+}
+
+.glance-icon--weather::before {
+  width: 11px;
+  height: 11px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-shadow:
+    0 -7px 0 -5px currentColor,
+    0 7px 0 -5px currentColor,
+    7px 0 0 -5px currentColor,
+    -7px 0 0 -5px currentColor;
+  content: "";
 }
 
 .glance-icon--calendar {
@@ -912,7 +928,7 @@ body[data-phase="night"] .day-progress i {
 .action-card {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 13px;
   align-items: start;
   min-height: 100px;
@@ -1045,9 +1061,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .action-arrow {
-  align-self: center;
-  color: var(--muted);
-  font-size: 18px;
+  display: none;
 }
 
 .action-card--dark .action-arrow {
@@ -2411,6 +2425,27 @@ body[data-phase="night"] .day-progress i {
   content: "";
 }
 
+.bulls-game-card.is-live {
+  background:
+    radial-gradient(circle at 100% 0, rgba(196, 240, 77, 0.2), transparent 42%),
+    #082d44;
+}
+
+.bulls-game-card.is-live > b {
+  color: var(--acid);
+}
+
+.bulls-game-card.is-live > b::before {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+  animation: breathe 1.5s ease-in-out infinite alternate;
+}
+
 .bulls-logo {
   position: relative;
   z-index: 1;
@@ -2877,6 +2912,75 @@ body[data-phase="night"] .day-progress i {
 
 .spotify-control-status.has-warning {
   color: #ffc8b8;
+}
+
+.spotify-device-picker {
+  margin: 0 16px 16px;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.spotify-device-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
+.spotify-device-head button {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.spotify-device-list {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.spotify-device-list::-webkit-scrollbar {
+  display: none;
+}
+
+.spotify-device-list > button {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 10px;
+}
+
+.spotify-device-list > button.is-active {
+  border-color: #1ed760;
+  background: rgba(30, 215, 96, 0.13);
+  color: #d6ffe4;
+}
+
+.spotify-device-list > button.is-restricted,
+.spotify-device-list > button:disabled {
+  opacity: 0.42;
+}
+
+.spotify-device-empty {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .spotify-open {

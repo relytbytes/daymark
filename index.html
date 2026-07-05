@@ -9,11 +9,11 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=13" />
+    <link rel="manifest" href="./manifest.webmanifest?v=14" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=13" />
-    <script src="./config.js?v=13"></script>
+    <link rel="stylesheet" href="./styles.css?v=14" />
+    <script src="./config.js?v=14"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -53,7 +53,7 @@
           </div>
           <div class="live-phase">
             <span class="live-pulse" aria-hidden="true"></span>
-            <strong id="phaseLabel">Morning runway</strong>
+            <strong id="phaseLabel">Plan the day</strong>
           </div>
           <time id="currentTime" datetime="">9:41 AM</time>
           <span class="day-progress" aria-hidden="true"><i id="dayProgress"></i></span>
@@ -64,8 +64,8 @@
         <section class="hero" id="today">
           <div class="hero-copy">
             <p class="eyebrow" id="dateLabel">THURSDAY · JULY 2</p>
-            <h1 id="heroTitle">Good morning, Ty.</h1>
-            <p class="hero-note" id="heroNote">A clear day to move the important things. The rest can wait.</p>
+            <h1 id="heroTitle">Make the day smaller, Ty.</h1>
+            <p class="hero-note" id="heroNote">Three priorities. One focused block. Everything else can wait its turn.</p>
           </div>
 
           <div class="hero-orbit" aria-label="Brief completion">
@@ -90,7 +90,7 @@
           </div>
           <div class="focus-actions">
             <button class="focus-start" id="focusTimerButton" type="button">
-              <span class="focus-play" aria-hidden="true">▶</span>
+              <span class="focus-play" aria-hidden="true"></span>
               <span id="focusTimerLabel">Focus 25:00</span>
             </button>
             <button class="focus-done" id="focusDoneButton" type="button">Done</button>
@@ -101,7 +101,7 @@
 
         <section class="glance-widget" aria-label="Daymark glance">
           <button type="button" data-scroll="durham">
-            <span class="glance-icon glance-icon--weather" aria-hidden="true">☼</span>
+            <span class="glance-icon glance-icon--weather" aria-hidden="true"></span>
             <span><small>WEATHER</small><strong id="widgetWeather">Checking</strong><em id="widgetWeatherNote">Durham</em></span>
           </button>
           <button type="button" data-scroll="signals">
@@ -109,7 +109,7 @@
             <span><small>NEXT</small><strong id="widgetNext">Calendar</strong><em id="widgetNextNote">Not connected</em></span>
           </button>
           <button type="button" data-scroll="signals">
-            <span class="glance-icon glance-icon--mail" aria-hidden="true">↗</span>
+            <span class="glance-icon glance-icon--mail" aria-hidden="true">M</span>
             <span><small>MAIL</small><strong id="widgetMail">Connect</strong><em id="widgetMailNote">Priority unread</em></span>
           </button>
           <button type="button" data-scroll="sports">
@@ -142,7 +142,7 @@
                     <strong>Move one real application forward</strong>
                     <small>Follow up, apply, or add the next concrete opportunity.</small>
                   </span>
-                  <span class="action-arrow" aria-hidden="true">↗</span>
+                  <span class="action-arrow" aria-hidden="true"></span>
                 </label>
 
                 <label class="action-card action-card--dark" data-task="veraya-pricing">
@@ -155,7 +155,7 @@
                     <strong>Advance the current Veraya milestone</strong>
                     <small>Choose the smallest piece of evidence that changes the work.</small>
                   </span>
-                  <span class="action-arrow" aria-hidden="true">↗</span>
+                  <span class="action-arrow" aria-hidden="true"></span>
                 </label>
 
                 <label class="action-card" data-task="submit-application">
@@ -168,7 +168,7 @@
                     <strong>Clear one captured loose end</strong>
                     <small>Use your inbox below; choose the item that will keep resurfacing.</small>
                   </span>
-                  <span class="action-arrow" aria-hidden="true">↗</span>
+                  <span class="action-arrow" aria-hidden="true"></span>
                 </label>
               </div>
 
@@ -183,7 +183,7 @@
                     <strong>Update the job pipeline</strong>
                     <small>Record what moved and the next follow-up date.</small>
                   </span>
-                  <span class="action-arrow" aria-hidden="true">↗</span>
+                  <span class="action-arrow" aria-hidden="true"></span>
                 </label>
 
                 <label class="action-card action-card--dark" data-task="veraya-decision">
@@ -196,7 +196,7 @@
                     <strong>Capture today’s Veraya decision</strong>
                     <small>Write what changed, why it changed, and the next test.</small>
                   </span>
-                  <span class="action-arrow" aria-hidden="true">↗</span>
+                  <span class="action-arrow" aria-hidden="true"></span>
                 </label>
 
                 <label class="action-card" data-task="tomorrow-first">
@@ -209,7 +209,7 @@
                     <strong>Choose the first move</strong>
                     <small>Put one specific task at 9:00 AM before the day fills up.</small>
                   </span>
-                  <span class="action-arrow" aria-hidden="true">↗</span>
+                  <span class="action-arrow" aria-hidden="true"></span>
                 </label>
               </div>
 
@@ -456,31 +456,31 @@
                   <span><small>RAIN</small><b id="weatherRain">—%</b></span>
                   <span><small>SUNSET</small><b id="weatherSunset">—</b></span>
                 </div>
-                <a class="source-link weather-source-link" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather by Open-Meteo ↗</a>
+                <a class="source-link weather-source-link" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather by Open-Meteo</a>
               </article>
 
               <div class="local-list">
                 <a href="https://www.discoverdurham.com/events/" target="_blank" rel="noreferrer">
-                  <span class="local-icon local-icon--event" aria-hidden="true">✦</span>
-                  <div><small>LOCAL EVENTS · LIVE SEARCH</small><strong>Browse Durham events</strong><p>Open the current Discover Durham calendar. ↗</p></div>
+                  <span class="local-icon local-icon--event" aria-hidden="true">D</span>
+                  <div><small>LOCAL EVENTS · LIVE SEARCH</small><strong>Browse Durham events</strong><p>Open the current Discover Durham calendar.</p></div>
                 </a>
                 <a href="https://nasher.duke.edu/events/" target="_blank" rel="noreferrer">
                   <span class="local-icon local-icon--nasher" aria-hidden="true">N</span>
-                  <div><small>THE NASHER · OFFICIAL CALENDAR</small><strong>Exhibitions, talks and events</strong><p>See what is happening at Duke’s art museum. ↗</p></div>
+                  <div><small>THE NASHER · OFFICIAL CALENDAR</small><strong>Exhibitions, talks and events</strong><p>See what is happening at Duke’s art museum.</p></div>
                 </a>
                 <a href="https://www.redfin.com/city/4909/NC/Durham/filter/max-price=450k" target="_blank" rel="noreferrer">
-                  <span class="local-icon local-icon--home" aria-hidden="true">⌂</span>
-                  <div><small>HOMES FOR SALE · UP TO $450K</small><strong>Browse current Durham listings</strong><p>Open the filtered Redfin market. ↗</p></div>
+                  <span class="local-icon local-icon--home" aria-hidden="true">H</span>
+                  <div><small>HOMES FOR SALE · UP TO $450K</small><strong>Browse current Durham listings</strong><p>Open the filtered Redfin market.</p></div>
                 </a>
                 <button class="local-reminder" id="practicalReminder" type="button" data-open-reminder>
                   <span class="local-icon local-icon--bell" aria-hidden="true">!</span>
-                  <div><small>PRACTICAL · YOURS</small><strong id="practicalReminderTitle">Add a practical reminder</strong><p id="practicalReminderNote">Tap to capture the thing that cannot slip. ↗</p></div>
+                  <div><small>PRACTICAL · YOURS</small><strong id="practicalReminderTitle">Add a practical reminder</strong><p id="practicalReminderNote">Tap to capture the thing that cannot slip.</p></div>
                 </button>
               </div>
 
               <article class="search-card map-search-card">
                 <div class="search-card-heading">
-                  <span class="search-mark search-mark--maps" aria-hidden="true">⌖</span>
+                  <span class="search-mark search-mark--maps" aria-hidden="true">M</span>
                   <div><small>GOOGLE MAPS</small><strong>Find it around Durham</strong></div>
                 </div>
                 <form class="search-form" id="mapSearchForm">
@@ -723,7 +723,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 13</small>
+          <small>Daymark keeps the signal. You keep the day. · BUILD 14</small>
         </footer>
       </main>
 
@@ -834,6 +834,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=13" defer></script>
+    <script src="./app.js?v=14" defer></script>
   </body>
 </html>

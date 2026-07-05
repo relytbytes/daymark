@@ -6,11 +6,12 @@ const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
 const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
 const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
 const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
-const STATE_SCHEMA_VERSION = 13;
+const STATE_SCHEMA_VERSION = 14;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const BASEBALL_REFRESH_INTERVAL_MS = 60 * 1000;
 const BASEBALL_LIVE_REFRESH_INTERVAL_MS = 30 * 1000;
 const DURHAM_SPORTS_REFRESH_INTERVAL_MS = 60 * 1000;
+const DURHAM_SPORTS_LIVE_REFRESH_INTERVAL_MS = 15 * 1000;
 const GOOGLE_REFRESH_INTERVAL_MS = 2 * 60 * 1000;
 const SPOTIFY_REFRESH_INTERVAL_MS = 15 * 1000;
 const SPOTIFY_LIBRARY_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -70,6 +71,7 @@ let lastSpotifyLibraryRefreshAt = 0;
 let weatherRefreshInFlight = false;
 let baseballRefreshInFlight = false;
 let durhamSportsRefreshInFlight = false;
+let durhamBullsGameIsLive = false;
 let publicFeedStatus = { weather: "checking", baseball: "checking", durhamSports: "checking" };
 let googleAccessToken = "";
 let googleTokenExpiresAt = 0;
@@ -443,7 +445,7 @@ function renderPracticalReminder() {
   document.querySelector("#practicalReminderTitle").textContent =
     reminder?.title || "Add a practical reminder";
   document.querySelector("#practicalReminderNote").textContent =
-    reminder?.note || "Tap to capture the thing that cannot slip. ↗";
+    reminder?.note || "Tap to capture the thing that cannot slip.";
   document
     .querySelector("#practicalReminder")
     .classList.toggle("has-reminder", Boolean(reminder));
@@ -579,11 +581,12 @@ function updateLiveDay(date = new Date()) {
   }
 
   const phase = getDayPhase(date);
+  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
   const phaseContent = {
     morning: {
-      label: "Morning runway",
-      title: "Good morning, Ty.",
-      note: "A clear day to move the important things. The rest can wait.",
+      label: "Plan the day",
+      title: isWeekend ? "Give the day some room, Ty." : "Make the day smaller, Ty.",
+      note: "Three priorities. One focused block. Everything else can wait its turn.",
       priorityKicker: "START HERE",
       priorityTitle: "Today’s essential three",
       signalKicker: "WHAT’S IN MOTION",
@@ -591,9 +594,9 @@ function updateLiveDay(date = new Date()) {
       readingKicker: "LATER TONIGHT · 28 MIN",
     },
     afternoon: {
-      label: "Afternoon check-in",
-      title: "Good afternoon, Ty.",
-      note: "The day is in motion. Protect the next useful block and let the noise pass.",
+      label: "Protect the middle",
+      title: "Protect the next hour, Ty.",
+      note: "Review what moved, close one loop, and keep the rest from multiplying.",
       priorityKicker: "MIDDAY CHECK",
       priorityTitle: "What matters this afternoon",
       signalKicker: "THE NEXT FEW HOURS",
@@ -601,9 +604,9 @@ function updateLiveDay(date = new Date()) {
       readingKicker: "FOR LATER · 28 MIN",
     },
     evening: {
-      label: "Evening landing",
-      title: "Good evening, Ty.",
-      note: "The ambitious part of the day is over. Close what matters and release the rest.",
+      label: "Land the day",
+      title: "Land the day cleanly, Ty.",
+      note: "Close what matters, capture the rest, and leave tomorrow one clear first move.",
       priorityKicker: "CLOSE THE LOOPS",
       priorityTitle: "Finish the day clean",
       signalKicker: "WHAT MOVED",
@@ -611,9 +614,9 @@ function updateLiveDay(date = new Date()) {
       readingKicker: "WIND DOWN · 28 MIN",
     },
     night: {
-      label: "Night reset",
-      title: "The day can end, Ty.",
-      note: "Capture the loose ends, choose tomorrow’s first move, and get out of the dashboard.",
+      label: "You are done",
+      title: "You’re done for today, Ty.",
+      note: "Nothing here needs another hour. Set tomorrow’s first move and step away.",
       priorityKicker: "RESET",
       priorityTitle: "Leave tomorrow lighter",
       signalKicker: "TOMORROW",
@@ -1580,6 +1583,10 @@ function bindSpotifyPanelActions() {
   document.querySelector("#spotifyPrevious")?.addEventListener("click", () => controlSpotify("previous"));
   document.querySelector("#spotifyPlay")?.addEventListener("click", () => controlSpotify("toggle"));
   document.querySelector("#spotifyNext")?.addEventListener("click", () => controlSpotify("next"));
+  document.querySelector("#spotifyRefreshDevices")?.addEventListener("click", () => refreshSpotify(true));
+  document.querySelectorAll("[data-spotify-device]").forEach((button) => {
+    button.addEventListener("click", () => transferSpotifyPlayback(button.dataset.spotifyDevice));
+  });
   document.querySelectorAll("[data-spotify-view]").forEach((button) => {
     button.addEventListener("click", () => {
       spotifyLibraryView = button.dataset.spotifyView;
@@ -1594,6 +1601,42 @@ function getActiveSpotifyDevice() {
     lastSpotifyData.devices.find((device) => device.is_active) ||
     null
   );
+}
+
+function renderSpotifyDevicePicker(data) {
+  const devices = [...(data.devices || [])];
+  const playbackDevice = data.playback?.device;
+  if (playbackDevice?.id && !devices.some((device) => device.id === playbackDevice.id)) {
+    devices.unshift(playbackDevice);
+  }
+  const deviceButtons = devices.length
+    ? devices
+        .filter((device) => device.id)
+        .map((device) => {
+          const active = Boolean(device.is_active || device.id === playbackDevice?.id);
+          const qualifier = device.is_restricted ? " · unavailable" : active ? " · active" : "";
+          return `
+            <button
+              class="${active ? "is-active" : ""}${device.is_restricted ? " is-restricted" : ""}"
+              type="button"
+              data-spotify-device="${escapeHtml(device.id)}"
+              aria-pressed="${active}"
+              ${device.is_restricted ? "disabled" : ""}
+            >${escapeHtml(device.name || device.type || "Spotify device")}${qualifier}</button>
+          `;
+        })
+        .join("")
+    : '<span class="spotify-device-empty">Open Spotify on a phone, computer or speaker to make it available.</span>';
+
+  return `
+    <div class="spotify-device-picker">
+      <div class="spotify-device-head">
+        <span>PLAYBACK DEVICE</span>
+        <button id="spotifyRefreshDevices" type="button">REFRESH</button>
+      </div>
+      <div class="spotify-device-list">${deviceButtons}</div>
+    </div>
+  `;
 }
 
 function renderSpotifyPanel(data = lastSpotifyData) {
@@ -1615,7 +1658,7 @@ function renderSpotifyPanel(data = lastSpotifyData) {
   const hasControlScope =
     !spotifyGrantedScopes ||
     spotifyGrantedScopes.split(/\s+/).includes("user-modify-playback-state");
-  const controlsUnavailable = Boolean(activeDevice?.is_restricted || !hasControlScope);
+  const controlsUnavailable = Boolean(!activeDevice || activeDevice.is_restricted || !hasControlScope);
   const controlNote = !hasControlScope
     ? "Reconnect once to grant playback controls."
     : activeDevice?.is_restricted
@@ -1657,10 +1700,12 @@ function renderSpotifyPanel(data = lastSpotifyData) {
         <p>Start something on your phone, computer or speaker; Daymark will pick it up automatically.</p>
         <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify ↗</a>
       </div>
+      <div class="spotify-control-status has-warning" id="spotifyControlStatus">Choose an available device below, then start playback in Spotify.</div>
     `;
 
   document.querySelector("#spotifyContent").innerHTML = `
     ${currentMarkup}
+    ${renderSpotifyDevicePicker(data)}
     <div class="spotify-library">
       <div class="spotify-library-head">
         <span>YOUR ROTATION</span>
@@ -1717,8 +1762,53 @@ function setSpotifyControlStatus(message, warning = false) {
   status.classList.toggle("has-warning", warning);
 }
 
+async function transferSpotifyPlayback(deviceId) {
+  const device = lastSpotifyData.devices.find((item) => item.id === deviceId);
+  if (!deviceId || device?.is_restricted) {
+    setSpotifyControlStatus("That Spotify device cannot accept remote controls.", true);
+    return;
+  }
+
+  const buttons = document.querySelectorAll("[data-spotify-device]");
+  buttons.forEach((button) => {
+    button.disabled = true;
+  });
+  setSpotifyControlStatus(`Connecting Daymark controls to ${device?.name || "that device"}…`);
+
+  try {
+    await fetchSpotify("/v1/me/player", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        device_ids: [deviceId],
+        play: Boolean(lastSpotifyData.playback?.is_playing),
+      }),
+    });
+    const successMessage = `${device?.name || "Spotify device"} is now selected.`;
+    setSpotifyControlStatus(successMessage);
+    showToast(successMessage);
+    window.setTimeout(() => refreshSpotify(true), 750);
+  } catch (error) {
+    buttons.forEach((button) => {
+      button.disabled = false;
+    });
+    const fallback =
+      error.status === 404
+        ? "Spotify lost that device. Open Spotify there, then refresh devices."
+        : error.status === 403
+          ? "Spotify refused the device handoff. Tap Repair controls and reconnect."
+          : "Spotify could not switch playback devices.";
+    setSpotifyControlStatus(error.spotifyMessage || fallback, true);
+    showToast(fallback);
+  }
+}
+
 async function controlSpotify(action) {
   const device = getActiveSpotifyDevice();
+  if (!device?.id) {
+    setSpotifyControlStatus("Choose an available playback device below first.", true);
+    return;
+  }
   if (device?.is_restricted) {
     setSpotifyControlStatus(
       `${device.name || "This device"} blocks remote Spotify controls. Open Spotify directly or switch devices.`,
@@ -2291,7 +2381,7 @@ function getDurhamBullsScheduleUrl() {
   end.setDate(now.getDate() + 10);
   return (
     "https://statsapi.mlb.com/api/v1/schedule?sportId=11&teamId=234" +
-    `&startDate=${formatApiDate(now)}&endDate=${formatApiDate(end)}&hydrate=team`
+    `&startDate=${formatApiDate(now)}&endDate=${formatApiDate(end)}&hydrate=team,linescore`
   );
 }
 
@@ -2305,8 +2395,11 @@ function renderDurhamBulls(data, source = "live", updatedAt = new Date()) {
   const sourceLabel = source === "live" ? "OFFICIAL MiLB" : "CACHED MiLB";
   document.querySelector("#durhamSportsSource").textContent =
     `${sourceLabel} · ${formatFreshness(updatedAt)}`.toUpperCase();
+  const gameCard = document.querySelector("#durhamBullsGame");
 
   if (!game) {
+    durhamBullsGameIsLive = false;
+    gameCard.classList.remove("is-live");
     document.querySelector("#bullsGameTime").textContent = "DURHAM BULLS";
     document.querySelector("#bullsGameOpponent").textContent = "No upcoming game found";
     document.querySelector("#bullsGameDetail").textContent = "Open the official schedule for more.";
@@ -2331,27 +2424,58 @@ function renderDurhamBulls(data, source = "live", updatedAt = new Date()) {
     minute: "2-digit",
   }).format(gameDate);
   const gameState = game.status.abstractGameState;
-
-  document.querySelector("#bullsGameTime").textContent =
-    `DURHAM BULLS · ${dateLabel} ${timeLabel}`;
-  document.querySelector("#bullsGameOpponent").textContent =
-    `${bullsHome ? "vs." : "at"} ${opponent}`;
-  document.querySelector("#bullsGameStatus").textContent =
-    game.status.detailedState || "MiLB";
+  const linescore = game.linescore || {};
+  const bullsLine = bullsHome ? linescore.teams?.home : linescore.teams?.away;
+  const opponentLine = bullsHome ? linescore.teams?.away : linescore.teams?.home;
+  const bullsScore = bullsLine?.runs ?? bullsSide.score ?? "—";
+  const opponentScore = opponentLine?.runs ?? opponentSide.score ?? "—";
+  durhamBullsGameIsLive = gameState === "Live";
+  gameCard.classList.toggle("is-live", durhamBullsGameIsLive);
 
   if (gameState === "Final") {
+    const result =
+      Number(bullsScore) > Number(opponentScore)
+        ? "BULLS WIN"
+        : Number(bullsScore) < Number(opponentScore)
+          ? "BULLS LOSS"
+          : "FINAL";
+    document.querySelector("#bullsGameTime").textContent = `FINAL · ${dateLabel}`;
+    document.querySelector("#bullsGameOpponent").textContent =
+      `Durham ${bullsScore} · ${opponent} ${opponentScore}`;
     document.querySelector("#bullsGameDetail").textContent =
-      `Durham ${bullsSide.score ?? "—"} · ${opponent} ${opponentSide.score ?? "—"} · Final`;
+      `${result} · Official MiLB result`;
+    document.querySelector("#bullsGameStatus").textContent = "FINAL";
   } else if (gameState === "Live") {
+    const inning = [linescore.inningState, linescore.currentInningOrdinal]
+      .filter(Boolean)
+      .join(" ");
+    const occupiedBases = ["first", "second", "third"].filter(
+      (base) => linescore.offense?.[base],
+    ).length;
+    const outs = Number(linescore.outs);
+    const baseState = occupiedBases ? `${occupiedBases} on base` : "bases empty";
+    document.querySelector("#bullsGameTime").textContent =
+      `LIVE · ${inning || game.status.detailedState || "IN PROGRESS"}`.toUpperCase();
+    document.querySelector("#bullsGameOpponent").textContent =
+      `Durham ${bullsScore} · ${opponent} ${opponentScore}`;
     document.querySelector("#bullsGameDetail").textContent =
-      `Durham ${bullsSide.score ?? 0}–${opponentSide.score ?? 0} · ${game.status.detailedState}`;
+      `${Number.isFinite(outs) ? `${outs} ${outs === 1 ? "out" : "outs"}` : "Live"} · ${baseState}`;
+    document.querySelector("#bullsGameStatus").textContent = "LIVE";
   } else {
+    document.querySelector("#bullsGameTime").textContent =
+      `DURHAM BULLS · ${dateLabel} ${timeLabel}`;
+    document.querySelector("#bullsGameOpponent").textContent =
+      `${bullsHome ? "vs." : "at"} ${opponent}`;
     document.querySelector("#bullsGameDetail").textContent =
-      `${bullsHome ? "Goodmon Field" : opponentSide.team.venue?.name || "Away"} · Official schedule`;
+      `${bullsHome ? "Durham Bulls Athletic Park" : game.venue?.name || "Away"} · Official schedule`;
+    document.querySelector("#bullsGameStatus").textContent =
+      game.status.detailedState || "SCHEDULED";
   }
 }
 
 function renderDurhamBullsError() {
+  durhamBullsGameIsLive = false;
+  document.querySelector("#durhamBullsGame").classList.remove("is-live");
   document.querySelector("#durhamSportsSource").textContent = "MiLB UNAVAILABLE";
   document.querySelector("#bullsGameTime").textContent = "DURHAM BULLS";
   document.querySelector("#bullsGameOpponent").textContent = "Schedule unavailable";
@@ -2389,9 +2513,12 @@ async function refreshWeather(force = false) {
 
 async function refreshDurhamSports(force = false) {
   if (durhamSportsRefreshInFlight) return;
+  const interval = durhamBullsGameIsLive
+    ? DURHAM_SPORTS_LIVE_REFRESH_INTERVAL_MS
+    : DURHAM_SPORTS_REFRESH_INTERVAL_MS;
   if (
     !force &&
-    Date.now() - lastDurhamSportsRefreshAt < DURHAM_SPORTS_REFRESH_INTERVAL_MS
+    Date.now() - lastDurhamSportsRefreshAt < interval
   ) return;
   durhamSportsRefreshInFlight = true;
   updateSyncState();
@@ -3005,6 +3132,6 @@ window.addEventListener("offline", updateSyncState);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=13").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=14").catch(() => {});
   });
 }
