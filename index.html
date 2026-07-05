@@ -9,11 +9,11 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=14" />
+    <link rel="manifest" href="./manifest.webmanifest?v=15" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=14" />
-    <script src="./config.js?v=14"></script>
+    <link rel="stylesheet" href="./styles.css?v=15" />
+    <script src="./config.js?v=15"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -94,7 +94,9 @@
               <span id="focusTimerLabel">Focus 25:00</span>
             </button>
             <button class="focus-done" id="focusDoneButton" type="button">Done</button>
-            <button class="focus-next" id="focusNextButton" type="button" aria-label="Show next open action">↻</button>
+            <button class="focus-next" id="focusNextButton" type="button" aria-label="Show next open action">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7v5h-5M5 17v-5h5" /><path d="M7.4 7.4A6.5 6.5 0 0 1 19 12M5 12a6.5 6.5 0 0 0 11.6 4.6" /></svg>
+            </button>
           </div>
           <span class="focus-progress" aria-hidden="true"><i id="focusProgress"></i></span>
         </section>
@@ -219,7 +221,7 @@
                     <span>INBOX</span>
                     <strong>Captured for later</strong>
                   </div>
-                  <button type="button" data-open-capture>＋ Add</button>
+                  <button type="button" data-open-capture>+ Add</button>
                 </div>
                 <div class="capture-items" id="captureItems"></div>
               </article>
@@ -246,7 +248,7 @@
                   </div>
                   <div id="calendarContent">
                     <button class="connection-empty google-connect-button" type="button" data-google-connect>
-                    <span aria-hidden="true">＋</span>
+                    <span aria-hidden="true">+</span>
                     <strong>Connect Google securely</strong>
                     <p>Allow read-only access to your calendar.</p>
                     </button>
@@ -258,13 +260,15 @@
                     <span class="panel-icon panel-icon--coral" aria-hidden="true"></span>
                     PRIORITY MAIL
                     <span class="panel-tools">
-                      <button class="panel-refresh" id="refreshMail" type="button" aria-label="Refresh priority mail" hidden>↻</button>
+                      <button class="panel-refresh" id="refreshMail" type="button" aria-label="Refresh priority mail" hidden>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7v5h-5M5 17v-5h5" /><path d="M7.4 7.4A6.5 6.5 0 0 1 19 12M5 12a6.5 6.5 0 0 0 11.6 4.6" /></svg>
+                      </button>
                       <span class="panel-status disconnected-status" id="emailStatus">NOT CONNECTED</span>
                     </span>
                   </div>
                   <div id="emailContent">
                     <button class="connection-empty google-connect-button" type="button" data-google-connect>
-                      <span aria-hidden="true">＋</span>
+                      <span aria-hidden="true">+</span>
                       <strong>Connect Google securely</strong>
                       <p>See unread priority mail and mark messages read.</p>
                     </button>
@@ -305,8 +309,10 @@
                   <small>Connect a Duke search or add roles manually.</small>
                 </div>
                 <div class="duke-actions">
-                  <button type="button" data-open-job-capture aria-label="Add a Duke opportunity">＋</button>
-                  <a class="round-arrow" href="https://careers.duke.edu/" target="_blank" rel="noreferrer" aria-label="Open Duke careers">↗</a>
+                  <button type="button" data-open-job-capture aria-label="Add a Duke opportunity">+</button>
+                  <a class="round-arrow" href="https://careers.duke.edu/" target="_blank" rel="noreferrer" aria-label="Open Duke careers">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg>
+                  </a>
                 </div>
               </article>
             </section>
@@ -516,11 +522,11 @@
                 <div class="durham-team-grid">
                   <a href="https://goduke.com/calendar" target="_blank" rel="noreferrer">
                     <span class="durham-team-logo" data-abbr="DUKE"><img src="https://a.espncdn.com/i/teamlogos/ncaa/500/150.png" alt="" loading="lazy" width="38" height="38" data-team-logo /></span>
-                    <span><small>DUKE BLUE DEVILS</small><strong>All-sport calendar ↗</strong></span>
+                    <span><small>DUKE BLUE DEVILS</small><strong>All-sport calendar</strong></span>
                   </a>
                   <a href="https://nccueaglepride.com/calendar" target="_blank" rel="noreferrer">
                     <span class="durham-team-logo" data-abbr="NCCU"><img src="https://a.espncdn.com/i/teamlogos/ncaa/500/2428.png" alt="" loading="lazy" width="38" height="38" data-team-logo /></span>
-                    <span><small>NCCU EAGLES</small><strong>All-sport calendar ↗</strong></span>
+                    <span><small>NCCU EAGLES</small><strong>All-sport calendar</strong></span>
                   </a>
                 </div>
               </article>
@@ -593,15 +599,15 @@
                 </div>
                 <div class="standings-source">
                   <span>Official MLB data · 30 sec live / 60 sec otherwise</span>
-                  <a href="https://www.mlb.com/standings" target="_blank" rel="noreferrer">Full standings ↗</a>
+                  <a href="https://www.mlb.com/standings" target="_blank" rel="noreferrer">Full standings</a>
                 </div>
               </article>
 
               <div class="team-ticker">
-                <a href="https://www.chelseafc.com/en/matches/mens-fixtures-and-results" target="_blank" rel="noreferrer"><span class="mini-team mini-team--chelsea" data-abbr="CFC"><img src="https://a.espncdn.com/i/teamlogos/soccer/500/363.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>CHELSEA</small><strong>Open official fixtures ↗</strong></div></a>
-                <a href="https://arizonawildcats.com/calendar" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cats" data-abbr="UA"><img src="https://a.espncdn.com/i/teamlogos/ncaa/500/12.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>ARIZONA</small><strong>Open official calendar ↗</strong></div></a>
-                <a href="https://www.nba.com/suns/schedule" target="_blank" rel="noreferrer"><span class="mini-team mini-team--suns" data-abbr="PHX"><img src="https://a.espncdn.com/i/teamlogos/nba/500/phx.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>SUNS</small><strong>Open official schedule ↗</strong></div></a>
-                <a href="https://www.azcardinals.com/schedule/" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cards" data-abbr="AZ"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/ari.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>CARDINALS</small><strong>Open official schedule ↗</strong></div></a>
+                <a href="https://www.chelseafc.com/en/matches/mens-fixtures-and-results" target="_blank" rel="noreferrer"><span class="mini-team mini-team--chelsea" data-abbr="CFC"><img src="https://a.espncdn.com/i/teamlogos/soccer/500/363.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>CHELSEA</small><strong>Open official fixtures</strong></div></a>
+                <a href="https://arizonawildcats.com/calendar" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cats" data-abbr="UA"><img src="https://a.espncdn.com/i/teamlogos/ncaa/500/12.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>ARIZONA</small><strong>Open official calendar</strong></div></a>
+                <a href="https://www.nba.com/suns/schedule" target="_blank" rel="noreferrer"><span class="mini-team mini-team--suns" data-abbr="PHX"><img src="https://a.espncdn.com/i/teamlogos/nba/500/phx.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>SUNS</small><strong>Open official schedule</strong></div></a>
+                <a href="https://www.azcardinals.com/schedule/" target="_blank" rel="noreferrer"><span class="mini-team mini-team--cards" data-abbr="AZ"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/ari.png" alt="" loading="lazy" width="31" height="31" data-team-logo /></span><div><small>CARDINALS</small><strong>Open official schedule</strong></div></a>
               </div>
             </section>
 
@@ -615,7 +621,7 @@
 
               <article class="search-card youtube-card">
                 <div class="search-card-heading">
-                  <span class="search-mark search-mark--youtube" aria-hidden="true">▶</span>
+                  <span class="search-mark search-mark--youtube" aria-hidden="true"><i></i></span>
                   <div><small>YOUTUBE</small><strong>Choose a lane, then explore</strong></div>
                 </div>
                 <form class="search-form" id="youtubeSearchForm">
@@ -629,7 +635,7 @@
                   <button type="button" data-youtube-query="Arizona Diamondbacks analysis">D-backs</button>
                   <button type="button" data-youtube-query="modern product design documentary">Design</button>
                 </div>
-                <a class="youtube-home" href="https://www.youtube.com/" target="_blank" rel="noreferrer">Open my personalized YouTube Home ↗</a>
+                <a class="youtube-home" href="https://www.youtube.com/" target="_blank" rel="noreferrer">Open my personalized YouTube Home</a>
                 <p class="search-note">YouTube keeps its recommendation feed out of the public API; Home shows it when you are signed in, while these lanes open live searches.</p>
               </article>
             </section>
@@ -648,7 +654,7 @@
                   <span class="spotify-mark" aria-hidden="true"><i></i><i></i><i></i></span>
                   <div><small>SPOTIFY PREMIUM</small><strong>Your listening, without the detour</strong></div>
                   <span class="spotify-brand-actions">
-                    <button id="repairSpotify" type="button" hidden>Repair controls</button>
+                    <button id="repairSpotify" type="button" hidden>Reconnect access</button>
                     <button class="spotify-disconnect" id="disconnectSpotify" type="button" hidden>Disconnect</button>
                   </span>
                 </div>
@@ -658,7 +664,7 @@
                     <strong>Bring the current track into Daymark</strong>
                     <p>See what is playing, recent listening and your short-term favorites. Control the active Spotify device without leaving the brief.</p>
                     <button id="connectSpotify" type="button">Connect Spotify</button>
-                    <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify instead ↗</a>
+                    <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify instead</a>
                   </div>
                 </div>
               </article>
@@ -684,7 +690,7 @@
                   <small>SOCIALIST READING · LATEST</small>
                   <strong>Browse Jacobin’s latest analysis</strong>
                   <p>Current socialist reporting, political analysis, and long-form essays from the source.</p>
-                  <span class="reading-cta">Open Jacobin <span>↗</span></span>
+                  <span class="reading-cta">Open Jacobin</span>
                 </div>
               </a>
 
@@ -692,12 +698,10 @@
                 <a href="https://longreads.com/" target="_blank" rel="noreferrer">
                   <span class="reading-index">02</span>
                   <div><small>LONGFORM · EDITORS’ PICKS</small><strong>Browse the latest from Longreads</strong></div>
-                  <span>↗</span>
                 </a>
                 <a href="https://www.nplusonemag.com/online-only/" target="_blank" rel="noreferrer">
                   <span class="reading-index">03</span>
                   <div><small>ESSAYS · N+1 · LATEST</small><strong>Open the current online essays</strong></div>
-                  <span>↗</span>
                 </a>
               </div>
 
@@ -715,7 +719,7 @@
               <h2 id="tomorrowTitle">Tomorrow, without guesswork.</h2>
               <p id="tomorrowSummary">Connect Google and Daymark will build this from your real schedule.</p>
               <div><span id="tomorrowFirstLabel">FIRST EVENT</span><strong id="tomorrowFirstValue">NOT CONNECTED</strong></div>
-              <a href="https://calendar.google.com/" target="_blank" rel="noreferrer">Open Google Calendar ↗</a>
+              <a href="https://calendar.google.com/" target="_blank" rel="noreferrer">Open Google Calendar</a>
             </section>
           </aside>
         </div>
@@ -723,7 +727,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 14</small>
+          <small>Daymark keeps the signal. You keep the day. · BUILD 15</small>
         </footer>
       </main>
 
@@ -737,7 +741,7 @@
           <span>Work</span>
         </button>
         <button class="nav-button nav-capture" type="button" data-open-capture aria-label="Quick capture">
-          <span class="nav-capture-icon" aria-hidden="true">＋</span>
+          <span class="nav-capture-icon" aria-hidden="true">+</span>
           <span>Capture</span>
         </button>
         <button class="nav-button" type="button" data-scroll="durham">
@@ -758,7 +762,9 @@
             <p class="section-kicker">JOB SEARCH</p>
             <h2 id="applicationDialogTitle">Add an application</h2>
           </div>
-          <button class="dialog-close" type="button" id="closeApplicationDialog" aria-label="Close">×</button>
+          <button class="dialog-close" type="button" id="closeApplicationDialog" aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+          </button>
         </div>
         <label>
           Organization
@@ -797,7 +803,9 @@
             <p class="section-kicker">QUICK CAPTURE</p>
             <h2>Get it out of your head.</h2>
           </div>
-          <button class="dialog-close" type="button" id="closeCaptureDialog" aria-label="Close">×</button>
+          <button class="dialog-close" type="button" id="closeCaptureDialog" aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+          </button>
         </div>
 
         <fieldset class="capture-types">
@@ -834,6 +842,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=14" defer></script>
+    <script src="./app.js?v=15" defer></script>
   </body>
 </html>

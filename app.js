@@ -6,7 +6,7 @@ const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
 const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
 const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
 const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
-const STATE_SCHEMA_VERSION = 14;
+const STATE_SCHEMA_VERSION = 15;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const BASEBALL_REFRESH_INTERVAL_MS = 60 * 1000;
 const BASEBALL_LIVE_REFRESH_INTERVAL_MS = 30 * 1000;
@@ -415,7 +415,7 @@ function renderCaptureInbox() {
           <small>${escapeHtml(item.type === "reminder" ? "Reminder" : "Task")}${item.note ? ` · ${escapeHtml(item.note)}` : ""}</small>
         </span>
       </label>
-      <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(item.title)}">×</button>
+      <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(item.title)}">Remove</button>
     `;
     row.querySelector("input").addEventListener("change", (event) => {
       item.done = event.target.checked;
@@ -477,11 +477,10 @@ function renderReadingQueue() {
           <small>${escapeHtml(host.toUpperCase())}</small>
           <strong>${escapeHtml(item.title)}</strong>
         </span>
-        <span aria-hidden="true">↗</span>
       </a>
       <div class="reading-row-actions">
         <button class="reading-toggle" type="button">${item.read ? "Unread" : "Read"}</button>
-        <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(item.title)}">×</button>
+        <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(item.title)}">Remove</button>
       </div>
     `;
     row.querySelector(".reading-toggle").addEventListener("click", () => {
@@ -674,7 +673,7 @@ function hasGoogleClientId() {
 function googleConnectMarkup(title = "Connect Google securely", copy = "Allow read-only access.") {
   return `
     <button class="connection-empty google-connect-button" type="button" data-google-connect>
-      <span aria-hidden="true">＋</span>
+      <span aria-hidden="true">+</span>
       <strong>${escapeHtml(title)}</strong>
       <p>${escapeHtml(copy)}</p>
     </button>
@@ -1437,7 +1436,6 @@ function spotifyTrackRow(item, detail = getSpotifyByline(item)) {
     <a class="spotify-list-row" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">
       ${artwork ? `<img src="${escapeHtml(artwork)}" alt="" loading="lazy" width="38" height="38" />` : '<span class="spotify-list-placeholder"></span>'}
       <span><strong>${escapeHtml(item?.name || "Untitled")}</strong><small>${escapeHtml(detail)}</small></span>
-      <span aria-hidden="true">↗</span>
     </a>
   `;
 }
@@ -1557,7 +1555,7 @@ function renderSpotifyLibrary() {
       ? `
         <div class="spotify-view-note">Older favorites missing from your recent rotation—Daymark’s honest alternative to a recommendation feed.</div>
         ${rediscovery.map((track) => spotifyTrackRow(track)).join("")}
-        <a class="spotify-home-link" href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify’s personalized Home ↗</a>
+        <a class="spotify-home-link" href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify’s personalized Home</a>
       `
       : '<div class="spotify-list-empty">Keep listening and Daymark will find something worth rediscovering.</div>';
   } else {
@@ -1603,15 +1601,39 @@ function getActiveSpotifyDevice() {
   );
 }
 
+function spotifyControlIcon(type) {
+  const paths = {
+    previous:
+      '<path d="M7 6v12M18 7.5 10 12l8 4.5Z" />',
+    next:
+      '<path d="M17 6v12M6 7.5l8 4.5-8 4.5Z" />',
+    play:
+      '<path d="m9 7 8 5-8 5Z" />',
+    pause:
+      '<path d="M9 7v10M15 7v10" />',
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[type] || ""}</svg>`;
+}
+
+function spotifyActionIsDisallowed(action, playback = lastSpotifyData.playback) {
+  const actions = playback?.actions || {};
+  if (action === "previous") return Boolean(actions.skipping_prev);
+  if (action === "next") return Boolean(actions.skipping_next);
+  if (action === "toggle") {
+    return Boolean(playback?.is_playing ? actions.pausing : actions.resuming);
+  }
+  return false;
+}
+
 function renderSpotifyDevicePicker(data) {
   const devices = [...(data.devices || [])];
   const playbackDevice = data.playback?.device;
   if (playbackDevice?.id && !devices.some((device) => device.id === playbackDevice.id)) {
     devices.unshift(playbackDevice);
   }
-  const deviceButtons = devices.length
-    ? devices
-        .filter((device) => device.id)
+  const availableDevices = devices.filter((device) => device.id);
+  const deviceButtons = availableDevices.length
+    ? availableDevices
         .map((device) => {
           const active = Boolean(device.is_active || device.id === playbackDevice?.id);
           const qualifier = device.is_restricted ? " · unavailable" : active ? " · active" : "";
@@ -1621,7 +1643,7 @@ function renderSpotifyDevicePicker(data) {
               type="button"
               data-spotify-device="${escapeHtml(device.id)}"
               aria-pressed="${active}"
-              ${device.is_restricted ? "disabled" : ""}
+              ${device.is_restricted || active ? "disabled" : ""}
             >${escapeHtml(device.name || device.type || "Spotify device")}${qualifier}</button>
           `;
         })
@@ -1648,7 +1670,6 @@ function renderSpotifyPanel(data = lastSpotifyData) {
   heading.textContent = `LIVE · ${product}`;
   heading.classList.add("is-live");
   document.querySelector("#disconnectSpotify").hidden = false;
-  document.querySelector("#repairSpotify").hidden = false;
 
   spotifyIsPlaying = Boolean(playback?.is_playing);
   spotifyProgressBaseMs = Number(playback?.progress_ms) || 0;
@@ -1658,13 +1679,26 @@ function renderSpotifyPanel(data = lastSpotifyData) {
   const hasControlScope =
     !spotifyGrantedScopes ||
     spotifyGrantedScopes.split(/\s+/).includes("user-modify-playback-state");
+  document.querySelector("#repairSpotify").hidden = hasControlScope;
   const controlsUnavailable = Boolean(!activeDevice || activeDevice.is_restricted || !hasControlScope);
+  const previousUnavailable =
+    controlsUnavailable || spotifyActionIsDisallowed("previous", playback);
+  const toggleUnavailable =
+    controlsUnavailable || spotifyActionIsDisallowed("toggle", playback);
+  const nextUnavailable =
+    controlsUnavailable || spotifyActionIsDisallowed("next", playback);
+  const hasPlaybackRestrictions =
+    spotifyActionIsDisallowed("previous", playback) ||
+    spotifyActionIsDisallowed("toggle", playback) ||
+    spotifyActionIsDisallowed("next", playback);
   const controlNote = !hasControlScope
-    ? "Reconnect once to grant playback controls."
+    ? "Reconnect once to grant playback permission."
     : activeDevice?.is_restricted
-      ? `${activeDevice.name || "This device"} does not accept Spotify Web API controls.`
+      ? `${activeDevice.name || "This device"} does not accept remote controls.`
+      : hasPlaybackRestrictions
+        ? "Spotify has limited one or more controls for this playback."
       : activeDevice
-        ? `Ready to control ${activeDevice.name}.`
+        ? `Controls follow the active ${activeDevice.name}.`
         : "Start Spotify on a device, then refresh.";
 
   const currentMarkup = item
@@ -1682,10 +1716,10 @@ function renderSpotifyPanel(data = lastSpotifyData) {
         </div>
       </div>
       <div class="spotify-controls">
-        <button id="spotifyPrevious" type="button" aria-label="Previous track"${controlsUnavailable ? " disabled" : ""}>↤</button>
-        <button class="spotify-play" id="spotifyPlay" type="button" aria-label="${spotifyIsPlaying ? "Pause" : "Play"}"${controlsUnavailable ? " disabled" : ""}>${spotifyIsPlaying ? "Ⅱ" : "▶"}</button>
-        <button id="spotifyNext" type="button" aria-label="Next track"${controlsUnavailable ? " disabled" : ""}>↦</button>
-        <a class="spotify-open" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">OPEN IN SPOTIFY ↗</a>
+        <button id="spotifyPrevious" type="button" aria-label="Previous track"${previousUnavailable ? " disabled" : ""}>${spotifyControlIcon("previous")}</button>
+        <button class="spotify-play" id="spotifyPlay" type="button" aria-label="${spotifyIsPlaying ? "Pause" : "Play"}"${toggleUnavailable ? " disabled" : ""}>${spotifyControlIcon(spotifyIsPlaying ? "pause" : "play")}</button>
+        <button id="spotifyNext" type="button" aria-label="Next track"${nextUnavailable ? " disabled" : ""}>${spotifyControlIcon("next")}</button>
+        <a class="spotify-open" href="${escapeHtml(getSpotifyUrl(item))}" target="_blank" rel="noreferrer">OPEN IN SPOTIFY</a>
       </div>
       <div class="spotify-control-status${controlsUnavailable ? " has-warning" : ""}" id="spotifyControlStatus">${escapeHtml(controlNote)}</div>
       ${
@@ -1698,7 +1732,7 @@ function renderSpotifyPanel(data = lastSpotifyData) {
       <div class="spotify-idle">
         <strong>Nothing is playing right now.</strong>
         <p>Start something on your phone, computer or speaker; Daymark will pick it up automatically.</p>
-        <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify ↗</a>
+        <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify</a>
       </div>
       <div class="spotify-control-status has-warning" id="spotifyControlStatus">Choose an available device below, then start playback in Spotify.</div>
     `;
@@ -1743,7 +1777,7 @@ function renderSpotifyDisconnected(message = "Bring the current track into Dayma
       <strong>${escapeHtml(message)}</strong>
       <p>See what is playing, recent listening and your short-term favorites. Control the active Spotify device without leaving the brief.</p>
       <button id="connectSpotify" type="button">Connect Spotify</button>
-      <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify instead ↗</a>
+      <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify instead</a>
     </div>
   `;
   bindSpotifyConnectButton();
@@ -1796,57 +1830,88 @@ async function transferSpotifyPlayback(deviceId) {
       error.status === 404
         ? "Spotify lost that device. Open Spotify there, then refresh devices."
         : error.status === 403
-          ? "Spotify refused the device handoff. Tap Repair controls and reconnect."
+          ? "Spotify is not allowing playback to move to that device."
           : "Spotify could not switch playback devices.";
     setSpotifyControlStatus(error.spotifyMessage || fallback, true);
-    showToast(fallback);
   }
 }
 
+async function getFreshSpotifyControlState() {
+  const [playback, devicePayload] = await Promise.all([
+    fetchSpotify("/v1/me/player"),
+    fetchSpotify("/v1/me/player/devices"),
+  ]);
+  lastSpotifyData.playback = playback;
+  lastSpotifyData.devices = devicePayload?.devices || [];
+  spotifyIsPlaying = Boolean(playback?.is_playing);
+  spotifyProgressBaseMs = Number(playback?.progress_ms) || 0;
+  spotifyProgressFetchedAt = Date.now();
+  return {
+    playback,
+    device:
+      playback?.device ||
+      lastSpotifyData.devices.find((item) => item.is_active) ||
+      null,
+  };
+}
+
 async function controlSpotify(action) {
-  const device = getActiveSpotifyDevice();
-  if (!device?.id) {
-    setSpotifyControlStatus("Choose an available playback device below first.", true);
-    return;
-  }
-  if (device?.is_restricted) {
-    setSpotifyControlStatus(
-      `${device.name || "This device"} blocks remote Spotify controls. Open Spotify directly or switch devices.`,
-      true,
-    );
-    return;
-  }
   if (
     spotifyGrantedScopes &&
     !spotifyGrantedScopes.split(/\s+/).includes("user-modify-playback-state")
   ) {
-    setSpotifyControlStatus("Playback permission is missing. Tap Repair controls above.", true);
+    setSpotifyControlStatus("Playback permission is missing. Tap Reconnect access above.", true);
     return;
   }
-  const deviceQuery = device?.id ? `?device_id=${encodeURIComponent(device.id)}` : "";
-  const commands = {
-    previous: { path: `/v1/me/player/previous${deviceQuery}`, method: "POST" },
-    next: { path: `/v1/me/player/next${deviceQuery}`, method: "POST" },
-    toggle: {
-      path: `/v1/me/player/${spotifyIsPlaying ? "pause" : "play"}${deviceQuery}`,
-      method: "PUT",
-    },
-  };
-  const command = commands[action];
-  if (!command) return;
+
   const buttons = document.querySelectorAll(".spotify-controls button");
   buttons.forEach((button) => {
     button.disabled = true;
   });
-  setSpotifyControlStatus(`Sending to ${device?.name || "your active Spotify device"}…`);
+  setSpotifyControlStatus("Checking the active Spotify player…");
+
   try {
-    const options = { method: command.method };
-    if (action === "toggle" && !spotifyIsPlaying) {
-      options.headers = { "Content-Type": "application/json" };
-      options.body = "{}";
+    const { playback, device } = await getFreshSpotifyControlState();
+    if (!device) {
+      const missingDevice = new Error("No active Spotify device.");
+      missingDevice.code = "NO_DEVICE";
+      throw missingDevice;
     }
-    await fetchSpotify(command.path, options);
-    if (action === "toggle") spotifyIsPlaying = !spotifyIsPlaying;
+    if (device.is_restricted) {
+      const restrictedDevice = new Error("Spotify marked this device as restricted.");
+      restrictedDevice.code = "RESTRICTED_DEVICE";
+      throw restrictedDevice;
+    }
+    if (spotifyActionIsDisallowed(action, playback)) {
+      const restrictedAction = new Error("Spotify marked this action as unavailable.");
+      restrictedAction.code = "RESTRICTED_ACTION";
+      throw restrictedAction;
+    }
+
+    const freshIsPlaying = Boolean(playback?.is_playing);
+    const commands = {
+      previous: { path: "/v1/me/player/previous", method: "POST" },
+      next: { path: "/v1/me/player/next", method: "POST" },
+      toggle: {
+        path: `/v1/me/player/${freshIsPlaying ? "pause" : "play"}`,
+        method: "PUT",
+      },
+    };
+    const command = commands[action];
+    if (!command) return;
+
+    try {
+      await fetchSpotify(command.path, { method: command.method });
+    } catch (error) {
+      if (error.status !== 404 || !device.id) throw error;
+      const separator = command.path.includes("?") ? "&" : "?";
+      await fetchSpotify(
+        `${command.path}${separator}device_id=${encodeURIComponent(device.id)}`,
+        { method: command.method },
+      );
+    }
+
+    if (action === "toggle") spotifyIsPlaying = !freshIsPlaying;
     const successMessage =
       action === "next"
         ? `Skipped on ${device?.name || "Spotify"}.`
@@ -1857,18 +1922,20 @@ async function controlSpotify(action) {
     showToast(successMessage);
     window.setTimeout(() => refreshSpotify(true), 750);
   } catch (error) {
-    buttons.forEach((button) => {
-      button.disabled = false;
-    });
-    const fallback =
-      error.status === 403
-        ? "Spotify refused playback control. Tap Repair controls, then approve playback access."
-        : error.status === 404
-          ? "No controllable device was found. Open Spotify and start playing something."
-          : "Spotify could not update playback.";
-    const message = error.spotifyMessage || fallback;
+    renderSpotifyPanel(lastSpotifyData);
+    const spotifyMessage = String(error.spotifyMessage || "").toLowerCase();
+    const isRestriction =
+      error.status === 403 ||
+      error.code === "RESTRICTED_DEVICE" ||
+      error.code === "RESTRICTED_ACTION" ||
+      spotifyMessage.includes("restriction");
+    const message =
+      error.code === "NO_DEVICE" || error.status === 404
+        ? "Spotify cannot see an active player. Open Spotify, start the track there, then return."
+        : isRestriction
+          ? "Spotify is limiting remote control for this playback. Use Open in Spotify; Daymark will keep the listening data current."
+          : "Spotify could not update playback. Refresh devices and try once more.";
     setSpotifyControlStatus(message, true);
-    showToast(fallback);
   }
 }
 
@@ -2004,12 +2071,13 @@ function weatherDescription(code) {
 }
 
 function weatherIcon(code) {
-  if (code === 0) return "☀";
-  if ([1, 2].includes(code)) return "◐";
-  if ([3, 45, 48].includes(code)) return "☁";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "✳";
-  if ([95, 96, 99].includes(code)) return "ϟ";
-  return "●";
+  if (code === 0) return "CLR";
+  if ([1, 2].includes(code)) return "PCL";
+  if ([3, 45, 48].includes(code)) return "OVC";
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "RAN";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "SNW";
+  if ([95, 96, 99].includes(code)) return "STM";
+  return "WX";
 }
 
 function formatFreshness(updatedAt) {
@@ -2748,7 +2816,7 @@ function renderApplications() {
     const row = document.createElement("div");
     row.className = "application-row";
     const titleMarkup = app.url
-      ? `<a class="application-title" href="${escapeHtml(app.url)}" target="_blank" rel="noreferrer">${escapeHtml(app.role)} ↗</a>`
+      ? `<a class="application-title" href="${escapeHtml(app.url)}" target="_blank" rel="noreferrer">${escapeHtml(app.role)}</a>`
       : `<strong>${escapeHtml(app.role)}</strong>`;
     row.innerHTML = `
       <div>
@@ -2757,8 +2825,8 @@ function renderApplications() {
       </div>
       <div class="application-actions">
         <button class="status-button" type="button" data-status="${escapeHtml(app.status)}" aria-label="Change status for ${escapeHtml(app.role)}">${escapeHtml(app.status)}</button>
-        <button class="item-edit" type="button" aria-label="Edit ${escapeHtml(app.role)}">✎</button>
-        <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(app.role)}">×</button>
+        <button class="item-edit" type="button" aria-label="Edit ${escapeHtml(app.role)}">Edit</button>
+        <button class="item-archive" type="button" aria-label="Archive ${escapeHtml(app.role)}">Remove</button>
       </div>
     `;
     row.querySelector(".status-button").addEventListener("click", () => cycleApplicationStatus(app.id));
@@ -3132,6 +3200,6 @@ window.addEventListener("offline", updateSyncState);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=14").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=15").catch(() => {});
   });
 }

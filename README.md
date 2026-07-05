@@ -33,6 +33,8 @@ The web app manifest, offline cache, standalone display mode, safe-area spacing,
 - Spotify Premium can be connected with browser-safe PKCE after completing `SPOTIFY_SETUP.md`. Daymark can show current/recent listening and control an active device without storing a client secret.
 - Durham sports includes an official live Durham Bulls score card with inning, outs, base state and final results, plus direct Duke and NCCU all-sport calendars.
 - Spotify listening includes a 50-play history, multi-period top-track statistics, top artists, rediscovery suggestions, a playback-device picker, direct device handoff, and visible control diagnostics.
+- Playback commands refresh Spotify’s active-player state first, target the active player without a cached device ID, and respect Spotify’s action restrictions.
+- Interface symbols use CSS or SVG artwork rather than platform-dependent emoji glyphs.
 - Tasks, decisions, sprint progress, applications, quick captures, focus sessions, and saved reading are stored on the device.
 - The **Now** rail pulls one open action forward and includes a persistent 25-minute focus timer.
 - **Quick Capture** can add a task, reminder, job lead, or read-later link from anywhere in the app.

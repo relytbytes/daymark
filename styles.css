@@ -601,7 +601,19 @@ body[data-phase="night"] .day-progress i {
 
 .focus-next {
   padding: 0;
-  font-size: 16px !important;
+}
+
+.focus-next svg,
+.panel-refresh svg,
+.round-arrow svg,
+.dialog-close svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .focus-progress {
@@ -909,20 +921,22 @@ body[data-phase="night"] .day-progress i {
 .item-archive,
 .item-edit {
   display: grid;
-  width: 30px;
+  width: auto;
+  min-width: 46px;
   height: 30px;
-  padding: 0;
+  padding: 0 8px;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 50%;
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 9px;
+  font-weight: 800;
 }
 
 .item-edit {
   color: var(--blue);
-  font-size: 12px;
+  font-size: 9px;
 }
 
 .action-card {
@@ -2270,7 +2284,14 @@ body[data-phase="night"] .day-progress i {
 .search-mark--youtube {
   background: #ffded8;
   color: #ef2516;
-  font-size: 11px;
+}
+
+.search-mark--youtube i {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid currentColor;
 }
 
 .search-form {
@@ -2890,6 +2911,21 @@ body[data-phase="night"] .day-progress i {
   font-size: 13px;
 }
 
+.spotify-controls svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.spotify-controls .spotify-play svg {
+  width: 22px;
+  height: 22px;
+}
+
 .spotify-controls .spotify-play {
   border-color: #1ed760;
   border-radius: 50%;
@@ -2975,6 +3011,10 @@ body[data-phase="night"] .day-progress i {
 .spotify-device-list > button.is-restricted,
 .spotify-device-list > button:disabled {
   opacity: 0.42;
+}
+
+.spotify-device-list > button.is-active:disabled {
+  opacity: 1;
 }
 
 .spotify-device-empty {
@@ -3109,7 +3149,7 @@ body[data-phase="night"] .day-progress i {
 
 .spotify-list-row {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr);
   gap: 10px;
   min-height: 52px;
   align-items: center;
@@ -3147,11 +3187,6 @@ body[data-phase="night"] .day-progress i {
   margin-top: 3px;
   color: rgba(255, 255, 255, 0.43);
   font-size: 9px;
-}
-
-.spotify-list-row > span:last-child {
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 10px;
 }
 
 .spotify-stat-grid {
@@ -3869,7 +3904,7 @@ body[data-phase="night"] .day-progress i {
 
 .reading-list a {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 11px;
   min-height: 78px;
   align-items: center;
@@ -4240,7 +4275,6 @@ body[data-phase="night"] #eveningActions {
   border-radius: 50%;
   background: transparent;
   color: var(--muted);
-  font-size: 22px;
 }
 
 .application-dialog label {
@@ -4383,14 +4417,17 @@ body[data-phase="night"] #eveningActions {
   z-index: 60;
   bottom: calc(92px + env(safe-area-inset-bottom));
   left: 50%;
-  max-width: calc(100% - 40px);
+  width: calc(100% - 40px);
+  max-width: 520px;
   padding: 11px 16px;
-  border-radius: 999px;
+  border-radius: 15px;
   background: var(--ink);
   color: white;
   font-size: 10px;
   font-weight: 700;
-  white-space: nowrap;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, 10px);
