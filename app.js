@@ -6,7 +6,7 @@ const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
 const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
 const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
 const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
-const STATE_SCHEMA_VERSION = 15;
+const STATE_SCHEMA_VERSION = 16;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const BASEBALL_REFRESH_INTERVAL_MS = 60 * 1000;
 const BASEBALL_LIVE_REFRESH_INTERVAL_MS = 30 * 1000;
@@ -102,9 +102,6 @@ let currentStandingsView = "division";
 let divisionStandingsRecords = [];
 let wildCardStandingsRecords = [];
 let lastPriorityEmailMessages = [];
-let navScrollLockUntil = 0;
-let navScrollFrame = 0;
-
 const body = document.body;
 const taskInputs = [...document.querySelectorAll(".task-check")];
 const navButtons = [...document.querySelectorAll(".nav-button")];
@@ -112,6 +109,47 @@ const applicationDialog = document.querySelector("#applicationDialog");
 const applicationForm = document.querySelector("#applicationForm");
 const captureDialog = document.querySelector("#captureDialog");
 const captureForm = document.querySelector("#captureForm");
+const VIEW_CONFIG = Object.freeze({
+  today: {
+    kicker: "YOUR DAY",
+    title: "Today",
+    note: "The next useful move, your real schedule, and only what needs attention now.",
+    shortcuts: [],
+  },
+  work: {
+    kicker: "WORK",
+    title: "Move the work.",
+    note: "Applications, Veraya, decisions, and weekly momentum—without the rest of the dashboard.",
+    shortcuts: [
+      ["Applications", "jobs"],
+      ["Veraya", "veraya"],
+      ["Decisions", "decisions"],
+      ["Scorecard", "scorecard"],
+    ],
+  },
+  life: {
+    kicker: "LIFE IN DURHAM",
+    title: "Useful, nearby, current.",
+    note: "Weather, events, homes, practical reminders, maps, and Durham sports.",
+    shortcuts: [
+      ["Weather", "durham"],
+      ["Events", "durham"],
+      ["Homes", "durham"],
+      ["Bulls", "durhamBullsGame"],
+    ],
+  },
+  more: {
+    kicker: "MORE",
+    title: "Choose what you came for.",
+    note: "Sports, Spotify, reading, and video stay available without crowding the daily plan.",
+    shortcuts: [
+      ["Sports", "sports"],
+      ["Spotify", "listen"],
+      ["Reading", "reading"],
+      ["YouTube", "watch"],
+    ],
+  },
+});
 
 document.addEventListener(
   "error",
@@ -1375,11 +1413,11 @@ async function fetchSpotify(path, options = {}, retry = true) {
     await refreshSpotifyAccessToken();
     return await fetchSpotify(path, options, false);
   }
-  if (response.status === 204) return null;
+  const responseText = response.status === 204 ? "" : await response.text();
   if (!response.ok) {
     let detail = "";
     try {
-      const payload = await response.json();
+      const payload = responseText ? JSON.parse(responseText) : null;
       detail = payload?.error?.message || payload?.error_description || payload?.error || "";
     } catch {
       detail = "";
@@ -1389,7 +1427,14 @@ async function fetchSpotify(path, options = {}, retry = true) {
     requestError.spotifyMessage = String(detail || "");
     throw requestError;
   }
-  return await response.json();
+  if (!responseText.trim()) return null;
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    const parseError = new Error("Spotify returned an unreadable success response.");
+    parseError.code = "SPOTIFY_RESPONSE_PARSE";
+    throw parseError;
+  }
 }
 
 function getSpotifyArtwork(item) {
@@ -1855,6 +1900,38 @@ async function getFreshSpotifyControlState() {
   };
 }
 
+function spotifyCommandWasApplied(action, before, after) {
+  if (!after) return false;
+  if (action === "toggle") {
+    return Boolean(after.is_playing) !== Boolean(before?.is_playing);
+  }
+  const beforeTrack = before?.item?.id || before?.item?.uri || "";
+  const afterTrack = after?.item?.id || after?.item?.uri || "";
+  if (action === "next") return Boolean(afterTrack && afterTrack !== beforeTrack);
+  if (action === "previous") {
+    return Boolean(
+      (afterTrack && afterTrack !== beforeTrack) ||
+      Number(after.progress_ms) + 1000 < Number(before?.progress_ms),
+    );
+  }
+  return false;
+}
+
+async function confirmSpotifyCommand(action, before) {
+  await new Promise((resolve) => window.setTimeout(resolve, 700));
+  try {
+    const after = await fetchSpotify("/v1/me/player");
+    if (!spotifyCommandWasApplied(action, before, after)) return false;
+    lastSpotifyData.playback = after;
+    spotifyIsPlaying = Boolean(after?.is_playing);
+    spotifyProgressBaseMs = Number(after?.progress_ms) || 0;
+    spotifyProgressFetchedAt = Date.now();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function controlSpotify(action) {
   if (
     spotifyGrantedScopes &&
@@ -1900,15 +1977,26 @@ async function controlSpotify(action) {
     const command = commands[action];
     if (!command) return;
 
+    let commandError = null;
     try {
       await fetchSpotify(command.path, { method: command.method });
     } catch (error) {
-      if (error.status !== 404 || !device.id) throw error;
-      const separator = command.path.includes("?") ? "&" : "?";
-      await fetchSpotify(
-        `${command.path}${separator}device_id=${encodeURIComponent(device.id)}`,
-        { method: command.method },
-      );
+      if (error.status === 404 && device.id) {
+        const separator = command.path.includes("?") ? "&" : "?";
+        try {
+          await fetchSpotify(
+            `${command.path}${separator}device_id=${encodeURIComponent(device.id)}`,
+            { method: command.method },
+          );
+        } catch (fallbackError) {
+          commandError = fallbackError;
+        }
+      } else {
+        commandError = error;
+      }
+    }
+    if (commandError && !(await confirmSpotifyCommand(action, playback))) {
+      throw commandError;
     }
 
     if (action === "toggle") spotifyIsPlaying = !freshIsPlaying;
@@ -1934,7 +2022,7 @@ async function controlSpotify(action) {
         ? "Spotify cannot see an active player. Open Spotify, start the track there, then return."
         : isRestriction
           ? "Spotify is limiting remote control for this playback. Use Open in Spotify; Daymark will keep the listening data current."
-          : "Spotify could not update playback. Refresh devices and try once more.";
+          : "Daymark sent the command but could not confirm Spotify’s response. The player may still have updated.";
     setSpotifyControlStatus(message, true);
   }
 }
@@ -2907,15 +2995,54 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2200);
 }
 
-document.querySelectorAll("[data-scroll]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const id = button.dataset.scroll;
-    document.querySelector(`#${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (button.classList.contains("nav-button")) {
-      navScrollLockUntil = Date.now() + 1200;
-      navButtons.forEach((item) => item.classList.toggle("is-active", item === button));
-      window.setTimeout(updateActiveNavigation, 1250);
+function scrollToViewTarget(target = "", smooth = true) {
+  window.requestAnimationFrame(() => {
+    if (target) {
+      document.querySelector(`#${target}`)?.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "start",
+      });
+      return;
     }
+    window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
+  });
+}
+
+function setAppView(view, options = {}) {
+  const nextView = VIEW_CONFIG[view] ? view : "today";
+  const config = VIEW_CONFIG[nextView];
+  body.dataset.view = nextView;
+  document.querySelector("#viewKicker").textContent = config.kicker;
+  document.querySelector("#viewTitle").textContent = config.title;
+  document.querySelector("#viewNote").textContent = config.note;
+
+  const shortcuts = document.querySelector("#viewShortcuts");
+  shortcuts.innerHTML = config.shortcuts
+    .map(
+      ([label, target]) =>
+        `<button type="button" data-view-shortcut="${escapeHtml(target)}">${escapeHtml(label)}</button>`,
+    )
+    .join("");
+  shortcuts.querySelectorAll("[data-view-shortcut]").forEach((button) => {
+    button.addEventListener("click", () => scrollToViewTarget(button.dataset.viewShortcut));
+  });
+
+  navButtons.forEach((button) => {
+    const active = button.dataset.appView === nextView;
+    button.classList.toggle("is-active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+
+  if (options.scroll !== false) {
+    scrollToViewTarget(options.target || "", options.smooth !== false);
+  }
+}
+
+document.querySelectorAll("[data-app-view]").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    if (button instanceof HTMLAnchorElement) event.preventDefault();
+    setAppView(button.dataset.appView, { target: button.dataset.viewTarget || "" });
   });
 });
 
@@ -3113,9 +3240,15 @@ captureForm.addEventListener("submit", (event) => {
 document.querySelectorAll("[data-command-jump]").forEach((button) => {
   button.addEventListener("click", () => {
     const destination = button.dataset.commandJump;
+    const destinationView = {
+      jobs: "work",
+      decisions: "work",
+      reading: "more",
+      durham: "life",
+    }[destination] || "today";
     captureDialog.close();
     window.setTimeout(() => {
-      document.querySelector(`#${destination}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setAppView(destinationView, { target: destination });
     }, 100);
   });
 });
@@ -3133,38 +3266,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-function updateActiveNavigation() {
-  if (Date.now() < navScrollLockUntil) return;
-  const anchor = 165;
-  const sections = [
-    { id: "today", nav: "today" },
-    { id: "jobs", nav: "jobs" },
-    { id: "veraya", nav: "jobs" },
-    { id: "durham", nav: "durham" },
-    { id: "sports", nav: "sports" },
-  ];
-  let active = "today";
-  sections.forEach((item) => {
-    const section = document.querySelector(`#${item.id}`);
-    if (section && section.getBoundingClientRect().top <= anchor) active = item.nav;
-  });
-  navButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.scroll === active);
-  });
-}
-
-window.addEventListener(
-  "scroll",
-  () => {
-    if (navScrollFrame) return;
-    navScrollFrame = window.requestAnimationFrame(() => {
-      navScrollFrame = 0;
-      updateActiveNavigation();
-    });
-  },
-  { passive: true },
-);
-
+setAppView("today", { scroll: false });
 formatDate();
 saveState();
 bindGoogleConnectButtons();
@@ -3200,6 +3302,6 @@ window.addEventListener("offline", updateSyncState);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=15").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=17").catch(() => {});
   });
 }
