@@ -49,7 +49,7 @@ Do not create or publish a client secret. This browser integration needs only th
 4. Commit the change.
 5. Wait for GitHub Pages to redeploy, then open:
 
-   https://relytbytes.github.io/daymark/?v=15
+   https://relytbytes.github.io/daymark/?v=17
 
 6. Tap **Connect Google securely** and approve Calendar access plus the updated Gmail permission.
 

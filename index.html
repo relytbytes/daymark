@@ -9,18 +9,18 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=15" />
+    <link rel="manifest" href="./manifest.webmanifest?v=17" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=15" />
-    <script src="./config.js?v=15"></script>
+    <link rel="stylesheet" href="./styles.css?v=17" />
+    <script src="./config.js?v=17"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
-  <body data-phase="morning">
+  <body data-phase="morning" data-view="today">
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="#today" aria-label="Daymark home">
+        <a class="brand" href="#today" data-app-view="today" aria-label="Daymark home">
           <span class="brand-mark" aria-hidden="true">
             <i></i><i></i><i></i>
           </span>
@@ -61,7 +61,14 @@
       </div>
 
       <main>
-        <section class="hero" id="today">
+        <section class="view-intro" id="viewIntro" aria-labelledby="viewTitle">
+          <p class="section-kicker" id="viewKicker">DAYMARK</p>
+          <h1 id="viewTitle">Today</h1>
+          <p id="viewNote">What needs attention now.</p>
+          <div class="view-shortcuts" id="viewShortcuts"></div>
+        </section>
+
+        <section class="hero" id="today" data-view-section="today">
           <div class="hero-copy">
             <p class="eyebrow" id="dateLabel">THURSDAY · JULY 2</p>
             <h1 id="heroTitle">Make the day smaller, Ty.</h1>
@@ -78,7 +85,7 @@
           </div>
         </section>
 
-        <section class="focus-rail" id="focus" aria-labelledby="focusTitle">
+        <section class="focus-rail" id="focus" data-view-section="today" aria-labelledby="focusTitle">
           <div class="focus-marker" aria-hidden="true"><span></span></div>
           <div class="focus-copy">
             <div class="focus-eyebrow">
@@ -101,20 +108,20 @@
           <span class="focus-progress" aria-hidden="true"><i id="focusProgress"></i></span>
         </section>
 
-        <section class="glance-widget" aria-label="Daymark glance">
-          <button type="button" data-scroll="durham">
+        <section class="glance-widget" data-view-section="today" aria-label="Daymark glance">
+          <button type="button" data-app-view="life" data-view-target="durham">
             <span class="glance-icon glance-icon--weather" aria-hidden="true"></span>
             <span><small>WEATHER</small><strong id="widgetWeather">Checking</strong><em id="widgetWeatherNote">Durham</em></span>
           </button>
-          <button type="button" data-scroll="signals">
+          <button type="button" data-app-view="today" data-view-target="signals">
             <span class="glance-icon glance-icon--calendar" aria-hidden="true">12</span>
             <span><small>NEXT</small><strong id="widgetNext">Calendar</strong><em id="widgetNextNote">Not connected</em></span>
           </button>
-          <button type="button" data-scroll="signals">
+          <button type="button" data-app-view="today" data-view-target="signals">
             <span class="glance-icon glance-icon--mail" aria-hidden="true">M</span>
             <span><small>MAIL</small><strong id="widgetMail">Connect</strong><em id="widgetMailNote">Priority unread</em></span>
           </button>
-          <button type="button" data-scroll="sports">
+          <button type="button" data-app-view="more" data-view-target="sports">
             <span class="glance-icon glance-icon--dbacks" aria-hidden="true">
               <img src="https://www.mlbstatic.com/team-logos/109.svg" alt="" width="24" height="24" data-team-logo />
             </span>
@@ -124,7 +131,7 @@
 
         <div class="content-grid">
           <div class="primary-column">
-            <section class="section-block" id="priorities">
+            <section class="section-block" id="priorities" data-view-section="today">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker" id="priorityKicker">START HERE</p>
@@ -227,7 +234,7 @@
               </article>
             </section>
 
-            <section class="section-block" id="signals">
+            <section class="section-block" id="signals" data-view-section="today">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker" id="signalKicker">WHAT’S IN MOTION</p>
@@ -235,7 +242,7 @@
                 </div>
                 <div class="section-heading-actions">
                   <button class="text-button text-button--muted" id="disconnectGoogle" type="button" hidden>End Google session</button>
-                  <button class="text-button" type="button" data-scroll="decisions">Decide next</button>
+                  <button class="text-button" type="button" data-app-view="work" data-view-target="decisions">Decide next</button>
                 </div>
               </div>
 
@@ -278,7 +285,7 @@
               <p class="connection-note">Spotify can renew its session on this device. Google requires a quick reconnect when its short-lived browser access expires.</p>
             </section>
 
-            <section class="section-block" id="jobs">
+            <section class="section-block" id="jobs" data-view-section="work">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">JOB SEARCH</p>
@@ -317,7 +324,7 @@
               </article>
             </section>
 
-            <section class="section-block" id="veraya">
+            <section class="section-block" id="veraya" data-view-section="work">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">VERAYA · CURRENT SPRINT</p>
@@ -359,7 +366,7 @@
           </div>
 
           <aside class="secondary-column">
-            <section class="section-block" id="decisions">
+            <section class="section-block" id="decisions" data-view-section="work">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">DECISION QUEUE</p>
@@ -407,7 +414,7 @@
               </div>
             </section>
 
-            <section class="section-block" id="scorecard">
+            <section class="section-block" id="scorecard" data-view-section="work">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">WEEKLY SCORECARD</p>
@@ -440,7 +447,7 @@
               </article>
             </section>
 
-            <section class="section-block" id="durham">
+            <section class="section-block" id="durham" data-view-section="life">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">DURHAM · TODAY</p>
@@ -532,7 +539,7 @@
               </article>
             </section>
 
-            <section class="section-block" id="sports">
+            <section class="section-block" id="sports" data-view-section="more">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">YOUR TEAMS</p>
@@ -611,7 +618,7 @@
               </div>
             </section>
 
-            <section class="section-block" id="watch">
+            <section class="section-block" id="watch" data-view-section="more">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">WATCH WITH INTENT</p>
@@ -640,7 +647,7 @@
               </article>
             </section>
 
-            <section class="section-block" id="listen">
+            <section class="section-block" id="listen" data-view-section="more">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">SOUNDTRACK THE MOMENT</p>
@@ -670,7 +677,7 @@
               </article>
             </section>
 
-            <section class="section-block reading-section" id="reading">
+            <section class="section-block reading-section" id="reading" data-view-section="more">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker" id="readingKicker">LATER TONIGHT · 28 MIN</p>
@@ -714,7 +721,7 @@
               </div>
             </section>
 
-            <section class="section-block tomorrow-card">
+            <section class="section-block tomorrow-card" data-view-section="today">
               <span class="tomorrow-label">TOMORROW · ACTUAL CALENDAR</span>
               <h2 id="tomorrowTitle">Tomorrow, without guesswork.</h2>
               <p id="tomorrowSummary">Connect Google and Daymark will build this from your real schedule.</p>
@@ -727,16 +734,16 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 15</small>
+          <small>Daymark keeps the signal. You keep the day. · BUILD 17</small>
         </footer>
       </main>
 
       <nav class="bottom-nav" aria-label="Primary navigation">
-        <button class="nav-button is-active" type="button" data-scroll="today">
+        <button class="nav-button is-active" type="button" data-app-view="today">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V20H4Z" /><path d="M9 20v-6h6v6" /></svg>
           <span>Today</span>
         </button>
-        <button class="nav-button" type="button" data-scroll="jobs">
+        <button class="nav-button" type="button" data-app-view="work">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V4h8v3M3 12h18M10 12v2h4v-2" /></svg>
           <span>Work</span>
         </button>
@@ -744,11 +751,11 @@
           <span class="nav-capture-icon" aria-hidden="true">+</span>
           <span>Capture</span>
         </button>
-        <button class="nav-button" type="button" data-scroll="durham">
+        <button class="nav-button" type="button" data-app-view="life">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" /><circle cx="12" cy="9" r="2.4" /></svg>
           <span>Life</span>
         </button>
-        <button class="nav-button" type="button" data-scroll="sports">
+        <button class="nav-button" type="button" data-app-view="more">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 9h16M9 9v11" /><path d="m13 14 2 2 4-4" /></svg>
           <span>More</span>
         </button>
@@ -842,6 +849,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=15" defer></script>
+    <script src="./app.js?v=17" defer></script>
   </body>
 </html>

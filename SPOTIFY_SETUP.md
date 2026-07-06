@@ -42,7 +42,7 @@ window.DAYMARK_CONFIG = Object.freeze({
 5. Commit the change.
 6. Wait for GitHub Pages to redeploy, then open:
 
-   https://relytbytes.github.io/daymark/?v=15
+   https://relytbytes.github.io/daymark/?v=17
 
 7. Tap **Connect Spotify** and approve the requested playback permissions.
 
@@ -58,4 +58,4 @@ Daymark cannot edit playlists, change your saved library, follow artists, or acc
 
 If playback controls say to open Spotify first, start playing something in the Spotify app on your phone, computer or speaker, then return to Daymark.
 
-If the current track appears but playback buttons fail, choose a different device under **Playback device** if one is available. Daymark v15 refreshes Spotify’s active-player state before every command and normally targets the active player without relying on a saved device ID. If Spotify restricts that playback context, Daymark keeps the listening data current and directs you to the Spotify app instead of repeatedly suggesting reconnection.
+If the current track appears but playback buttons fail, choose a different device under **Playback device** if one is available. Daymark v17 refreshes Spotify’s active-player state before every command, accepts Spotify’s empty success responses correctly, and reconciles uncertain command responses against the updated player state. If Spotify restricts that playback context, Daymark keeps the listening data current and directs you to the Spotify app.
