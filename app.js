@@ -6,6 +6,7 @@ const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
 const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
 const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
 const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
+const GOOGLE_SCOPE_VERSION_STORAGE_KEY = "daymark-google-scope-version";
 const STATE_SCHEMA_VERSION = 16;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const BASEBALL_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -734,12 +735,11 @@ function setGoogleButtonsDisabled(disabled) {
 
 function persistGoogleSession() {
   try {
-    sessionStorage.setItem(
+    localStorage.setItem(
       GOOGLE_SESSION_KEY,
       JSON.stringify({
         accessToken: googleAccessToken,
         expiresAt: googleTokenExpiresAt,
-        scopeVersion: GOOGLE_SCOPE_VERSION,
       }),
     );
   } catch {
@@ -751,7 +751,7 @@ function clearGoogleSession() {
   googleAccessToken = "";
   googleTokenExpiresAt = 0;
   try {
-    sessionStorage.removeItem(GOOGLE_SESSION_KEY);
+    localStorage.removeItem(GOOGLE_SESSION_KEY);
   } catch {
     // Nothing else to clear.
   }
@@ -761,18 +761,16 @@ function clearGoogleSession() {
 
 function restoreGoogleSession() {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(GOOGLE_SESSION_KEY));
-    if (
-      saved?.accessToken &&
-      saved.scopeVersion === GOOGLE_SCOPE_VERSION &&
-      Number(saved.expiresAt) > Date.now() + 30000
-    ) {
+    const saved = JSON.parse(localStorage.getItem(GOOGLE_SESSION_KEY));
+    const hasCurrentScope =
+      localStorage.getItem(GOOGLE_SCOPE_VERSION_STORAGE_KEY) === GOOGLE_SCOPE_VERSION;
+    if (saved?.accessToken && hasCurrentScope && Number(saved.expiresAt) > Date.now() + 30000) {
       googleAccessToken = saved.accessToken;
       googleTokenExpiresAt = Number(saved.expiresAt);
       return true;
     }
   } catch {
-    // Invalid or unavailable session storage means reconnecting manually.
+    // Invalid or unavailable local storage means reconnecting manually.
   }
   clearGoogleSession();
   return false;
@@ -807,7 +805,7 @@ function connectGoogle() {
       googleAccessToken = response.access_token;
       googleTokenExpiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
       localStorage.setItem("daymark-google-was-connected", "1");
-      localStorage.setItem("daymark-google-scope-version", GOOGLE_SCOPE_VERSION);
+      localStorage.setItem(GOOGLE_SCOPE_VERSION_STORAGE_KEY, GOOGLE_SCOPE_VERSION);
       persistGoogleSession();
       await loadGoogleData();
     },
@@ -818,13 +816,73 @@ function connectGoogle() {
   });
 
   const hasCurrentScope =
-    localStorage.getItem("daymark-google-scope-version") === GOOGLE_SCOPE_VERSION;
+    localStorage.getItem(GOOGLE_SCOPE_VERSION_STORAGE_KEY) === GOOGLE_SCOPE_VERSION;
   tokenClient.requestAccessToken({ prompt: hasCurrentScope ? "" : "consent" });
 }
 
-async function fetchGoogleJson(url) {
-  if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) {
+async function waitForGoogleIdentityServices(timeoutMs = 4000, intervalMs = 200) {
+  const start = Date.now();
+  while (!window.google?.accounts?.oauth2) {
+    if (Date.now() - start >= timeoutMs) return false;
+    await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
+  }
+  return true;
+}
+
+let googleSilentTokenClient = null;
+let googleTokenRefreshPromise = null;
+
+async function requestSilentGoogleToken() {
+  const ready = await waitForGoogleIdentityServices();
+  if (!ready) return false;
+  try {
+    if (!googleSilentTokenClient) {
+      googleSilentTokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: window.DAYMARK_CONFIG.googleClientId.trim(),
+        scope: GOOGLE_SCOPES,
+        callback: () => {},
+      });
+    }
+    const response = await new Promise((resolve) => {
+      googleSilentTokenClient.callback = (resp) => resolve(resp);
+      googleSilentTokenClient.error_callback = () => resolve({ error: "silent_reauth_failed" });
+      googleSilentTokenClient.requestAccessToken({ prompt: "" });
+    });
+    if (response.error || !response.access_token) return false;
+    googleAccessToken = response.access_token;
+    googleTokenExpiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
+    localStorage.setItem(GOOGLE_SCOPE_VERSION_STORAGE_KEY, GOOGLE_SCOPE_VERSION);
+    persistGoogleSession();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureGoogleAccessToken() {
+  if (googleAccessToken && Date.now() < googleTokenExpiresAt) return true;
+  if (!hasGoogleClientId()) return false;
+
+  const hasCurrentScope =
+    localStorage.getItem(GOOGLE_SCOPE_VERSION_STORAGE_KEY) === GOOGLE_SCOPE_VERSION;
+  if (!hasCurrentScope) {
     clearGoogleSession();
+    return false;
+  }
+
+  if (!googleTokenRefreshPromise) {
+    googleTokenRefreshPromise = requestSilentGoogleToken().finally(() => {
+      googleTokenRefreshPromise = null;
+    });
+  }
+
+  const renewed = await googleTokenRefreshPromise;
+  if (!renewed) clearGoogleSession();
+  return renewed;
+}
+
+async function fetchGoogleJson(url) {
+  if (!(await ensureGoogleAccessToken())) {
     throw new Error("Google access has expired.");
   }
   const response = await fetch(url, {
@@ -837,8 +895,7 @@ async function fetchGoogleJson(url) {
 }
 
 async function modifyGmailMessage(messageId, body) {
-  if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) {
-    clearGoogleSession();
+  if (!(await ensureGoogleAccessToken())) {
     throw new Error("Google access has expired.");
   }
   const response = await fetch(
@@ -1175,8 +1232,7 @@ async function loadGoogleData() {
 }
 
 async function refreshPriorityMail() {
-  if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) {
-    clearGoogleSession();
+  if (!(await ensureGoogleAccessToken())) {
     renderGoogleDisconnected();
     return;
   }
@@ -1447,7 +1503,7 @@ function getSpotifyByline(item) {
 }
 
 function getSpotifyUrl(item) {
-  return item?.external_urls?.spotify || "https://open.spotify.com/";
+  return item?.uri || item?.external_urls?.spotify || "https://open.spotify.com/";
 }
 
 function formatSpotifyTime(milliseconds) {
@@ -1693,7 +1749,7 @@ function renderSpotifyDevicePicker(data) {
           `;
         })
         .join("")
-    : '<span class="spotify-device-empty">Open Spotify on a phone, computer or speaker to make it available.</span>';
+    : '<a class="spotify-device-empty" href="spotify:" rel="noreferrer">Open Spotify on this phone to make it available.</a>';
 
   return `
     <div class="spotify-device-picker">
@@ -1777,7 +1833,7 @@ function renderSpotifyPanel(data = lastSpotifyData) {
       <div class="spotify-idle">
         <strong>Nothing is playing right now.</strong>
         <p>Start something on your phone, computer or speaker; Daymark will pick it up automatically.</p>
-        <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify</a>
+        <a href="spotify:" rel="noreferrer">Open Spotify</a>
       </div>
       <div class="spotify-control-status has-warning" id="spotifyControlStatus">Choose an available device below, then start playback in Spotify.</div>
     `;
@@ -1822,7 +1878,7 @@ function renderSpotifyDisconnected(message = "Bring the current track into Dayma
       <strong>${escapeHtml(message)}</strong>
       <p>See what is playing, recent listening and your short-term favorites. Control the active Spotify device without leaving the brief.</p>
       <button id="connectSpotify" type="button">Connect Spotify</button>
-      <a href="https://open.spotify.com/" target="_blank" rel="noreferrer">Open Spotify instead</a>
+      <a href="spotify:" rel="noreferrer">Open Spotify instead</a>
     </div>
   `;
   bindSpotifyConnectButton();
@@ -2755,8 +2811,8 @@ async function refreshBaseball(force = false) {
 }
 
 async function refreshGoogleIfNeeded(force = false) {
-  if (!googleAccessToken || Date.now() >= googleTokenExpiresAt) return;
   if (!force && Date.now() - lastGoogleRefreshAt < GOOGLE_REFRESH_INTERVAL_MS) return;
+  if (!(await ensureGoogleAccessToken())) return;
   try {
     await loadGoogleData();
   } catch {

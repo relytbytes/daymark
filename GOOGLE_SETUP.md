@@ -1,6 +1,6 @@
 # Connect Daymark to Google Calendar and Gmail
 
-Daymark uses Google Identity Services. Calendar access is read-only. Gmail access can list priority unread messages and remove the `UNREAD` label when you tap **Mark read**; Daymark cannot send, delete, or archive mail. The temporary access token is kept in session storage so a page reload can reconnect during the same browser session. It is never written to the repository or permanent local storage, and Google will require reconnection after the token expires or the session ends.
+Daymark uses Google Identity Services. Calendar access is read-only. Gmail access can list priority unread messages and remove the `UNREAD` label when you tap **Mark read**; Daymark cannot send, delete, or archive mail. The access token is cached on-device (browser local storage) and silently renewed using Google's own sign-in session while it stays valid, so reopening Daymark normally does not require reconnecting. It is never written to the repository. Manual reconnection is only needed after a real Google-side sign-out or a Daymark scope upgrade.
 
 ## 1. Create a Google Cloud project
 
@@ -57,4 +57,4 @@ If you connected an earlier Daymark build, Google will ask once more because bui
 
 ## Why Google occasionally asks to reconnect
 
-Google’s browser authorization issues a short-lived access token and requires a user-driven action to obtain a new one after expiration. A static GitHub Pages app cannot safely receive or store Google’s long-lived refresh token. Truly persistent Google access would require a small secure backend using Google’s offline authorization flow.
+Google’s browser authorization issues a short-lived access token. A static GitHub Pages app cannot safely receive or store Google’s long-lived refresh token, so Daymark instead renews the token silently through Google's own sign-in session in the background. That silent renewal depends on an active Google session in the browser; if it's signed out, revoked, or the token can't be renewed silently for any other reason, Daymark falls back to asking for a manual reconnect.
