@@ -9,11 +9,17 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=18" />
+    <link rel="manifest" href="./manifest.webmanifest?v=19" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=18" />
-    <script src="./config.js?v=18"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css?v=19" />
+    <script src="./config.js?v=19"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -28,6 +34,7 @@
         </a>
 
         <div class="topbar-actions">
+          <span class="masthead-tag" id="viewKicker">Morning Brief</span>
           <span class="sync-state" id="syncState">
             <span class="sync-dot"></span>
             <span class="sync-label">waiting</span>
@@ -45,32 +52,32 @@
         </div>
       </header>
 
-      <div class="live-wrap">
-        <div class="live-strip" aria-label="Current day, date, time and day phase">
-          <div class="live-date">
-            <strong id="stripDay">THURSDAY</strong>
-            <span id="stripDate">JULY 2</span>
+      <div class="masthead-wrap">
+        <div class="masthead">
+          <div class="masthead-head">
+            <p class="masthead-date" id="dateLabel">THURSDAY · JULY 2</p>
+            <span class="masthead-phase">
+              <span class="live-pulse" aria-hidden="true"></span>
+              <strong id="phaseLabel">Plan the day</strong>
+            </span>
           </div>
-          <div class="live-phase">
-            <span class="live-pulse" aria-hidden="true"></span>
-            <strong id="phaseLabel">Plan the day</strong>
-          </div>
-          <time id="currentTime" datetime="">9:41 AM</time>
+          <h1 class="masthead-title" id="viewTitle">Good morning, <i>Ty.</i></h1>
+          <p class="masthead-note" id="viewNote" hidden></p>
+          <div class="masthead-rule" aria-hidden="true"></div>
+          <section class="glance" aria-label="At a glance">
+            <p class="glance-label">At a Glance</p>
+            <div class="glance-grid" id="glanceGrid"></div>
+          </section>
+          <div class="view-shortcuts" id="viewShortcuts"></div>
+          <time id="currentTime" class="sr-only" datetime="">9:41 AM</time>
           <span class="day-progress" aria-hidden="true"><i id="dayProgress"></i></span>
         </div>
       </div>
 
       <main>
-        <section class="view-intro" id="viewIntro" aria-labelledby="viewTitle">
-          <p class="section-kicker" id="viewKicker">DAYMARK</p>
-          <h1 id="viewTitle">Today</h1>
-          <p id="viewNote">What needs attention now.</p>
-          <div class="view-shortcuts" id="viewShortcuts"></div>
-        </section>
-
         <section class="hero" id="today" data-view-section="today">
           <div class="hero-copy">
-            <p class="eyebrow" id="dateLabel">THURSDAY · JULY 2</p>
+            <p class="eyebrow">Lead · Your day</p>
             <h1 id="heroTitle">Make the day smaller, Ty.</h1>
             <p class="hero-note" id="heroNote">Three priorities. One focused block. Everything else can wait its turn.</p>
           </div>
@@ -734,7 +741,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 17</small>
+          <small>Daymark keeps the signal. You keep the day. · BUILD 19</small>
         </footer>
       </main>
 
@@ -849,6 +856,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=18" defer></script>
+    <script src="./app.js?v=19" defer></script>
   </body>
 </html>

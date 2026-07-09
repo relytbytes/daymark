@@ -112,15 +112,15 @@ const captureDialog = document.querySelector("#captureDialog");
 const captureForm = document.querySelector("#captureForm");
 const VIEW_CONFIG = Object.freeze({
   today: {
-    kicker: "YOUR DAY",
-    title: "Today",
-    note: "The next useful move, your real schedule, and only what needs attention now.",
+    tag: "Morning Brief",
+    title: "Good morning, Ty.",
+    glance: ["weather", "now", "daylight", "open"],
     shortcuts: [],
   },
   work: {
-    kicker: "WORK",
-    title: "Move the work.",
-    note: "Applications, Veraya, decisions, and weekly momentum—without the rest of the dashboard.",
+    tag: "Section B",
+    title: "Work",
+    glance: ["active", "interviews", "followups", "sprint"],
     shortcuts: [
       ["Applications", "jobs"],
       ["Veraya", "veraya"],
@@ -129,9 +129,9 @@ const VIEW_CONFIG = Object.freeze({
     ],
   },
   life: {
-    kicker: "LIFE IN DURHAM",
-    title: "Useful, nearby, current.",
-    note: "Weather, events, homes, practical reminders, maps, and Durham sports.",
+    tag: "Section C · Durham",
+    title: "Life",
+    glance: ["weather", "now", "sunset", "daylight"],
     shortcuts: [
       ["Weather", "durham"],
       ["Events", "durham"],
@@ -140,9 +140,9 @@ const VIEW_CONFIG = Object.freeze({
     ],
   },
   more: {
-    kicker: "MORE",
-    title: "Choose what you came for.",
-    note: "Sports, Spotify, reading, and video stay available without crowding the daily plan.",
+    tag: "Section D · Arts & Media",
+    title: "More",
+    glance: ["dbacks", "saved", "playing", "now"],
     shortcuts: [
       ["Sports", "sports"],
       ["Spotify", "listen"],
@@ -151,6 +151,150 @@ const VIEW_CONFIG = Object.freeze({
     ],
   },
 });
+
+// Labels + presentation for the At-a-Glance ribbon cells. Values are filled
+// live by syncGlances() from the canonical elements each already maintains.
+const GLANCE_CELLS = Object.freeze({
+  weather: { label: "Weather", glyph: "☀", accent: false },
+  now: { label: "Now", accent: false },
+  daylight: { label: "Daylight", accent: false },
+  open: { label: "Open", accent: true },
+  active: { label: "Active", accent: false },
+  interviews: { label: "Interviews", accent: true },
+  followups: { label: "Follow-ups", accent: false },
+  sprint: { label: "Sprint", accent: false },
+  sunset: { label: "Sunset", accent: false },
+  dbacks: { label: "D-backs", accent: true },
+  saved: { label: "Saved", accent: false },
+  playing: { label: "Playing", accent: false },
+});
+
+function mastheadGreeting(date = new Date()) {
+  const phase = getDayPhase(date);
+  const word =
+    phase === "morning"
+      ? "Good morning"
+      : phase === "afternoon"
+        ? "Good afternoon"
+        : "Good evening";
+  return `${word}, <i>Ty.</i>`;
+}
+
+function glanceShortDate(date = new Date()) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })
+    .format(date)
+    .replace(",", " ·");
+}
+
+function stripMeridiem(value) {
+  return String(value || "").replace(/\s?(AM|PM)$/i, "").trim();
+}
+
+function readText(id) {
+  const el = document.getElementById(id);
+  return el ? el.textContent.trim() : "";
+}
+
+function glanceValue(key) {
+  switch (key) {
+    case "weather": {
+      const val = readText("weatherCurrent");
+      const summary = readText("weatherSummary").split("·")[0].trim();
+      return { val: val && val !== "—°" ? val : "—", sub: summary || "Durham" };
+    }
+    case "now":
+      return { val: stripMeridiem(readText("currentTime")) || "—", sub: glanceShortDate() };
+    case "daylight":
+      return {
+        val: document.body.dataset.daylight || "—",
+        sub: document.body.dataset.sunwindow || "Durham",
+      };
+    case "open":
+      return { val: readText("openCount") || "0", sub: "loops" };
+    case "active":
+      return { val: readText("activeApps") || "0", sub: "apps" };
+    case "interviews":
+      return { val: readText("interviewApps") || "0", sub: "scheduled" };
+    case "followups":
+      return { val: readText("followupApps") || "0", sub: "due" };
+    case "sprint":
+      return { val: readText("sprintPercent") || "0%", sub: "complete" };
+    case "sunset":
+      return { val: document.body.dataset.sunset || "—", sub: "Durham" };
+    case "saved":
+      return { val: (readText("readingQueueCount").match(/\d+/) || ["0"])[0], sub: "to read" };
+    case "dbacks":
+      return { val: readText("widgetGame") || "—", sub: readText("widgetGameNote") || "MLB" };
+    case "playing": {
+      const item =
+        typeof lastSpotifyData !== "undefined" && lastSpotifyData.playback
+          ? lastSpotifyData.playback.item
+          : null;
+      if (item && item.name) {
+        const artist =
+          Array.isArray(item.artists) && item.artists[0] ? item.artists[0].name : "Spotify";
+        return { val: spotifyIsPlaying ? "On" : "Paused", sub: item.name || artist };
+      }
+      return { val: "—", sub: "Spotify" };
+    }
+    default:
+      return { val: "—", sub: "" };
+  }
+}
+
+function syncGlances() {
+  const grid = document.querySelector("#glanceGrid");
+  if (!grid) return;
+  grid.querySelectorAll(".glance-cell").forEach((cell) => {
+    const { val, sub } = glanceValue(cell.dataset.glance);
+    const valEl = cell.querySelector("[data-glance-val]");
+    const subEl = cell.querySelector("[data-glance-sub]");
+    if (valEl) valEl.textContent = val;
+    if (subEl) subEl.textContent = sub;
+  });
+}
+
+function setMastheadTitle(view) {
+  const el = document.querySelector("#viewTitle");
+  if (!el) return;
+  if (view === "today") el.innerHTML = mastheadGreeting();
+  else el.textContent = VIEW_CONFIG[view] ? VIEW_CONFIG[view].title : "Daymark";
+}
+
+function buildGlanceGrid(view) {
+  const grid = document.querySelector("#glanceGrid");
+  if (!grid) return;
+  const keys = VIEW_CONFIG[view] ? VIEW_CONFIG[view].glance : [];
+  grid.innerHTML = keys
+    .map((key) => {
+      const cell = GLANCE_CELLS[key] || { label: key };
+      const glyph = cell.glyph
+        ? `<span class="glance-cell-glyph" aria-hidden="true">${cell.glyph}</span>`
+        : "";
+      const accent = cell.accent ? " is-accent" : "";
+      return (
+        `<div class="glance-cell" data-glance="${escapeHtml(key)}">` +
+        `<div class="glance-cell-label">${escapeHtml(cell.label)}</div>` +
+        `<div class="glance-cell-value${accent}">${glyph}<span data-glance-val>—</span></div>` +
+        `<div class="glance-cell-sub" data-glance-sub>—</div>` +
+        `</div>`
+      );
+    })
+    .join("");
+}
+
+function renderMasthead(view) {
+  const nextView = VIEW_CONFIG[view] ? view : "today";
+  const tag = document.querySelector("#viewKicker");
+  if (tag) tag.textContent = VIEW_CONFIG[nextView].tag;
+  setMastheadTitle(nextView);
+  buildGlanceGrid(nextView);
+  syncGlances();
+}
 
 document.addEventListener(
   "error",
@@ -570,12 +714,6 @@ function formatDate(date = new Date()) {
     .format(date)
     .replace(",", " ·");
   document.querySelector("#dateLabel").textContent = label.toUpperCase();
-  document.querySelector("#stripDay").textContent =
-    new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date).toUpperCase();
-  document.querySelector("#stripDate").textContent =
-    new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" })
-      .format(date)
-      .toUpperCase();
 
   const tomorrow = new Date(date);
   tomorrow.setDate(date.getDate() + 1);
@@ -594,12 +732,7 @@ function updateClock(date = new Date()) {
     minute: "2-digit",
   }).format(date);
   currentTime.dateTime = date.toISOString();
-  document.querySelector("#stripDay").textContent =
-    new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date).toUpperCase();
-  document.querySelector("#stripDate").textContent =
-    new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" })
-      .format(date)
-      .toUpperCase();
+  syncGlances();
 }
 
 function updateLiveDay(date = new Date()) {
@@ -664,6 +797,7 @@ function updateLiveDay(date = new Date()) {
   }[phase];
 
   body.dataset.phase = phase;
+  if (body.dataset.view === "today") setMastheadTitle("today");
   document.querySelector("#phaseLabel").textContent = phaseContent.label;
   document.querySelector("#heroTitle").textContent = phaseContent.title;
   document.querySelector("#heroNote").textContent = phaseContent.note;
@@ -2241,10 +2375,21 @@ function renderWeather(data, source = "live", updatedAt = new Date()) {
   const high = Math.round(data.daily.temperature_2m_max[0]);
   const rain = Math.round(data.daily.precipitation_probability_max[0]);
   const code = data.current.weather_code;
-  const sunset = new Intl.DateTimeFormat("en-US", {
+  const timeFormat = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(data.daily.sunset[0]));
+  });
+  const sunsetDate = new Date(data.daily.sunset[0]);
+  const sunset = timeFormat.format(sunsetDate);
+  const sunriseDate =
+    data.daily.sunrise && data.daily.sunrise[0] ? new Date(data.daily.sunrise[0]) : null;
+  document.body.dataset.sunset = stripMeridiem(sunset);
+  if (sunriseDate) {
+    const sunrise = timeFormat.format(sunriseDate);
+    const minutes = Math.max(0, Math.round((sunsetDate - sunriseDate) / 60000));
+    document.body.dataset.daylight = `${Math.floor(minutes / 60)}h`;
+    document.body.dataset.sunwindow = `${stripMeridiem(sunrise)}–${stripMeridiem(sunset)}`;
+  }
   const description = weatherDescription(code);
   const feelsText = Math.abs(feelsLike - current) >= 3 ? ` · feels ${feelsLike}°` : "";
 
@@ -2262,6 +2407,7 @@ function renderWeather(data, source = "live", updatedAt = new Date()) {
   document.querySelector("#widgetWeatherNote").textContent = `High ${high}° · Rain ${rain}%`;
   const ageMinutes = Math.max(0, (Date.now() - new Date(updatedAt).getTime()) / 60000);
   document.querySelector(".weather-card").classList.toggle("is-stale", ageMinutes > 15);
+  syncGlances();
 }
 
 function renderWeatherError() {
@@ -2564,7 +2710,7 @@ function getWeatherUrl() {
   return (
     "https://api.open-meteo.com/v1/forecast?latitude=35.9940&longitude=-78.8986" +
     "&current=temperature_2m,apparent_temperature,weather_code" +
-    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset" +
+    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset,sunrise" +
     "&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=2"
   );
 }
@@ -3068,9 +3214,7 @@ function setAppView(view, options = {}) {
   const nextView = VIEW_CONFIG[view] ? view : "today";
   const config = VIEW_CONFIG[nextView];
   body.dataset.view = nextView;
-  document.querySelector("#viewKicker").textContent = config.kicker;
-  document.querySelector("#viewTitle").textContent = config.title;
-  document.querySelector("#viewNote").textContent = config.note;
+  renderMasthead(nextView);
 
   const shortcuts = document.querySelector("#viewShortcuts");
   shortcuts.innerHTML = config.shortcuts
@@ -3358,6 +3502,6 @@ window.addEventListener("offline", updateSyncState);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js?v=17").catch(() => {});
+    navigator.serviceWorker.register("./sw.js?v=19").catch(() => {});
   });
 }
