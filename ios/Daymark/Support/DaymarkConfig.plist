@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Spotify: reused from the Daymark web app (public PKCE client id, no secret).
+	     Add the redirect URI daymark://spotify-callback in the Spotify developer dashboard. -->
+	<key>SpotifyClientID</key>
+	<string>378332274e5641d8af7bce5516f3d0da</string>
+	<!-- Google: create an OAuth client of type *iOS* in your existing Google Cloud project
+	     (the web client id cannot be used by a native app). See ios/README.md. -->
+	<key>GoogleiOSClientID</key>
+	<string></string>
+	<!-- Home coordinates for weather + travel (Durham, NC by default). -->
+	<key>HomeLatitude</key>
+	<real>35.9940</real>
+	<key>HomeLongitude</key>
+	<real>-78.8986</real>
+	<key>OwnerName</key>
+	<string>Ty</string>
+</dict>
+</plist>

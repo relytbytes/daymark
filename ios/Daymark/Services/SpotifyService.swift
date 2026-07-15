@@ -1,0 +1,197 @@
+//
+//  SpotifyService.swift
+//  Daymark
+//
+//  Spotify PKCE auth (reuses the web app's public client id) + playback state,
+//  recent listening, and lightweight control of the active device.
+//
+
+import Foundation
+
+@MainActor
+final class SpotifyService {
+    private static let refreshKey = "spotify.refresh"
+    private var accessToken: String?
+    private var accessExpiresAt = Date.distantPast
+
+    var isConnected: Bool { Keychain.get(Self.refreshKey) != nil }
+
+    private static let scopes = [
+        "user-read-playback-state",
+        "user-modify-playback-state",
+        "user-read-currently-playing",
+        "user-read-recently-played",
+        "user-top-read",
+    ].joined(separator: " ")
+
+    // MARK: Connect / disconnect
+
+    func connect() async throws {
+        guard AppConfig.spotifyConfigured else {
+            throw ServiceError.notConfigured("Spotify (client ID)")
+        }
+        let verifier = PKCE.verifier()
+        var components = URLComponents(string: "https://accounts.spotify.com/authorize")!
+        components.queryItems = [
+            URLQueryItem(name: "client_id", value: AppConfig.spotifyClientID),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "redirect_uri", value: AppConfig.spotifyRedirectURI),
+            URLQueryItem(name: "scope", value: Self.scopes),
+            URLQueryItem(name: "code_challenge", value: PKCE.challenge(for: verifier)),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+        ]
+        let callback = try await WebAuthenticator.shared.authenticate(
+            url: components.url!,
+            callbackScheme: AppConfig.spotifyCallbackScheme
+        )
+        guard let code = URLComponents(url: callback, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "code" })?.value
+        else { throw ServiceError.auth("Spotify did not return an authorization code.") }
+
+        let data = try await HTTP.postForm(URL(string: "https://accounts.spotify.com/api/token")!, body: [
+            "client_id": AppConfig.spotifyClientID,
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": AppConfig.spotifyRedirectURI,
+            "code_verifier": verifier,
+        ])
+        try adopt(data)
+    }
+
+    func disconnect() {
+        Keychain.delete(Self.refreshKey)
+        accessToken = nil
+        accessExpiresAt = .distantPast
+    }
+
+    private func adopt(_ data: Data) throws {
+        let token = try JSONDecoder().decode(TokenResponse.self, from: data)
+        accessToken = token.access_token
+        accessExpiresAt = Date().addingTimeInterval(TimeInterval(token.expires_in ?? 3600) - 120)
+        if let refresh = token.refresh_token {
+            Keychain.set(refresh, key: Self.refreshKey)
+        }
+    }
+
+    private func validToken() async throws -> String {
+        if let accessToken, Date() < accessExpiresAt { return accessToken }
+        guard let refresh = Keychain.get(Self.refreshKey) else { throw ServiceError.notConnected }
+        let data = try await HTTP.postForm(URL(string: "https://accounts.spotify.com/api/token")!, body: [
+            "client_id": AppConfig.spotifyClientID,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh,
+        ])
+        try adopt(data)
+        guard let access = accessToken else { throw ServiceError.auth("Spotify session could not be renewed.") }
+        return access
+    }
+
+    // MARK: Reads
+
+    func playback() async throws -> PlaybackInfo? {
+        let token = try await validToken()
+        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/player")!, timeoutInterval: 15)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { return nil }
+        if http.statusCode == 204 || data.isEmpty { return nil }   // nothing active
+        guard (200...299).contains(http.statusCode) else { throw HTTPError.status(http.statusCode) }
+        let state = try JSONDecoder().decode(PlayerState.self, from: data)
+        guard let item = state.item else { return nil }
+        return PlaybackInfo(
+            isPlaying: state.is_playing ?? false,
+            track: item.name,
+            artist: item.artists?.first?.name ?? "Spotify",
+            artURL: item.album?.images?.first.flatMap { URL(string: $0.url) },
+            deviceName: state.device?.name,
+            progressMs: state.progress_ms,
+            durationMs: item.duration_ms
+        )
+    }
+
+    func recentTracks() async throws -> [RecentTrack] {
+        let token = try await validToken()
+        let url = URL(string: "https://api.spotify.com/v1/me/player/recently-played?limit=10")!
+        let response = try await HTTP.json(RecentList.self, url, headers: ["Authorization": "Bearer \(token)"])
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let fallback = ISO8601DateFormatter()
+        var seen = Set<String>()
+        var out: [RecentTrack] = []
+        for item in response.items ?? [] {
+            guard let track = item.track, !seen.contains(track.id ?? track.name) else { continue }
+            seen.insert(track.id ?? track.name)
+            out.append(RecentTrack(
+                id: (track.id ?? track.name) + (item.played_at ?? ""),
+                track: track.name,
+                artist: track.artists?.first?.name ?? "",
+                playedAt: item.played_at.flatMap { formatter.date(from: $0) ?? fallback.date(from: $0) },
+                artURL: track.album?.images?.last.flatMap { URL(string: $0.url) }
+            ))
+        }
+        return out
+    }
+
+    // MARK: Controls (best effort against the active device)
+
+    enum Control { case play, pause, next, previous }
+
+    func send(_ control: Control) async throws {
+        let token = try await validToken()
+        let (path, method): (String, String)
+        switch control {
+        case .play: (path, method) = ("me/player/play", "PUT")
+        case .pause: (path, method) = ("me/player/pause", "PUT")
+        case .next: (path, method) = ("me/player/next", "POST")
+        case .previous: (path, method) = ("me/player/previous", "POST")
+        }
+        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/\(path)")!, timeoutInterval: 15)
+        request.httpMethod = method
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse,
+           !(200...299).contains(http.statusCode), http.statusCode != 204 {
+            // 404 = no active device; surface a friendly error
+            if http.statusCode == 404 {
+                throw ServiceError.auth("No active Spotify device — start playback on a device first.")
+            }
+            throw HTTPError.status(http.statusCode)
+        }
+    }
+}
+
+// MARK: - Wire shapes
+
+private struct TokenResponse: Decodable {
+    let access_token: String
+    let expires_in: Int?
+    let refresh_token: String?
+}
+
+private struct PlayerState: Decodable {
+    struct Device: Decodable { let name: String? }
+    struct Item: Decodable {
+        struct Artist: Decodable { let name: String }
+        struct Album: Decodable {
+            struct Image: Decodable { let url: String }
+            let images: [Image]?
+        }
+        let id: String?
+        let name: String
+        let duration_ms: Int?
+        let artists: [Artist]?
+        let album: Album?
+    }
+    let is_playing: Bool?
+    let progress_ms: Int?
+    let device: Device?
+    let item: Item?
+}
+
+private struct RecentList: Decodable {
+    struct Entry: Decodable {
+        let played_at: String?
+        let track: PlayerState.Item?
+    }
+    let items: [Entry]?
+}
