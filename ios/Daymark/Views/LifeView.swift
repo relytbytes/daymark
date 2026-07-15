@@ -12,7 +12,7 @@ import UIKit
 struct LifeView: View {
     @Environment(AppState.self) private var app
     @Binding var showSettings: Bool
-    @State private var openURLItem: URL?
+    @State private var openURLItem: SheetLink?
 
     var body: some View {
         let phase = DayPhase.current()
@@ -36,8 +36,8 @@ struct LifeView: View {
             bullsSection
             remindersSection
         }
-        .sheet(item: $openURLItem) { url in
-            SafariView(url: url).ignoresSafeArea()
+        .sheet(item: $openURLItem) { item in
+            SafariView(url: item.url).ignoresSafeArea()
         }
     }
 
@@ -150,7 +150,7 @@ struct LifeView: View {
         VStack(spacing: 0) {
             Hairline()
             Button {
-                if let u = URL(string: url) { openURLItem = u }
+                if let u = URL(string: url) { openURLItem = SheetLink(url: u) }
             } label: {
                 HStack(spacing: 13) {
                     Text(index)
@@ -204,13 +204,13 @@ struct LifeView: View {
 
             HStack(spacing: 10) {
                 QuietButton(label: "Bulls schedule") {
-                    openURLItem = URL(string: "https://www.milb.com/durham/schedule")
+                    openURLItem = URL(string: "https://www.milb.com/durham/schedule").map { SheetLink(url: $0) }
                 }
                 QuietButton(label: "Duke calendar") {
-                    openURLItem = URL(string: "https://goduke.com/calendar")
+                    openURLItem = URL(string: "https://goduke.com/calendar").map { SheetLink(url: $0) }
                 }
                 QuietButton(label: "NCCU") {
-                    openURLItem = URL(string: "https://nccueaglepride.com/calendar")
+                    openURLItem = URL(string: "https://nccueaglepride.com/calendar").map { SheetLink(url: $0) }
                 }
             }
             .padding(.top, 12)

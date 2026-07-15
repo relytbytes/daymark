@@ -194,7 +194,7 @@ final class GoogleService {
             subject: subject,
             snippet: snippet,
             date: date,
-            isVIP: vipSet.contains(lowerEmail),
+            isVIP: vips.contains(lowerEmail),
             needsReply: !automated && (snippet.contains("?") || subject.lowercased().hasPrefix("re:"))
         )
     }

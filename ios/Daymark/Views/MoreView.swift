@@ -12,7 +12,7 @@ import UIKit
 struct MoreView: View {
     @Environment(AppState.self) private var app
     @Binding var showSettings: Bool
-    @State private var openURLItem: URL?
+    @State private var openURLItem: SheetLink?
     @State private var standingsView = "division"
 
     var body: some View {
@@ -38,8 +38,8 @@ struct MoreView: View {
             readingSection
             watchSection
         }
-        .sheet(item: $openURLItem) { url in
-            SafariView(url: url).ignoresSafeArea()
+        .sheet(item: $openURLItem) { item in
+            SafariView(url: item.url).ignoresSafeArea()
         }
     }
 
@@ -64,7 +64,7 @@ struct MoreView: View {
                     VStack(spacing: 0) {
                         Hairline()
                         Button {
-                            openURLItem = article.link
+                            openURLItem = SheetLink(url: article.link)
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
@@ -370,7 +370,7 @@ struct MoreView: View {
                         HStack(spacing: 12) {
                             Button {
                                 if let raw = item.url, let url = URL(string: raw) {
-                                    openURLItem = url
+                                    openURLItem = SheetLink(url: url)
                                 }
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -403,9 +403,9 @@ struct MoreView: View {
 
             // standing sources
             HStack(spacing: 8) {
-                QuietButton(label: "Jacobin") { openURLItem = URL(string: "https://jacobin.com/") }
-                QuietButton(label: "Longreads") { openURLItem = URL(string: "https://longreads.com/") }
-                QuietButton(label: "n+1") { openURLItem = URL(string: "https://www.nplusonemag.com/online-only/") }
+                QuietButton(label: "Jacobin") { openURLItem = URL(string: "https://jacobin.com/").map { SheetLink(url: $0) } }
+                QuietButton(label: "Longreads") { openURLItem = URL(string: "https://longreads.com/").map { SheetLink(url: $0) } }
+                QuietButton(label: "n+1") { openURLItem = URL(string: "https://www.nplusonemag.com/online-only/").map { SheetLink(url: $0) } }
             }
             .padding(.top, 12)
         }

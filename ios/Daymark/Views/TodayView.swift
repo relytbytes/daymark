@@ -13,7 +13,7 @@ import UIKit
 struct TodayView: View {
     @Environment(AppState.self) private var app
     @Binding var showSettings: Bool
-    @State private var openURLItem: URL?
+    @State private var openURLItem: SheetLink?
 
     var body: some View {
         let phase = DayPhase.current()
@@ -45,8 +45,8 @@ struct TodayView: View {
                 eveningReviewSection
             }
         }
-        .sheet(item: $openURLItem) { url in
-            SafariView(url: url).ignoresSafeArea()
+        .sheet(item: $openURLItem) { item in
+            SafariView(url: item.url).ignoresSafeArea()
         }
     }
 
@@ -318,7 +318,7 @@ struct TodayView: View {
                             }
                         }
                         ForEach(Array(meeting.links.prefix(2).enumerated()), id: \.offset) { _, link in
-                            QuietButton(label: link.host ?? "Link") { openURLItem = link }
+                            QuietButton(label: link.host ?? "Link") { openURLItem = SheetLink(url: link) }
                         }
                     }
                 }
@@ -639,6 +639,7 @@ struct TodayView: View {
     }
 }
 
-extension URL: Identifiable {
-    public var id: String { absoluteString }
+struct SheetLink: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
 }
