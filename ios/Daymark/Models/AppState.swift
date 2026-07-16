@@ -754,6 +754,7 @@ final class AppState {
             // A fresh grant may be the first with playlist scopes — retry
             // today's wire sync right away instead of waiting for tomorrow.
             UserDefaults.standard.removeObject(forKey: "daymark-wire-synced-day")
+            UserDefaults.standard.removeObject(forKey: Self.wireGateKey)
             await refreshDiscovery()
         } catch {
             toast(error.localizedDescription)
@@ -940,8 +941,14 @@ final class AppState {
     /// also retried from the cached path, so connecting Spotify (or
     /// granting the playlist scopes) later in the day still fills it.
     /// Fire and forget; a miss never degrades the wire itself.
+    static let wireGateKey = "daymark-wire-playlist-gated"
+
     private func syncWirePlaylistIfNeeded(_ wire: [DiscoveryTrack]) {
         let syncKey = "daymark-wire-synced-day"
+        // Spotify's dev-mode gate forbids all playlist writes for this
+        // app; once detected, stand down instead of failing daily. A
+        // reconnect clears the flag and probes again.
+        guard !UserDefaults.standard.bool(forKey: Self.wireGateKey) else { return }
         guard UserDefaults.standard.string(forKey: syncKey) != Date().dayKey else { return }
         Task {
             do {
@@ -954,8 +961,9 @@ final class AppState {
                     toast("Wire playlist: none of today's tracks matched on Spotify.")
                 }
             } catch let error as SpotifyAPIError {
-                if error.status == 403, error.step == "creating the playlist" {
-                    toast("Spotify won't let Daymark create playlists — make one named 'Daymark Discovery Wire' in Spotify and it will be kept filled.")
+                if error.status == 403 {
+                    UserDefaults.standard.set(true, forKey: Self.wireGateKey)
+                    toast("Spotify blocks playlist writes for this app — use ▶ Play the wire instead.")
                 } else {
                     toast(error.readable)
                 }
