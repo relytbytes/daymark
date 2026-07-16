@@ -2,10 +2,10 @@
 //  DaymarkWidgets.swift
 //  DaymarkWidgets
 //
-//  The At-a-Glance home screen widget and the focus-timer Live Activity.
-//  The widget is deliberately self-contained: it fetches Durham weather
-//  and today's D-backs game straight from the same public APIs the app
-//  uses, so no App Group or shared state is required.
+//  The Daymark widget suite, all self-contained (public APIs, no App
+//  Group): the At-a-Glance home screen widget (small + medium), Lock
+//  Screen accessories, and the focus-timer Live Activity. Timelines
+//  refresh every 45 minutes, tightening to 10 when a game is live.
 //
 
 import WidgetKit
@@ -18,24 +18,52 @@ import ActivityKit
 
 private enum WPalette {
     static let paper = Color(red: 0.992, green: 0.992, blue: 0.988)
+    static let wash = Color(red: 0.973, green: 0.969, blue: 0.961)
     static let ink = Color(red: 0.078, green: 0.078, blue: 0.070)
     static let muted = Color(red: 0.459, green: 0.447, blue: 0.424)
+    static let subtle = Color(red: 0.541, green: 0.529, blue: 0.498)
     static let red = Color(red: 0.784, green: 0.063, blue: 0.180)
+    static let gold = Color(red: 0.725, green: 0.541, blue: 0.122)
+    static let blue = Color(red: 0.114, green: 0.435, blue: 0.878)
+    static let line = Color(red: 0.078, green: 0.078, blue: 0.070).opacity(0.14)
 }
 
-// MARK: - At a Glance widget
+// MARK: - Entry
+
+struct GameLine: Hashable {
+    var label: String       // "DBACKS" / "BULLS"
+    var text: String        // "ARI 4–2 SD · Bot 7" / "at Padres · 9:40 PM"
+    var isLive = false
+}
 
 struct GlanceEntry: TimelineEntry {
     let date: Date
     var tempF: Int?
-    var condition: String = "—"
-    var sunset: String = "—"
-    var gameLine: String = "No game today"
+    var condition = "—"
+    var symbol = "sun.max.fill"
+    var high: Int?
+    var low: Int?
+    var rainPct: Int?
+    var sunset = "—"
+    var sunsetDate: Date?
+    var moonSymbol = "moon.fill"
+    var moonName = ""
+    var games: [GameLine] = []
+
+    var isEvening: Bool {
+        guard let sunsetDate else { return false }
+        return date > sunsetDate.addingTimeInterval(-3600)
+    }
 }
+
+// MARK: - Provider
 
 struct GlanceProvider: TimelineProvider {
     func placeholder(in context: Context) -> GlanceEntry {
-        GlanceEntry(date: Date(), tempF: 85, condition: "Clear", sunset: "8:31 PM", gameLine: "DBacks 9:40 PM")
+        GlanceEntry(date: Date(), tempF: 85, condition: "Clear", high: 96, low: 74, rainPct: 20,
+                    sunset: "8:31 PM",
+                    games: [GameLine(label: "DBACKS", text: "at Padres · 9:40 PM"),
+                            GameLine(label: "BULLS", text: "DUR 6–3 MEM · Bot 7", isLive: true)])
     }
 
     func getSnapshot(in context: Context, completion: @escaping (GlanceEntry) -> Void) {
@@ -46,22 +74,41 @@ struct GlanceProvider: TimelineProvider {
         Task {
             var entry = GlanceEntry(date: Date())
             async let weather = fetchWeather()
-            async let game = fetchGame()
+            async let dbacks = fetchGame(teamID: 109, sportID: 1, label: "DBACKS")
+            async let bulls = fetchGame(teamID: 234, sportID: 11, label: "BULLS")
+
             if let weather = await weather {
                 entry.tempF = weather.tempF
                 entry.condition = weather.condition
+                entry.symbol = weather.symbol
+                entry.high = weather.high
+                entry.low = weather.low
+                entry.rainPct = weather.rainPct
                 entry.sunset = weather.sunset
+                entry.sunsetDate = weather.sunsetDate
             }
-            if let game = await game { entry.gameLine = game }
-            let refresh = Calendar.current.date(byAdding: .minute, value: 45, to: Date())!
+            entry.games = [await dbacks, await bulls].compactMap { $0 }
+            let (moonSymbol, moonName) = Moon.phase(on: Date())
+            entry.moonSymbol = moonSymbol
+            entry.moonName = moonName
+
+            let anyLive = entry.games.contains(where: \.isLive)
+            let refresh = Calendar.current.date(byAdding: .minute, value: anyLive ? 10 : 45, to: Date())!
             completion(Timeline(entries: [entry], policy: .after(refresh)))
         }
     }
 
+    // MARK: Weather
+
     private struct WeatherBits {
         var tempF: Int?
         var condition = "—"
+        var symbol = "sun.max.fill"
+        var high: Int?
+        var low: Int?
+        var rainPct: Int?
         var sunset = "—"
+        var sunsetDate: Date?
     }
 
     private func fetchWeather() async -> WeatherBits? {
@@ -70,7 +117,12 @@ struct GlanceProvider: TimelineProvider {
                 let temperature_2m: Double
                 let weather_code: Int
             }
-            struct Daily: Decodable { let sunset: [String] }
+            struct Daily: Decodable {
+                let sunset: [String]
+                let temperature_2m_max: [Double]?
+                let temperature_2m_min: [Double]?
+                let precipitation_probability_max: [Int]?
+            }
             let current: Current
             let daily: Daily
         }
@@ -79,7 +131,7 @@ struct GlanceProvider: TimelineProvider {
             URLQueryItem(name: "latitude", value: "35.9940"),
             URLQueryItem(name: "longitude", value: "-78.8986"),
             URLQueryItem(name: "current", value: "temperature_2m,weather_code"),
-            URLQueryItem(name: "daily", value: "sunset"),
+            URLQueryItem(name: "daily", value: "sunset,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
             URLQueryItem(name: "temperature_unit", value: "fahrenheit"),
             URLQueryItem(name: "timezone", value: "America/New_York"),
             URLQueryItem(name: "forecast_days", value: "1"),
@@ -88,12 +140,16 @@ struct GlanceProvider: TimelineProvider {
               let response = try? JSONDecoder().decode(Response.self, from: data) else { return nil }
         var bits = WeatherBits()
         bits.tempF = Int(response.current.temperature_2m.rounded())
-        bits.condition = conditionText(response.current.weather_code)
+        (bits.condition, bits.symbol) = Self.condition(response.current.weather_code)
+        bits.high = response.daily.temperature_2m_max?.first.map { Int($0.rounded()) }
+        bits.low = response.daily.temperature_2m_min?.first.map { Int($0.rounded()) }
+        bits.rainPct = response.daily.precipitation_probability_max?.first
         if let sunsetRaw = response.daily.sunset.first {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
             formatter.timeZone = TimeZone(identifier: "America/New_York")
             if let date = formatter.date(from: sunsetRaw) {
+                bits.sunsetDate = date
                 let out = DateFormatter()
                 out.dateFormat = "h:mm a"
                 bits.sunset = out.string(from: date)
@@ -102,14 +158,37 @@ struct GlanceProvider: TimelineProvider {
         return bits
     }
 
-    private func fetchGame() async -> String? {
+    private static func condition(_ code: Int) -> (String, String) {
+        switch code {
+        case 0: return ("Clear", "sun.max.fill")
+        case 1...2: return ("Partly cloudy", "cloud.sun.fill")
+        case 3: return ("Overcast", "cloud.fill")
+        case 45, 48: return ("Fog", "cloud.fog.fill")
+        case 51...67: return ("Rain", "cloud.rain.fill")
+        case 71...77: return ("Snow", "cloud.snow.fill")
+        case 80...82: return ("Showers", "cloud.heavyrain.fill")
+        case 95...99: return ("Storms", "cloud.bolt.rain.fill")
+        default: return ("—", "sun.max.fill")
+        }
+    }
+
+    // MARK: Games
+
+    private func fetchGame(teamID: Int, sportID: Int, label: String) async -> GameLine? {
         struct Schedule: Decodable {
             struct DateEntry: Decodable { let games: [Game] }
             struct Game: Decodable {
                 struct Status: Decodable { let abstractGameState: String? }
+                struct Linescore: Decodable {
+                    let currentInning: Int?
+                    let inningState: String?
+                }
                 struct Teams: Decodable {
                     struct Side: Decodable {
-                        struct Team: Decodable { let abbreviation: String? }
+                        struct Team: Decodable {
+                            let abbreviation: String?
+                            let teamName: String?
+                        }
                         let team: Team?
                         let score: Int?
                     }
@@ -118,99 +197,293 @@ struct GlanceProvider: TimelineProvider {
                 }
                 let gameDate: String?
                 let status: Status?
+                let linescore: Linescore?
                 let teams: Teams?
             }
             let dates: [DateEntry]
         }
         var components = URLComponents(string: "https://statsapi.mlb.com/api/v1/schedule")!
         components.queryItems = [
-            URLQueryItem(name: "sportId", value: "1"),
-            URLQueryItem(name: "teamId", value: "109"),
+            URLQueryItem(name: "sportId", value: String(sportID)),
+            URLQueryItem(name: "teamId", value: String(teamID)),
+            URLQueryItem(name: "hydrate", value: "linescore"),
         ]
         guard let (data, _) = try? await URLSession.shared.data(from: components.url!),
               let schedule = try? JSONDecoder().decode(Schedule.self, from: data),
               let game = schedule.dates.first?.games.first else { return nil }
 
-        let away = game.teams?.away?.team?.abbreviation ?? "AWY"
-        let home = game.teams?.home?.team?.abbreviation ?? "HOM"
+        func abbr(_ side: Schedule.Game.Teams.Side?) -> String {
+            side?.team?.abbreviation ?? String(side?.team?.teamName?.prefix(3) ?? "—").uppercased()
+        }
+        let away = abbr(game.teams?.away)
+        let home = abbr(game.teams?.home)
+        let awayScore = game.teams?.away?.score ?? 0
+        let homeScore = game.teams?.home?.score ?? 0
+
         switch game.status?.abstractGameState {
         case "Live":
-            return "\(away) \(game.teams?.away?.score ?? 0)–\(game.teams?.home?.score ?? 0) \(home) · LIVE"
+            var inning = ""
+            if let state = game.linescore?.inningState, let number = game.linescore?.currentInning {
+                inning = " · \(state.prefix(3)) \(number)"
+            }
+            return GameLine(label: label, text: "\(away) \(awayScore)–\(homeScore) \(home)\(inning)", isLive: true)
         case "Final":
-            return "\(away) \(game.teams?.away?.score ?? 0)–\(game.teams?.home?.score ?? 0) \(home) · Final"
+            return GameLine(label: label, text: "\(away) \(awayScore)–\(homeScore) \(home) · Final")
         default:
             let formatter = ISO8601DateFormatter()
             if let raw = game.gameDate, let date = formatter.date(from: raw) {
                 let out = DateFormatter()
                 out.dateFormat = "h:mm a"
-                return "\(away) at \(home) · \(out.string(from: date))"
+                return GameLine(label: label, text: "\(away) at \(home) · \(out.string(from: date))")
             }
-            return "\(away) at \(home)"
-        }
-    }
-
-    private func conditionText(_ code: Int) -> String {
-        switch code {
-        case 0: return "Clear"
-        case 1...3: return "Partly cloudy"
-        case 45, 48: return "Fog"
-        case 51...67: return "Rain"
-        case 71...77: return "Snow"
-        case 80...82: return "Showers"
-        case 95...99: return "Storms"
-        default: return "—"
+            return GameLine(label: label, text: "\(away) at \(home)")
         }
     }
 }
 
+// MARK: - Moon phase (compact local computation)
+
+private enum Moon {
+    static func phase(on date: Date) -> (symbol: String, name: String) {
+        let jd = date.timeIntervalSince1970 / 86400.0 + 2440587.5
+        let d = jd - 2451543.5
+        func norm(_ x: Double) -> Double { var v = x.truncatingRemainder(dividingBy: 360); if v < 0 { v += 360 }; return v }
+        // Sun ecliptic longitude (low precision)
+        let ws = 282.9404 + 4.70935e-5 * d
+        let ms = norm(356.0470 + 0.9856002585 * d)
+        let sunLon = norm(ws + ms + 1.915 * sin(ms * .pi / 180))
+        // Moon mean longitude with the largest evection/variation terms
+        let moonLon = norm(218.316 + 13.176396 * d)
+        let elongation = norm(moonLon - sunLon)
+        switch elongation {
+        case ..<22.5: return ("moonphase.new.moon", "New Moon")
+        case ..<67.5: return ("moonphase.waxing.crescent", "Waxing Crescent")
+        case ..<112.5: return ("moonphase.first.quarter", "First Quarter")
+        case ..<157.5: return ("moonphase.waxing.gibbous", "Waxing Gibbous")
+        case ..<202.5: return ("moonphase.full.moon", "Full Moon")
+        case ..<247.5: return ("moonphase.waning.gibbous", "Waning Gibbous")
+        case ..<292.5: return ("moonphase.last.quarter", "Last Quarter")
+        case ..<337.5: return ("moonphase.waning.crescent", "Waning Crescent")
+        default: return ("moonphase.new.moon", "New Moon")
+        }
+    }
+}
+
+// MARK: - Home screen views
+
 struct GlanceWidgetView: View {
+    @Environment(\.widgetFamily) private var family
     var entry: GlanceEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("DAYMARK")
-                    .font(.system(size: 8, weight: .heavy))
-                    .tracking(1.4)
-                    .foregroundStyle(WPalette.red)
-                Spacer()
-                Text(entry.date, style: .time)
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(WPalette.muted)
-            }
+        switch family {
+        case .systemMedium: medium
+        case .accessoryCircular: circular
+        case .accessoryInline: inline
+        case .accessoryRectangular: rectangular
+        default: small
+        }
+    }
+
+    // MARK: Small — the front page stamp
+
+    private var small: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            masthead
             Spacer(minLength: 0)
-            HStack(alignment: .lastTextBaseline, spacing: 5) {
+            HStack(alignment: .lastTextBaseline, spacing: 6) {
                 Text(entry.tempF.map { "\($0)°" } ?? "—")
-                    .font(.system(size: 34, weight: .bold, design: .serif))
+                    .font(.system(size: 36, weight: .bold, design: .serif))
                     .foregroundStyle(WPalette.ink)
-                Text(entry.condition)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(WPalette.muted)
-                    .lineLimit(1)
+                Image(systemName: entry.symbol)
+                    .font(.system(size: 14))
+                    .foregroundStyle(WPalette.gold)
             }
-            Rectangle().fill(WPalette.ink.opacity(0.14)).frame(height: 1)
-            row("SUNSET", entry.sunset)
-            row("DBACKS", entry.gameLine)
+            Text(detailLine)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(WPalette.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            rule
+            if let game = entry.games.first(where: \.isLive) ?? entry.games.first {
+                gameRow(game, compact: true)
+            } else {
+                eveningRow
+            }
         }
         .containerBackground(WPalette.paper, for: .widget)
     }
 
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack(spacing: 6) {
-            Text(label)
-                .font(.system(size: 7, weight: .heavy))
-                .tracking(0.8)
-                .foregroundStyle(WPalette.muted)
-                .frame(width: 40, alignment: .leading)
-            Text(value)
-                .font(.system(size: 10, weight: .bold))
+    // MARK: Medium — weather desk + scoreboard
+
+    private var medium: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                masthead
+                Spacer(minLength: 0)
+                HStack(alignment: .lastTextBaseline, spacing: 6) {
+                    Text(entry.tempF.map { "\($0)°" } ?? "—")
+                        .font(.system(size: 40, weight: .bold, design: .serif))
+                        .foregroundStyle(WPalette.ink)
+                    Image(systemName: entry.symbol)
+                        .font(.system(size: 15))
+                        .foregroundStyle(WPalette.gold)
+                }
+                Text(entry.condition)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(WPalette.ink)
+                Text(detailLine)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(WPalette.muted)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Rectangle().fill(WPalette.line).frame(width: 1)
+
+            VStack(alignment: .leading, spacing: 7) {
+                HStack {
+                    Text("SCOREBOARD")
+                        .font(.system(size: 7.5, weight: .heavy)).tracking(1.2)
+                        .foregroundStyle(WPalette.subtle)
+                    Spacer()
+                    if entry.games.contains(where: \.isLive) {
+                        HStack(spacing: 3) {
+                            Circle().fill(WPalette.red).frame(width: 5, height: 5)
+                            Text("LIVE")
+                                .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
+                                .foregroundStyle(WPalette.red)
+                        }
+                    }
+                }
+                ForEach(entry.games, id: \.label) { game in
+                    gameRow(game, compact: false)
+                }
+                if entry.games.isEmpty {
+                    Text("No games today")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(WPalette.muted)
+                }
+                Spacer(minLength: 0)
+                eveningRow
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .containerBackground(WPalette.paper, for: .widget)
+    }
+
+    // MARK: Lock Screen accessories
+
+    private var circular: some View {
+        Gauge(value: Double(entry.tempF ?? 0), in: 0...110) {
+            Image(systemName: entry.symbol)
+        } currentValueLabel: {
+            Text(entry.tempF.map { "\($0)°" } ?? "—")
+                .font(.system(size: 18, weight: .bold, design: .serif))
+        }
+        .gaugeStyle(.accessoryCircular)
+        .containerBackground(.clear, for: .widget)
+    }
+
+    private var inline: some View {
+        Text("\(entry.tempF.map { "\($0)°" } ?? "—") \(entry.condition) · ☀︎ \(entry.sunset)")
+            .containerBackground(.clear, for: .widget)
+    }
+
+    private var rectangular: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Image(systemName: entry.symbol).font(.system(size: 10))
+                Text("\(entry.tempF.map { "\($0)°" } ?? "—") · \(entry.condition)")
+                    .font(.system(size: 12, weight: .bold))
+            }
+            if let game = entry.games.first(where: \.isLive) ?? entry.games.first {
+                Text("\(game.isLive ? "● " : "")\(game.text)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+            }
+            Text("Sunset \(entry.sunset)")
+                .font(.system(size: 10, weight: .medium))
+                .opacity(0.8)
+        }
+        .containerBackground(.clear, for: .widget)
+    }
+
+    // MARK: Pieces
+
+    private var masthead: some View {
+        HStack(spacing: 5) {
+            HStack(alignment: .bottom, spacing: 1.5) {
+                Capsule().fill(WPalette.subtle).frame(width: 2.5, height: 4)
+                Capsule().fill(WPalette.subtle).frame(width: 2.5, height: 6.5)
+                Capsule().fill(WPalette.red).frame(width: 2.5, height: 9)
+            }
+            Text("DAYMARK")
+                .font(.system(size: 7.5, weight: .heavy)).tracking(1.3)
+                .foregroundStyle(WPalette.subtle)
+            Spacer()
+            Text(entry.date.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
+                .foregroundStyle(WPalette.red)
+        }
+    }
+
+    private var rule: some View {
+        Rectangle().fill(WPalette.line).frame(height: 1)
+    }
+
+    private var detailLine: String {
+        var parts: [String] = []
+        if let high = entry.high, let low = entry.low { parts.append("H \(high) · L \(low)") }
+        if let rain = entry.rainPct, rain > 15 { parts.append("Rain \(rain)%") }
+        return parts.isEmpty ? entry.condition : parts.joined(separator: " · ")
+    }
+
+    private func gameRow(_ game: GameLine, compact: Bool) -> some View {
+        HStack(spacing: 5) {
+            if game.isLive {
+                Circle().fill(WPalette.red).frame(width: 5, height: 5)
+            }
+            Text(game.label)
+                .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
+                .foregroundStyle(game.isLive ? WPalette.red : WPalette.subtle)
+                .frame(width: compact ? 38 : 42, alignment: .leading)
+            Text(game.text)
+                .font(.system(size: compact ? 9.5 : 10.5, weight: .bold))
+                .monospacedDigit()
                 .foregroundStyle(WPalette.ink)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.75)
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Sunset before dark; moon phase once the evening arrives.
+    private var eveningRow: some View {
+        HStack(spacing: 5) {
+            if entry.isEvening {
+                Image(systemName: entry.moonSymbol)
+                    .font(.system(size: 9))
+                    .foregroundStyle(WPalette.gold)
+                Text(entry.moonName)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(WPalette.ink)
+                    .lineLimit(1)
+            } else {
+                Image(systemName: "sunset.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(WPalette.gold)
+                Text("Sunset \(entry.sunset)")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(WPalette.ink)
+                    .lineLimit(1)
+            }
             Spacer(minLength: 0)
         }
     }
 }
+
+// MARK: - Widget declarations
 
 struct AtAGlanceWidget: Widget {
     var body: some WidgetConfiguration {
@@ -218,8 +491,11 @@ struct AtAGlanceWidget: Widget {
             GlanceWidgetView(entry: entry)
         }
         .configurationDisplayName("At a Glance")
-        .description("Durham weather, sunset, and today's D-backs game.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .description("Durham weather, the scoreboard, sunset, and the moon.")
+        .supportedFamilies([
+            .systemSmall, .systemMedium,
+            .accessoryCircular, .accessoryInline, .accessoryRectangular,
+        ])
     }
 }
 
