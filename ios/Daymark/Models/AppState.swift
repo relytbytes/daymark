@@ -8,6 +8,7 @@
 import SwiftUI
 import Observation
 import AVFoundation
+import WidgetKit
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
@@ -146,6 +147,9 @@ final class AppState {
             focusTitle: focusRunning ? focusTaskTitle : nil,
             events: Array((today + tomorrow).prefix(8))
         ))
+        // Nudge the widgets whenever the app has fresher data than they
+        // do — app-initiated reloads don't count against their budget.
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func rolloverIfNeeded() {

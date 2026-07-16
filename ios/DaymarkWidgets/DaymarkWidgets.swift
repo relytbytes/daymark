@@ -45,7 +45,7 @@ struct MarketLine: Hashable {
 }
 
 struct GlanceEntry: TimelineEntry {
-    let date: Date
+    var date: Date
     var tempF: Int?
     var feels: Int?
     var condition = "—"
@@ -109,9 +109,19 @@ struct GlanceProvider: TimelineProvider {
             entry.moonSymbol = moonSymbol
             entry.moonName = moonName
 
+            // One network fetch, many dated entries: WidgetKit swaps them
+            // in on schedule for free, so the clock-driven parts (the NOW
+            // bar, expired events, the evening moon flip) stay current
+            // between fetches without spending refresh budget.
+            var entries: [GlanceEntry] = []
+            for minutes in stride(from: 0, through: 60, by: 10) {
+                var projected = entry
+                projected.date = Date().addingTimeInterval(TimeInterval(minutes * 60))
+                entries.append(projected)
+            }
             let anyLive = entry.games.contains(where: \.isLive)
-            let refresh = Calendar.current.date(byAdding: .minute, value: anyLive ? 10 : 45, to: Date())!
-            completion(Timeline(entries: [entry], policy: .after(refresh)))
+            let refresh = Calendar.current.date(byAdding: .minute, value: anyLive ? 10 : 30, to: Date())!
+            completion(Timeline(entries: entries, policy: .after(refresh)))
         }
     }
 
@@ -533,7 +543,9 @@ struct GlanceWidgetView: View {
                 }
             }
 
-            let events = entry.desk?.events ?? []
+            // Drop events that end before this entry's moment, so finished
+            // items fall off between refreshes as the timeline advances.
+            let events = (entry.desk?.events ?? []).filter { $0.end > entry.date }
             if events.isEmpty {
                 Text(entry.desk == nil
                      ? "Open Daymark once to connect the calendar"
