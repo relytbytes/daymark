@@ -210,10 +210,16 @@ struct SettingsView: View {
                         .onChange(of: aiKeyField) { _, _ in aiKeyDirty = true }
                     if aiKeyDirty {
                         Button("Save key") {
-                            AIService.apiKey = aiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let entered = aiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if entered.contains("•") {
+                                // The masked placeholder — never store it over the real key.
+                                app.toast("That's the masked placeholder — clear the field and paste the key fresh.")
+                            } else {
+                                AIService.apiKey = entered
+                                app.toast(AIService.isConfigured ? "AI desk is on." : "AI key cleared.")
+                            }
                             aiKeyDirty = false
                             aiKeyField = AIService.isConfigured ? "••••••••••••" : ""
-                            app.toast(AIService.isConfigured ? "AI desk is on." : "AI key cleared.")
                         }
                     }
                 } header: {
