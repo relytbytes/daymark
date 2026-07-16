@@ -894,8 +894,12 @@ final class AppState {
         guard spotifyConnected else { return }
         let defaults = UserDefaults.standard
 
+        // A target bump (10 → 20) invalidates the day's cache so the
+        // fuller wire arrives immediately, not tomorrow.
+        let wireTarget = 20
         if !force,
            defaults.string(forKey: Self.discoveryDayKey) == Date().dayKey,
+           defaults.integer(forKey: "daymark-discovery-target") == wireTarget,
            let data = defaults.data(forKey: Self.discoveryCacheKey),
            let cached = try? JSONDecoder().decode([DiscoveryTrack].self, from: data),
            !cached.isEmpty {
@@ -922,7 +926,7 @@ final class AppState {
             seeds: seeds.isEmpty ? recentArtists : seeds,
             liked: persisted.musicLikes,
             exclude: exclude,
-            count: 20
+            count: wireTarget
         )
         guard !wire.isEmpty else {
             discoveryStatus = degrade(discoveryStatus)
@@ -931,10 +935,40 @@ final class AppState {
         discoveryWire = wire
         discoveryStatus = .live(Date())
         defaults.set(Date().dayKey, forKey: Self.discoveryDayKey)
+        defaults.set(wireTarget, forKey: "daymark-discovery-target")
         defaults.set(try? JSONEncoder().encode(wire), forKey: Self.discoveryCacheKey)
         defaults.set(surfaced + wire.map { $0.artist.lowercased() }, forKey: Self.discoverySurfacedKey)
 
+        archiveWire(wire)
         syncWirePlaylistIfNeeded(wire)
+    }
+
+    /// The Wire Archive — every discovery that ever crossed the wire,
+    /// with the verdicts, kept in Daymark since Spotify won't host it.
+    private func archiveWire(_ wire: [DiscoveryTrack]) {
+        let day = Date().dayKey
+        let seen = Set(persisted.wireArchive
+            .filter { $0.day == day }
+            .map { $0.artist.lowercased() + "|" + $0.title.lowercased() })
+        for track in wire {
+            let key = track.artist.lowercased() + "|" + track.title.lowercased()
+            guard !seen.contains(key) else { continue }
+            persisted.wireArchive.append(WireArchiveEntry(
+                day: day, title: track.title, artist: track.artist, reason: track.reason))
+        }
+        // Keep roughly two months of history.
+        if persisted.wireArchive.count > 1200 {
+            persisted.wireArchive.removeFirst(persisted.wireArchive.count - 1200)
+        }
+    }
+
+    private func setWireVerdict(_ track: DiscoveryTrack, verdict: String) {
+        if let index = persisted.wireArchive.lastIndex(where: {
+            $0.artist.caseInsensitiveCompare(track.artist) == .orderedSame &&
+            $0.title.caseInsensitiveCompare(track.title) == .orderedSame
+        }) {
+            persisted.wireArchive[index].verdict = verdict
+        }
     }
 
     /// Mirror today's wire into its Spotify playlist, once per day —
@@ -1004,6 +1038,7 @@ final class AppState {
         let key = track.artist.lowercased()
         if !persisted.musicLikes.contains(key) { persisted.musicLikes.append(key) }
         persisted.musicPasses.removeAll { $0 == key }
+        setWireVerdict(track, verdict: "like")
         Task {
             if let added = try? await spotify.addToDiscoveries(title: track.title, artist: track.artist), added {
                 toast("Filed to Daymark Discoveries.")
@@ -1017,6 +1052,7 @@ final class AppState {
         let key = track.artist.lowercased()
         if !persisted.musicPasses.contains(key) { persisted.musicPasses.append(key) }
         persisted.musicLikes.removeAll { $0 == key }
+        setWireVerdict(track, verdict: "pass")
         discoveryWire.removeAll { $0.id == track.id }
     }
 

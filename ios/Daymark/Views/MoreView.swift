@@ -14,6 +14,7 @@ struct MoreView: View {
     @Binding var showSettings: Bool
     @State private var openURLItem: SheetLink?
     @State private var standingsView = "division"
+    @State private var showWireArchive = false
 
     var body: some View {
         let phase = DayPhase.current()
@@ -43,6 +44,7 @@ struct MoreView: View {
         .sheet(item: $openURLItem) { item in
             SafariView(url: item.url).ignoresSafeArea()
         }
+        .sheet(isPresented: $showWireArchive) { WireArchiveView() }
     }
 
     // MARK: News brief
@@ -146,7 +148,7 @@ struct MoreView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .overlay(alignment: .top) { Hairline() }
                 .overlay(alignment: .bottom) { Hairline() }
-                Text("DAILY CLOSES · STOOQ · DELAYED")
+                Text("DAILY CLOSES · YAHOO · DELAYED")
                     .kickerStyle(Palette.subtle, size: 7, tracking: 1.2)
                     .padding(.top, 6)
             }
@@ -468,15 +470,19 @@ extension MoreView {
                               ? "The wire came back empty — it retries on the next refresh."
                               : "Reading your listening history and walking the artist graph…")
                 } else {
-                    HStack(alignment: .top, spacing: 10) {
-                        Text("Twenty for today, seeded by what you actually play. Thumbs teach tomorrow's wire.")
-                            .font(DS.deck(13))
-                            .foregroundStyle(Palette.muted)
-                        Spacer()
+                    Text("Twenty for today, seeded by what you actually play. Thumbs teach tomorrow's wire.")
+                        .font(DS.deck(13))
+                        .foregroundStyle(Palette.muted)
+                        .padding(.bottom, 8)
+                    HStack(spacing: 8) {
                         QuietButton(label: app.wireQueueBusy ? "Queueing…" : "▶ Play the wire") {
                             app.playWire()
                         }
                         .disabled(app.wireQueueBusy)
+                        if !app.persisted.wireArchive.isEmpty {
+                            QuietButton(label: "The archive") { showWireArchive = true }
+                        }
+                        Spacer()
                     }
                     .padding(.bottom, 6)
                     ForEach(app.discoveryWire) { track in
@@ -614,5 +620,100 @@ struct StandingLogo: View {
             }
         }
         .frame(width: 20, height: 20)
+    }
+}
+
+// MARK: - The Wire Archive: discovery listening history, kept in-house
+
+private struct WireArchiveView: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
+
+    private var days: [(day: String, entries: [WireArchiveEntry])] {
+        let grouped = Dictionary(grouping: app.persisted.wireArchive, by: \.day)
+        return grouped.keys.sorted(by: >).map { ($0, grouped[$0] ?? []) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("THE WIRE ARCHIVE")
+                        .kickerStyle(Palette.coral, size: 10, tracking: 1.5)
+                        .padding(.bottom, 8)
+                    Text("Every discovery, on the record.")
+                        .font(DS.display(28))
+                        .foregroundStyle(Palette.ink)
+                    Text("Tap a track to find it in Spotify. ♥ liked · ✕ passed.")
+                        .font(DS.deck(13))
+                        .foregroundStyle(Palette.muted)
+                        .padding(.top, 6)
+                    InkRule().padding(.vertical, 14)
+
+                    ForEach(days, id: \.day) { group in
+                        Text(displayDay(group.day))
+                            .kickerStyle(Palette.subtle, size: 9, tracking: 1.2)
+                            .padding(.top, 10)
+                            .padding(.bottom, 4)
+                        ForEach(group.entries) { entry in
+                            archiveRow(entry)
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 40)
+            }
+            .background(Palette.paper)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Palette.ink)
+                }
+            }
+        }
+    }
+
+    private func archiveRow(_ entry: WireArchiveEntry) -> some View {
+        VStack(spacing: 0) {
+            Hairline()
+            Button {
+                if let url = entry.spotifySearchURL { UIApplication.shared.open(url) }
+            } label: {
+                HStack(spacing: 10) {
+                    Text(entry.verdict == "like" ? "♥" : entry.verdict == "pass" ? "✕" : "·")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(entry.verdict == "like" ? Palette.green
+                                         : entry.verdict == "pass" ? Palette.subtle : Palette.line)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.title)
+                            .font(DS.label(13.5, weight: .semibold))
+                            .foregroundStyle(entry.verdict == "pass" ? Palette.subtle : Palette.ink)
+                            .lineLimit(1)
+                        Text("\(entry.artist)\(entry.reason.isEmpty ? "" : " · \(entry.reason)")")
+                            .font(DS.label(11, weight: .regular))
+                            .foregroundStyle(Palette.muted)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Palette.subtle)
+                }
+                .padding(.vertical, 9)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func displayDay(_ dayKey: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: dayKey) else { return dayKey }
+        let out = DateFormatter()
+        out.dateFormat = "EEEE, MMMM d"
+        return out.string(from: date).uppercased()
     }
 }
