@@ -269,15 +269,28 @@ final class AppState {
     }
 
     func refreshMail() async {
-        guard googleConnected else { return }
+        guard googleConnected || ICloudMailService.isConfigured else { return }
         if mail.isEmpty { mailStatus = .checking }
-        do {
-            mail = try await google.fetchPriorityMail(
-                vips: persisted.settings.vipSenders,
-                cleared: persisted.clearedMailIDs
-            )
+
+        async let gmailTask: [EmailMessage] = googleConnected
+            ? google.fetchPriorityMail(vips: persisted.settings.vipSenders, cleared: persisted.clearedMailIDs)
+            : []
+        async let icloudTask: [EmailMessage] = ICloudMailService.isConfigured
+            ? ICloudMailService.fetchUnseen(vips: persisted.settings.vipSenders, cleared: persisted.clearedMailIDs)
+            : []
+
+        var merged: [EmailMessage] = []
+        var anySucceeded = false
+        if let gmail = try? await gmailTask { merged += gmail; anySucceeded = true }
+        if let icloud = try? await icloudTask { merged += icloud; anySucceeded = true }
+
+        if anySucceeded {
+            mail = merged.sorted {
+                if $0.isVIP != $1.isVIP { return $0.isVIP }
+                return ($0.date ?? .distantPast) > ($1.date ?? .distantPast)
+            }
             mailStatus = .live(Date())
-        } catch {
+        } else {
             mailStatus = degrade(mailStatus)
         }
     }
@@ -495,9 +508,13 @@ final class AppState {
         }
         Task {
             do {
-                try await google.markRead(id: message.id)
+                if message.id.hasPrefix("icloud-") {
+                    try await ICloudMailService.markSeen(id: message.id)
+                } else {
+                    try await google.markRead(id: message.id)
+                }
             } catch {
-                toast("Couldn't mark it read — it will stay unread in Gmail.")
+                toast("Couldn't mark it read — it will stay unread in the inbox.")
             }
         }
     }

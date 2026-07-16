@@ -377,7 +377,7 @@ struct TodayView: View {
             }
             .padding(.bottom, 12)
 
-            if !app.googleConnected {
+            if !app.googleConnected && !ICloudMailService.isConfigured {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Connect Gmail")
                         .font(DS.label(14, weight: .semibold))
@@ -420,6 +420,9 @@ struct TodayView: View {
                         .font(DS.label(13.5, weight: .bold))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
+                    if message.id.hasPrefix("icloud-") {
+                        StatusChip(text: "iCloud", foreground: Palette.blue, background: Palette.blueSoft)
+                    }
                     if message.isVIP {
                         StatusChip(text: "VIP")
                     }

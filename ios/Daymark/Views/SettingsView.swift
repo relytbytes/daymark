@@ -23,6 +23,8 @@ struct SettingsView: View {
     @State private var aiKeyDirty = false
     @State private var newSCArtist = ""
     @State private var importing = false
+    @State private var icloudUser = ICloudMailService.username ?? ""
+    @State private var icloudPassword = ICloudMailService.isConfigured ? "••••••••••••" : ""
     @State private var exportURL: ExportFile?
 
     var body: some View {
@@ -97,6 +99,36 @@ struct SettingsView: View {
                         Text(app.calendarAccess == true ? "On" : app.calendarAccess == false ? "Off" : "—")
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                Section {
+                    TextField("you@icloud.com", text: $icloudUser)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    SecureField("App-specific password", text: $icloudPassword)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Button(ICloudMailService.isConfigured ? "Update iCloud Mail" : "Connect iCloud Mail") {
+                        ICloudMailService.username = icloudUser.trimmingCharacters(in: .whitespaces)
+                        ICloudMailService.password = icloudPassword.trimmingCharacters(in: .whitespaces)
+                        icloudPassword = ICloudMailService.isConfigured ? "••••••••••••" : ""
+                        app.toast(ICloudMailService.isConfigured ? "iCloud Mail connected." : "iCloud Mail cleared.")
+                        Task { await app.refreshMail() }
+                    }
+                    if ICloudMailService.isConfigured {
+                        Button("Disconnect iCloud Mail", role: .destructive) {
+                            ICloudMailService.username = nil
+                            ICloudMailService.password = nil
+                            icloudUser = ""
+                            icloudPassword = ""
+                            app.toast("iCloud Mail disconnected.")
+                        }
+                    }
+                } header: {
+                    Text("iCloud Mail")
+                } footer: {
+                    Text("Daymark speaks IMAP directly to imap.mail.me.com — Apple has no mail API. Create an app-specific password at appleid.apple.com → Sign-In and Security. Both values live in the Keychain only. Unseen headers join priority mail with an iCloud badge; mark-read syncs back.")
                 }
 
                 Section {
