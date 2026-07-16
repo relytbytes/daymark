@@ -251,18 +251,23 @@ struct LifeView: View {
     }
 }
 
-// MARK: - Shared game box (ink panel with two team lines)
+// MARK: - Shared game box (elevated scoreboard card)
 
 func gameBox(_ game: GameInfo, headline: String, status: FeedStatus) -> some View {
     VStack(alignment: .leading, spacing: 0) {
         HStack {
-            Text(game.isLive ? "LIVE" : game.state == "Final" ? "FINAL" : "UP NEXT")
-                .font(.system(size: 9, weight: .black)).tracking(1.3)
-                .foregroundStyle(Palette.acid)
-            Spacer()
-            Text(game.detail.uppercased())
-                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
-                .foregroundStyle(.white.opacity(0.5))
+            if game.isLive {
+                LivePill(text: "Live · \(game.detail)")
+            } else {
+                Text(game.state == "Final" ? "FINAL" : "UP NEXT")
+                    .font(.system(size: 9, weight: .black)).tracking(1.3)
+                    .foregroundStyle(Palette.subtle)
+                Spacer()
+                Text(game.detail.uppercased())
+                    .font(.system(size: 9, weight: .heavy)).tracking(0.8)
+                    .foregroundStyle(Palette.subtle)
+            }
+            if game.isLive { Spacer() }
         }
         .padding(.bottom, 12)
 
@@ -273,28 +278,54 @@ func gameBox(_ game: GameInfo, headline: String, status: FeedStatus) -> some Vie
         if let venue = game.venue {
             Text(venue.uppercased())
                 .font(.system(size: 8, weight: .heavy)).tracking(1.0)
-                .foregroundStyle(.white.opacity(0.35))
+                .foregroundStyle(Palette.subtle.opacity(0.7))
                 .padding(.top, 10)
         }
     }
-    .inkPanel(padding: 15)
+    .editorialPanel(padding: 15)
 }
 
 private func teamLine(_ team: TeamScore, emphasized: Bool) -> some View {
     HStack {
         HStack(spacing: 10) {
-            Text(team.abbr.isEmpty ? String(team.name.prefix(3)).uppercased() : team.abbr)
-                .font(.system(size: 10, weight: .heavy))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 26)
-                .background(RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.12)))
+            TeamBadge(team: team)
             Text(team.name)
-                .font(DS.label(15, weight: .semibold))
-                .foregroundStyle(emphasized ? .white : .white.opacity(0.65))
+                .font(DS.label(15, weight: emphasized ? .bold : .semibold))
+                .foregroundStyle(emphasized ? Palette.ink : Palette.muted)
         }
         Spacer()
         Text(team.score.map(String.init) ?? "—")
             .font(DS.display(22))
-            .foregroundStyle(emphasized ? Palette.acid : .white.opacity(0.65))
+            .monospacedDigit()
+            .foregroundStyle(emphasized ? Palette.ink : Palette.subtle)
+    }
+}
+
+/// Team identity mark: official logo when a logo URL is known, monogram fallback.
+struct TeamBadge: View {
+    let team: TeamScore
+    var size: CGFloat = 28
+
+    var body: some View {
+        Group {
+            if let url = team.logoURL {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: {
+                    monogram
+                }
+            } else {
+                monogram
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    private var monogram: some View {
+        Text(team.abbr.isEmpty ? String(team.name.prefix(3)).uppercased() : team.abbr)
+            .font(.system(size: size * 0.32, weight: .heavy))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(Circle().fill(Palette.ink))
     }
 }

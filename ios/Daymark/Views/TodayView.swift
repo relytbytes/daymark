@@ -82,17 +82,17 @@ struct TodayView: View {
             HStack {
                 Text("NOW · FOCUS")
                     .font(.system(size: 9, weight: .black)).tracking(1.4)
-                    .foregroundStyle(Palette.acid)
+                    .foregroundStyle(Palette.coral)
                 Spacer()
                 Text("\(app.persisted.focusMinutes) MIN")
                     .font(.system(size: 9, weight: .heavy)).tracking(1.0)
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(Palette.subtle)
             }
             .padding(.bottom, 11)
 
             Text(app.focusTaskTitle)
                 .font(DS.deck(21, weight: 500, italic: false))
-                .foregroundStyle(.white)
+                .foregroundStyle(Palette.ink)
                 .padding(.bottom, 15)
 
             if app.focusRunning {
@@ -100,12 +100,12 @@ struct TodayView: View {
                     HStack(spacing: 10) {
                         Text(countdownText)
                             .font(DS.display(30))
-                            .foregroundStyle(Palette.acid)
+                            .foregroundStyle(Palette.coral)
                             .monospacedDigit()
                         Spacer()
                         Button("End early") { app.stopFocus() }
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(Palette.muted)
                     }
                 }
             } else {
@@ -227,10 +227,10 @@ struct TodayView: View {
                         } label: {
                             Label("Join", systemImage: "video.fill")
                                 .font(.system(size: 10, weight: .heavy))
-                                .foregroundStyle(Palette.acidInk)
+                                .foregroundStyle(.white)
                                 .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(Palette.acid)
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                                .background(Palette.ink)
+                                .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
                         .padding(.top, 3)
@@ -247,12 +247,12 @@ struct TodayView: View {
                     .font(DS.display(15))
                     .foregroundStyle(Palette.subtle)
                     .frame(width: 46, alignment: .leading)
-                Rectangle().fill(Palette.acid)
+                Rectangle().fill(Palette.coral)
                     .frame(width: 2.5)
                     .frame(maxHeight: .infinity)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("OPEN BLOCK · \(formatMinutes(minutes))")
-                        .kickerStyle(Palette.acidInk, size: 9, tracking: 1.1)
+                        .kickerStyle(Palette.coral, size: 9, tracking: 1.1)
                     Text("Good for a focused push on Veraya.")
                         .font(DS.deck(13))
                         .foregroundStyle(Palette.muted)
@@ -541,10 +541,10 @@ struct TodayView: View {
                 HStack(alignment: .lastTextBaseline, spacing: 8) {
                     Text("\(review.essentialsDone) of \(review.essentialsTotal)")
                         .font(DS.display(34))
-                        .foregroundStyle(Palette.acid)
+                        .foregroundStyle(Palette.coral)
                     Text("essentials landed · \(review.capturesCleared) loops cleared")
                         .font(DS.label(12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.65))
+                        .foregroundStyle(Palette.muted)
                 }
 
                 VStack(spacing: 7) {
@@ -552,43 +552,44 @@ struct TodayView: View {
                         HStack {
                             Text(line.label)
                                 .font(DS.label(12, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.85))
+                                .foregroundStyle(Palette.ink.opacity(0.85))
                             Spacer()
                             Text("\(line.done)/\(line.target)")
                                 .font(DS.display(14))
-                                .foregroundStyle(line.done >= line.target ? Palette.acid : .white.opacity(0.6))
+                                .foregroundStyle(line.done >= line.target ? Palette.green : Palette.subtle)
                         }
                     }
                 }
 
-                Rectangle().fill(.white.opacity(0.15)).frame(height: 1)
+                Hairline()
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("TOMORROW")
                         .font(.system(size: 9, weight: .black)).tracking(1.4)
-                        .foregroundStyle(Palette.acid)
+                        .foregroundStyle(Palette.coral)
                     if let first = review.tomorrowFirst {
                         Text("\(first.start.timeText()) — \(first.title)")
                             .font(DS.label(13, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Palette.ink)
                         Text("\(review.tomorrowCount) event\(review.tomorrowCount == 1 ? "" : "s") on the calendar")
                             .font(DS.label(11, weight: .regular))
-                            .foregroundStyle(.white.opacity(0.55))
+                            .foregroundStyle(Palette.subtle)
                     } else {
                         Text("No events yet — the morning is yours.")
                             .font(DS.label(13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(Palette.muted)
                     }
                     TextField(
                         "",
                         text: $app.persisted.tomorrowFirstMove,
-                        prompt: Text("Tomorrow's first move…").foregroundStyle(.white.opacity(0.4))
+                        prompt: Text("Tomorrow's first move…").foregroundStyle(Palette.subtle)
                     )
                     .font(DS.label(13, weight: .medium))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Palette.ink)
                     .padding(10)
-                    .background(Color.white.opacity(0.08))
+                    .background(Palette.card)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Palette.line, lineWidth: 1))
                 }
             }
             .inkPanel()

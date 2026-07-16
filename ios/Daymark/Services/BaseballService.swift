@@ -81,7 +81,8 @@ enum BaseballService {
             TeamScore(
                 name: t?.team?.teamName ?? t?.team?.name ?? "—",
                 abbr: t?.team?.abbreviation ?? "",
-                score: t?.score
+                score: t?.score,
+                teamID: t?.team?.id
             )
         }
         return GameInfo(

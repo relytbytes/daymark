@@ -71,8 +71,8 @@ enum ApplicationStatus: String, Codable, CaseIterable, Identifiable {
 
     var chipColors: (fg: Color, bg: Color) {
         switch self {
-        case .interview, .offer: return (Palette.acidInk, Palette.acid)
-        case .followUp: return (Color(hex: 0xC23C1E), Palette.coralSoft)
+        case .interview, .offer: return (Color(hex: 0x0E7A54), Palette.greenSoft)
+        case .followUp: return (Palette.coral, Palette.coralSoft)
         case .applied: return (Palette.blue, Palette.blueSoft)
         default: return (Palette.muted, Palette.paperDeep)
         }
@@ -352,6 +352,12 @@ struct TeamScore: Hashable {
     let name: String
     let abbr: String
     let score: Int?
+    var teamID: Int?
+
+    /// Official team mark from MLB's static CDN (works for MLB and MiLB ids).
+    var logoURL: URL? {
+        teamID.flatMap { URL(string: "https://midfield.mlbstatic.com/v1/team/\($0)/spots/64") }
+    }
 }
 
 struct GameInfo: Hashable {
@@ -374,6 +380,11 @@ struct StandingRow: Identifiable, Hashable {
     let pct: String
     let gamesBack: String
     let isDbacks: Bool
+
+    /// Official team mark from MLB's static CDN.
+    var logoURL: URL? {
+        Int(id).flatMap { $0 > 0 ? URL(string: "https://midfield.mlbstatic.com/v1/team/\($0)/spots/64") : nil }
+    }
 }
 
 struct NewsArticle: Identifiable, Hashable {

@@ -13,26 +13,31 @@ import CoreText
 // MARK: - Palette
 
 enum Palette {
-    static let paper = Color(hex: 0xF3F0E8)
-    static let paperDeep = Color(hex: 0xE7E2D7)
-    static let card = Color(hex: 0xFBFAF6)
-    static let ink = Color(hex: 0x181A1C)
-    static let muted = Color(hex: 0x73736D)
-    static let subtle = Color(hex: 0x8A897F)
-    static let line = Color(hex: 0xD8D3C9)
-    static let coral = Color(hex: 0xFF603D)
-    static let coralSoft = Color(hex: 0xFFD8CD)
-    static let blue = Color(hex: 0x3155E7)
-    static let blueSoft = Color(hex: 0xDCE3FF)
-    static let acid = Color(hex: 0xDFFD61)
-    static let acidInk = Color(hex: 0x3A3F16)
-    static let green = Color(hex: 0x3D8B68)
-    static let violet = Color(hex: 0x8C66D9)
-    static let gold = Color(hex: 0xD8A52B)
+    // The Daily × Scoreboard system: white ground, ink, one disciplined red.
+    // Red always means "now" — live dots, NOW markers, leave-by, the focus spine.
+    static let paper = Color(hex: 0xFDFDFC)
+    static let paperDeep = Color(hex: 0xF0EFEC)
+    static let card = Color(hex: 0xFFFFFF)
+    static let wash = Color(hex: 0xF8F7F5)
+    static let ink = Color(hex: 0x141412)
+    static let muted = Color(hex: 0x75726C)
+    static let subtle = Color(hex: 0x8A877F)
+    static let line = Color(hex: 0xE8E6E1)
+    static let coral = Color(hex: 0xC8102E)
+    static let coralSoft = Color(hex: 0xFBEDEF)
+    static let blue = Color(hex: 0x1D6FE0)
+    static let blueSoft = Color(hex: 0xEFF4FF)
+    static let acid = Color(hex: 0xF8F7F5)      // retired slab color, now the quiet wash
+    static let acidInk = Color(hex: 0x141412)
+    static let green = Color(hex: 0x0E9F6E)
+    static let greenSoft = Color(hex: 0xE9F7F1)
+    static let down = Color(hex: 0xDC2626)      // market direction only — never brand
+    static let violet = Color(hex: 0x6B4FA3)
+    static let gold = Color(hex: 0xB98A1F)
 
     /// Hairline rules, per the newspaper system.
-    static let hairline = ink.opacity(0.16)
-    static let hairlineSoft = ink.opacity(0.12)
+    static let hairline = ink.opacity(0.14)
+    static let hairlineSoft = ink.opacity(0.09)
 }
 
 // MARK: - Day phase
@@ -51,12 +56,8 @@ enum DayPhase: String, CaseIterable {
     }
 
     var accent: Color {
-        switch self {
-        case .morning: return Palette.coral
-        case .afternoon: return Palette.blue
-        case .evening: return Palette.violet
-        case .night: return Palette.acid
-        }
+        // One disciplined red across every phase — red is the brand and the "now."
+        Palette.coral
     }
 
     var label: String {
@@ -185,17 +186,26 @@ extension Text {
 }
 
 extension View {
-    /// Sharp-cornered editorial panel: card ground with a hairline ink border.
+    /// Elevated editorial card: white ground, hairline border, soft lift.
     func editorialPanel(padding: CGFloat = 16) -> some View {
         self.padding(padding)
             .background(Palette.card)
-            .overlay(Rectangle().stroke(Palette.hairline, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.line, lineWidth: 1))
+            .shadow(color: Palette.ink.opacity(0.05), radius: 8, y: 3)
+            .shadow(color: Palette.ink.opacity(0.03), radius: 1, y: 1)
     }
 
-    /// The ink bulletin box (dark panel used for NOW · FOCUS, box scores).
+    /// The bulletin panel (NOW · FOCUS, evening review): quiet wash with a red spine.
     func inkPanel(padding: CGFloat = 17) -> some View {
         self.padding(padding)
-            .background(Palette.ink)
-            .foregroundStyle(.white)
+            .foregroundStyle(Palette.ink)
+            .background(Palette.wash)
+            .clipShape(UnevenRoundedRectangle(
+                topLeadingRadius: 0, bottomLeadingRadius: 0,
+                bottomTrailingRadius: 12, topTrailingRadius: 12))
+            .overlay(alignment: .leading) {
+                Rectangle().fill(Palette.coral).frame(width: 3)
+            }
     }
 }

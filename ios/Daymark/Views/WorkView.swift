@@ -145,7 +145,7 @@ struct WorkView: View {
                             if app.sprintDone(milestone.id) {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(Palette.acid)
+                                    .foregroundStyle(.white)
                             }
                         }
                     }

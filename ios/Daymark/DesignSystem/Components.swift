@@ -257,8 +257,8 @@ struct SectionKickerHeader<Trailing: View>: View {
 
 struct StatusChip: View {
     let text: String
-    var foreground: Color = Palette.acidInk
-    var background: Color = Palette.acid
+    var foreground: Color = Color(hex: 0x0E7A54)
+    var background: Color = Palette.greenSoft
 
     var body: some View {
         Text(text.uppercased())
@@ -268,11 +268,30 @@ struct StatusChip: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .clipShape(Capsule())
     }
 }
 
-/// Full-width acid call-to-action (the "Begin — 25:00" button).
+/// Red live pill with pulse dot — red means "happening now."
+struct LivePill: View {
+    var text: String = "Live"
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(Palette.coral).frame(width: 6, height: 6)
+            Text(text.uppercased())
+                .font(.system(size: 8.5, weight: .heavy))
+                .tracking(0.8)
+        }
+        .foregroundStyle(Palette.coral)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(Palette.coralSoft)
+        .clipShape(Capsule())
+    }
+}
+
+/// Full-width primary call-to-action (the "Begin — 25:00" button): ink pill.
 struct AcidButton: View {
     let label: String
     var systemImage: String = "play.fill"
@@ -284,10 +303,10 @@ struct AcidButton: View {
                 Image(systemName: systemImage).font(.system(size: 12, weight: .black))
                 Text(label).font(.system(size: 13, weight: .heavy)).tracking(0.4)
             }
-            .foregroundStyle(Palette.ink)
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(Palette.acid)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Palette.ink)
+            .clipShape(RoundedRectangle(cornerRadius: 999))
         }
         .buttonStyle(.plain)
     }
@@ -358,7 +377,7 @@ struct CircleCheck: View {
                 if checked {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Palette.acid)
+                        .foregroundStyle(.white)
                 }
             }
         }

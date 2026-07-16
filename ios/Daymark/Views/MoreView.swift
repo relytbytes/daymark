@@ -124,7 +124,7 @@ struct MoreView: View {
                                 .lineLimit(1)
                             Text(String(format: "%+.2f%%", quote.changePct))
                                 .font(DS.display(18))
-                                .foregroundStyle(quote.isUp ? Palette.green : Palette.coral)
+                                .foregroundStyle(quote.isUp ? Palette.green : Palette.down)
                             Text(formatPrice(quote.price))
                                 .font(DS.label(9.5, weight: .semibold))
                                 .foregroundStyle(Palette.subtle)
@@ -224,6 +224,7 @@ struct MoreView: View {
                 VStack(spacing: 0) {
                     Hairline()
                     HStack {
+                        StandingLogo(url: row.logoURL)
                         Text(row.name)
                             .font(DS.label(13, weight: row.isDbacks ? .bold : .medium))
                             .foregroundStyle(row.isDbacks ? Palette.coral : Palette.ink)
@@ -277,7 +278,7 @@ struct MoreView: View {
                             AsyncImage(url: playback.artURL) { image in
                                 image.resizable().aspectRatio(contentMode: .fill)
                             } placeholder: {
-                                Rectangle().fill(.white.opacity(0.1))
+                                Rectangle().fill(Palette.paperDeep)
                             }
                             .frame(width: 52, height: 52)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -285,14 +286,14 @@ struct MoreView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(playback.isPlaying ? "PLAYING" : "PAUSED")
                                     .font(.system(size: 8, weight: .black)).tracking(1.2)
-                                    .foregroundStyle(Palette.acid)
+                                    .foregroundStyle(Palette.coral)
                                 Text(playback.track)
                                     .font(DS.label(14, weight: .semibold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Palette.ink)
                                     .lineLimit(1)
                                 Text(playback.artist + (playback.deviceName.map { " · \($0)" } ?? ""))
                                     .font(DS.label(11, weight: .regular))
-                                    .foregroundStyle(.white.opacity(0.6))
+                                    .foregroundStyle(Palette.muted)
                                     .lineLimit(1)
                             }
                             Spacer()
@@ -309,34 +310,34 @@ struct MoreView: View {
                             } label: {
                                 Text("Open Spotify")
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.6))
+                                    .foregroundStyle(Palette.muted)
                             }
                         }
                     } else {
                         Text("Nothing playing — recent listening below.")
                             .font(DS.label(12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(Palette.muted)
                     }
 
                     if !app.recentTracks.isEmpty {
-                        Rectangle().fill(.white.opacity(0.14)).frame(height: 1)
+                        Hairline()
                         ForEach(app.recentTracks.prefix(4)) { track in
                             HStack(spacing: 9) {
-                                Circle().fill(Palette.acid.opacity(0.85)).frame(width: 5, height: 5)
+                                Circle().fill(Palette.coral.opacity(0.85)).frame(width: 5, height: 5)
                                 Text(track.track)
                                     .font(DS.label(12, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.9))
+                                    .foregroundStyle(Palette.ink.opacity(0.9))
                                     .lineLimit(1)
                                 Text("· \(track.artist)")
                                     .font(DS.label(11, weight: .regular))
-                                    .foregroundStyle(.white.opacity(0.5))
+                                    .foregroundStyle(Palette.subtle)
                                     .lineLimit(1)
                                 Spacer()
                             }
                         }
                     }
                 }
-                .inkPanel()
+                .editorialPanel()
             }
         }
         .padding(.top, 26)
@@ -346,9 +347,10 @@ struct MoreView: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Palette.acid)
+                .foregroundStyle(Palette.ink)
                 .frame(width: 38, height: 38)
-                .background(Circle().fill(.white.opacity(0.08)))
+                .background(Circle().fill(Palette.wash))
+                .overlay(Circle().stroke(Palette.line, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -435,5 +437,25 @@ struct MoreView: View {
                 UIApplication.shared.open(url)
             }
         }
+    }
+}
+
+/// Small official team mark for standings rows.
+struct StandingLogo: View {
+    let url: URL?
+
+    var body: some View {
+        Group {
+            if let url {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: {
+                    Circle().fill(Palette.paperDeep)
+                }
+            } else {
+                Circle().fill(Palette.paperDeep)
+            }
+        }
+        .frame(width: 20, height: 20)
     }
 }
