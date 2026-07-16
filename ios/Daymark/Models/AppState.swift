@@ -27,6 +27,7 @@ final class AppState {
     let travelService = TravelService()
     let google = GoogleService()
     let spotify = SpotifyService()
+    let health = HealthService()
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
 
@@ -84,6 +85,11 @@ final class AppState {
     var aiHoroscope: String?
     var aiBusy: Set<String> = []
 
+    // MARK: Auto-scored categories
+
+    var autoFitnessDays: Int = 0        // HealthKit: fitness days since Monday
+    var autoJobTouches: Int = 0         // Landed: rows changed since Monday
+
     // MARK: Init
 
     init() {
@@ -102,7 +108,21 @@ final class AppState {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
             JSONStore.save(snapshot)
+            await self.publishWidgetSnapshot()
         }
+    }
+
+    /// Keep the widget's personal numbers current.
+    func publishWidgetSnapshot() {
+        let next = nextMeeting
+        WidgetSnapshot.write(WidgetSnapshot(
+            updatedAt: Date(),
+            openLoops: openLoops,
+            clearedPercent: Int((dayProgress * 100).rounded()),
+            nextEventTitle: next?.title,
+            nextEventTime: next?.start,
+            focusTitle: focusRunning ? focusTaskTitle : nil
+        ))
     }
 
     func rolloverIfNeeded() {
@@ -156,6 +176,7 @@ final class AppState {
             group.addTask { await self.refreshDiscovery() }
             for await _ in group {}
         }
+        publishWidgetSnapshot()
     }
 
     private func degrade(_ status: FeedStatus) -> FeedStatus {
@@ -177,6 +198,15 @@ final class AppState {
         airQuality = try? await WeatherService.fetchAirQuality()
         // Sky math is local and instant.
         astro = Astronomy.snapshot(latitude: AppConfig.homeLatitude, longitude: AppConfig.homeLongitude)
+        await refreshFitnessScore()
+    }
+
+    func refreshFitnessScore() async {
+        guard HealthService.isAvailable else { return }
+        if !health.authorized {
+            guard await health.requestAuthorization() else { return }
+        }
+        autoFitnessDays = await health.fitnessDaysThisWeek()
     }
 
     func refreshCalendar() async {
@@ -530,7 +560,23 @@ final class AppState {
 
     // MARK: Scorecard
 
-    func score(_ key: String) -> Int { persisted.weeklyScores[key] ?? 0 }
+    func score(_ key: String) -> Int {
+        let manual = persisted.weeklyScores[key] ?? 0
+        switch key {
+        case "fitness": return max(manual, autoFitnessDays)
+        case "jobs": return max(manual, autoJobTouches)
+        default: return manual
+        }
+    }
+
+    /// Whether this category currently shows an automatic reading.
+    func scoreIsAuto(_ key: String) -> Bool {
+        switch key {
+        case "fitness": return autoFitnessDays > (persisted.weeklyScores[key] ?? 0)
+        case "jobs": return autoJobTouches > (persisted.weeklyScores[key] ?? 0)
+        default: return false
+        }
+    }
 
     func bumpScore(_ category: ScoreCategory, by delta: Int) {
         let next = max(0, min(category.target, score(category.key) + delta))
@@ -647,9 +693,42 @@ final class AppState {
             landedRoles = try await google.fetchLandedRoles(sheetID: AppConfig.landedSheetID)
                 .sorted { ($0.stageRank, $0.company) < ($1.stageRank, $1.company) }
             landedStatus = .live(Date())
+            updateJobTouches()
         } catch {
             landedStatus = degrade(landedStatus)
         }
+    }
+
+    /// Job-search auto-score: count pipeline rows whose stage or next action
+    /// changed since Monday, tracked by comparing per-row fingerprints against
+    /// a weekly snapshot (the read-only sheet has no timestamps).
+    private func updateJobTouches() {
+        let defaults = UserDefaults.standard
+        let weekKey = Date().weekKey
+        let fingerprints = Dictionary(uniqueKeysWithValues: landedRoles.map {
+            ($0.company + "|" + $0.role, $0.status + "|" + $0.nextAction)
+        })
+        let storedWeek = defaults.string(forKey: "daymark-jobtouch-week")
+        var baseline = (defaults.dictionary(forKey: "daymark-jobtouch-baseline") as? [String: String]) ?? [:]
+        var touched = Set(defaults.stringArray(forKey: "daymark-jobtouch-touched") ?? [])
+
+        if storedWeek != weekKey {
+            // New week: current state becomes the baseline, touches reset.
+            baseline = fingerprints
+            touched = []
+            defaults.set(weekKey, forKey: "daymark-jobtouch-week")
+        } else {
+            for (key, print) in fingerprints where baseline[key] != nil && baseline[key] != print {
+                touched.insert(key)
+            }
+            for key in fingerprints.keys where baseline[key] == nil {
+                touched.insert(key)          // newly added role counts as a touch
+                baseline[key] = fingerprints[key]
+            }
+        }
+        defaults.set(baseline, forKey: "daymark-jobtouch-baseline")
+        defaults.set(Array(touched), forKey: "daymark-jobtouch-touched")
+        autoJobTouches = touched.count
     }
 
     /// Roles most worth attention: hot stages and high priority first.

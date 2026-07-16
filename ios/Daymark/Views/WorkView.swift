@@ -355,9 +355,18 @@ struct WorkView: View {
                     let done = app.score(category.key)
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(category.label)
-                                .font(DS.label(14, weight: .semibold))
-                                .foregroundStyle(Palette.ink)
+                            HStack(spacing: 5) {
+                                Text(category.label)
+                                    .font(DS.label(14, weight: .semibold))
+                                    .foregroundStyle(Palette.ink)
+                                if app.scoreIsAuto(category.key) {
+                                    Text("AUTO")
+                                        .font(.system(size: 7, weight: .heavy)).tracking(0.8)
+                                        .foregroundStyle(Color(hex: 0x0E7A54))
+                                        .padding(.horizontal, 5).padding(.vertical, 2)
+                                        .background(Capsule().fill(Palette.greenSoft))
+                                }
+                            }
                             Text("\(done) of \(category.target)")
                                 .font(DS.label(10.5, weight: .regular))
                                 .foregroundStyle(Palette.subtle)

@@ -26,6 +26,7 @@ struct DaymarkApp: App {
 
     init() {
         UNUserNotificationCenter.current().delegate = notificationDelegate
+        MorningBriefTask.register()
     }
 
     var body: some Scene {
@@ -38,6 +39,7 @@ struct DaymarkApp: App {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 app.rolloverIfNeeded()
+                MorningBriefTask.scheduleNext()
                 Task { await app.refreshAll(force: false) }
             }
         }

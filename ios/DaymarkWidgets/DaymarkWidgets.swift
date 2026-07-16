@@ -50,6 +50,7 @@ struct GlanceEntry: TimelineEntry {
     var moonSymbol = "moon.fill"
     var moonName = ""
     var games: [GameLine] = []
+    var desk: WidgetSnapshot?
 
     var isEvening: Bool {
         guard let sunsetDate else { return false }
@@ -90,6 +91,7 @@ struct GlanceProvider: TimelineProvider {
                 entry.sunsetDate = weather.sunsetDate
             }
             entry.games = [await dbacks, await bulls].compactMap { $0 }
+            entry.desk = WidgetSnapshot.read()
             let (moonSymbol, moonName) = Moon.phase(on: Date())
             entry.moonSymbol = moonSymbol
             entry.moonName = moonName
@@ -322,6 +324,9 @@ struct GlanceWidgetView: View {
             } else {
                 eveningRow
             }
+            if let desk = entry.desk {
+                deskRow(desk)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .padding(13)
@@ -383,6 +388,19 @@ struct GlanceWidgetView: View {
                         .foregroundStyle(WPalette.muted)
                 }
                 Spacer(minLength: 0)
+                if let desk = entry.desk {
+                    deskRow(desk)
+                    if let title = desk.nextEventTitle, let time = desk.nextEventTime, time > entry.date {
+                        HStack(spacing: 5) {
+                            Circle().fill(WPalette.blue).frame(width: 5, height: 5)
+                            Text("\(time.formatted(date: .omitted, time: .shortened)) \(title)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(WPalette.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
+                    }
+                }
                 eveningRow
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -491,6 +509,21 @@ struct GlanceWidgetView: View {
             Text(game.text)
                 .font(.system(size: compact ? 9.5 : 10.5, weight: .bold))
                 .monospacedDigit()
+                .foregroundStyle(WPalette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Personal numbers from the app, via the App Group.
+    private func deskRow(_ desk: WidgetSnapshot) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(desk.openLoops > 0 ? WPalette.red : WPalette.muted).frame(width: 5, height: 5)
+            Text(desk.focusTitle.map { "FOCUS · \($0)" }
+                 ?? "\(desk.openLoops) OPEN · \(desk.clearedPercent)% CLEAR")
+                .font(.system(size: 9, weight: .heavy))
+                .tracking(0.4)
                 .foregroundStyle(WPalette.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
