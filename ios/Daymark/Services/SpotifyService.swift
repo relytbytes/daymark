@@ -36,6 +36,9 @@ final class SpotifyService {
         "user-top-read",
         "playlist-read-private",
         "playlist-modify-private",
+        // Spotify quirk: creating even a private playlist can 403 with
+        // a bare "Forbidden" unless the public-modify scope rides along.
+        "playlist-modify-public",
     ].joined(separator: " ")
 
     // MARK: Connect / disconnect
