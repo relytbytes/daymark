@@ -42,6 +42,8 @@ final class AppState {
     var mail: [EmailMessage] = []
     var mailStatus: FeedStatus = .idle
     var googleConnected = false
+    var landedRoles: [LandedRole] = []
+    var landedStatus: FeedStatus = .idle
 
     var news: [NewsArticle] = []
     var newsStatus: FeedStatus = .idle
@@ -130,6 +132,7 @@ final class AppState {
             group.addTask { await self.refreshNews() }
             group.addTask { await self.refreshMarkets() }
             group.addTask { await self.refreshMail() }
+            group.addTask { await self.refreshLanded() }
             group.addTask { await self.refreshSpotify() }
             for await _ in group {}
         }
@@ -515,6 +518,25 @@ final class AppState {
         )
     }
 
+    // MARK: Landed pipeline
+
+    func refreshLanded() async {
+        guard AppConfig.landedConfigured, googleConnected else { return }
+        if landedRoles.isEmpty { landedStatus = .checking }
+        do {
+            landedRoles = try await google.fetchLandedRoles(sheetID: AppConfig.landedSheetID)
+                .sorted { ($0.stageRank, $0.company) < ($1.stageRank, $1.company) }
+            landedStatus = .live(Date())
+        } catch {
+            landedStatus = degrade(landedStatus)
+        }
+    }
+
+    /// Roles most worth attention: hot stages and high priority first.
+    var landedFocusQueue: [LandedRole] {
+        landedRoles.filter(\.isHot).prefix(5).map { $0 }
+    }
+
     // MARK: - AI desk
 
     private func runAI(_ slot: String, into keyPath: ReferenceWritableKeyPath<AppState, String?>, _ work: @escaping () async throws -> String) {
@@ -551,13 +573,21 @@ final class AppState {
     }
 
     func runJobCoach() {
-        let now = Date()
-        let apps = persisted.applications.filter { $0.status != .closed }
-        guard !apps.isEmpty else { toast("No open applications to coach on."); return }
-        let pipeline = apps.map {
-            let days = Int(now.timeIntervalSince($0.updatedAt) / 86400)
-            return "\($0.status.rawValue) · \($0.organization) · \($0.role) · \(days)d since touch · next: \($0.nextStep)"
-        }.joined(separator: "\n")
+        // Prefer the live Landed sheet; fall back to the local pipeline.
+        let pipeline: String
+        if !landedRoles.isEmpty {
+            pipeline = landedRoles.map {
+                "\($0.status) · \($0.company) · \($0.role) · priority \($0.priority.nilIfEmpty ?? "—") · next: \($0.nextAction.nilIfEmpty ?? "—")"
+            }.joined(separator: "\n")
+        } else {
+            let now = Date()
+            let apps = persisted.applications.filter { $0.status != .closed }
+            guard !apps.isEmpty else { toast("No open applications to coach on."); return }
+            pipeline = apps.map {
+                let days = Int(now.timeIntervalSince($0.updatedAt) / 86400)
+                return "\($0.status.rawValue) · \($0.organization) · \($0.role) · \(days)d since touch · next: \($0.nextStep)"
+            }.joined(separator: "\n")
+        }
         runAI("coach", into: \.aiJobCoach) { try await AIDesk.jobCoach(pipeline: pipeline) }
     }
 

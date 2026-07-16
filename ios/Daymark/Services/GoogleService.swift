@@ -77,7 +77,7 @@ final class GoogleService {
             URLQueryItem(name: "client_id", value: AppConfig.googleClientID),
             URLQueryItem(name: "redirect_uri", value: AppConfig.googleRedirectURI),
             URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/gmail.modify"),
+            URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/spreadsheets.readonly"),
             URLQueryItem(name: "code_challenge", value: PKCE.challenge(for: verifier)),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "prompt", value: "consent"),
@@ -127,6 +127,40 @@ final class GoogleService {
         adopt(token)
         guard let access = accessToken else { throw ServiceError.auth("Google session could not be renewed.") }
         return access
+    }
+
+    // MARK: Landed pipeline (Google Sheet the job-search-command-center writes)
+
+    /// Reads the Tracker tab of the Landed sheet: Company, Role, Source, Location,
+    /// Work Type, Salary, Track, Status, Priority, Contact, Next, Notes (A2:L).
+    func fetchLandedRoles(sheetID: String) async throws -> [LandedRole] {
+        let token = try await validToken()
+        var components = URLComponents(
+            string: "https://sheets.googleapis.com/v4/spreadsheets/\(sheetID)/values/Tracker!A2:L")!
+        components.queryItems = [URLQueryItem(name: "majorDimension", value: "ROWS")]
+        let response = try await HTTP.json(SheetValues.self, components.url!,
+                                           headers: ["Authorization": "Bearer \(token)"])
+        return (response.values ?? []).enumerated().compactMap { index, row in
+            func col(_ i: Int) -> String { i < row.count ? row[i].trimmingCharacters(in: .whitespaces) : "" }
+            let company = col(0)
+            guard !company.isEmpty else { return nil }
+            return LandedRole(
+                id: "r\(index)",
+                company: company,
+                role: col(1),
+                location: col(3),
+                salary: col(5),
+                track: col(6),
+                status: col(7).nilIfEmpty ?? "Interested",
+                priority: col(8),
+                nextAction: col(10),
+                notes: col(11)
+            )
+        }
+    }
+
+    private struct SheetValues: Decodable {
+        let values: [[String]]?
     }
 
     // MARK: Gmail

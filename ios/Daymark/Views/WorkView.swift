@@ -32,6 +32,7 @@ struct WorkView: View {
                 }
             }
 
+            landedSection
             applicationsSection
             aiCoachSection
             sprintSection
@@ -47,6 +48,70 @@ struct WorkView: View {
         }
         .sheet(isPresented: $addingWaiting) {
             WaitingEditor()
+        }
+    }
+
+    // MARK: Landed pipeline (live from the job-search-command-center sheet)
+
+    @ViewBuilder
+    private var landedSection: some View {
+        if AppConfig.landedConfigured, app.googleConnected {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    SectionRuleHeader(title: "The Landed Wire")
+                    AgeStamp(status: app.landedStatus)
+                }
+                .padding(.bottom, 4)
+
+                if app.landedRoles.isEmpty {
+                    EmptyNote(text: app.landedStatus == .unavailable
+                              ? "Could not reach the Landed sheet — check that this Google account can open it."
+                              : "Reading the pipeline from Landed…")
+                } else {
+                    Text("\(app.landedRoles.count) open roles · \(app.landedFocusQueue.count) worth attention today")
+                        .font(DS.label(11, weight: .semibold))
+                        .foregroundStyle(Palette.muted)
+                        .padding(.bottom, 8)
+
+                    ForEach(app.landedFocusQueue) { role in
+                        VStack(spacing: 0) {
+                            Hairline()
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("\(role.company) — \(role.role)")
+                                        .font(DS.label(13.5, weight: .semibold))
+                                        .foregroundStyle(Palette.ink)
+                                        .lineLimit(1)
+                                    Text(role.nextAction.nilIfEmpty ?? role.track.nilIfEmpty ?? role.location)
+                                        .font(DS.label(11, weight: .regular))
+                                        .foregroundStyle(Palette.muted)
+                                        .lineLimit(1)
+                                }
+                                Spacer()
+                                StatusChip(
+                                    text: role.status,
+                                    foreground: role.stageRank <= 1 ? Color(hex: 0x0E7A54) : Palette.coral,
+                                    background: role.stageRank <= 1 ? Palette.greenSoft : Palette.coralSoft
+                                )
+                            }
+                            .padding(.vertical, 10)
+                        }
+                    }
+                    Hairline()
+
+                    Button {
+                        if let url = URL(string: "https://job-search-command-center-brown.vercel.app") {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Text("OPEN LANDED ↗")
+                            .kickerStyle(Palette.coral, size: 9, tracking: 1.2)
+                            .padding(.top, 10)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 26)
         }
     }
 

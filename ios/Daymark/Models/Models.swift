@@ -79,6 +79,34 @@ enum ApplicationStatus: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// A pipeline row read live from the Landed sheet (job-search-command-center).
+struct LandedRole: Identifiable, Hashable {
+    let id: String
+    let company: String
+    let role: String
+    let location: String
+    let salary: String
+    let track: String
+    let status: String
+    let priority: String
+    let nextAction: String
+    let notes: String
+
+    /// Rough stage ordering for the focus queue: closer to offer sorts first.
+    var stageRank: Int {
+        switch status.lowercased() {
+        case let s where s.contains("offer"): return 0
+        case let s where s.contains("interview"): return 1
+        case let s where s.contains("screen"): return 2
+        case let s where s.contains("progress"): return 3
+        case let s where s.contains("applied"): return 4
+        default: return 5
+        }
+    }
+
+    var isHot: Bool { stageRank <= 2 || priority.lowercased() == "high" }
+}
+
 struct JobApplication: Identifiable, Codable, Hashable {
     var id = UUID()
     var organization: String

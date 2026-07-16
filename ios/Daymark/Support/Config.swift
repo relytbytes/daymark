@@ -17,6 +17,11 @@ enum AppConfig {
     }()
 
     static let ownerName: String = (plist["OwnerName"] as? String)?.nilIfEmpty ?? "Ty"
+
+    /// The Google Sheet behind Landed (job-search-command-center). Same ID as its
+    /// GOOGLE_SHEET_ID env var; read-only from Daymark.
+    static let landedSheetID: String = (plist["LandedSheetID"] as? String)?.nilIfEmpty ?? ""
+    static var landedConfigured: Bool { !landedSheetID.isEmpty }
     static let homeLatitude: Double = plist["HomeLatitude"] as? Double ?? 35.9940
     static let homeLongitude: Double = plist["HomeLongitude"] as? Double ?? -78.8986
 
