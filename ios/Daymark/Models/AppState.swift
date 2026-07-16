@@ -751,6 +751,10 @@ final class AppState {
             spotifyConnected = true
             toast("Spotify connected.")
             await refreshSpotify()
+            // A fresh grant may be the first with playlist scopes — retry
+            // today's wire sync right away instead of waiting for tomorrow.
+            UserDefaults.standard.removeObject(forKey: "daymark-wire-synced-day")
+            await refreshDiscovery()
         } catch {
             toast(error.localizedDescription)
         }
@@ -940,11 +944,21 @@ final class AppState {
         let syncKey = "daymark-wire-synced-day"
         guard UserDefaults.standard.string(forKey: syncKey) != Date().dayKey else { return }
         Task {
-            let count = (try? await spotify.syncDiscoveryWirePlaylist(
-                tracks: wire.map { (title: $0.title, artist: $0.artist) })) ?? 0
-            if count > 0 {
-                UserDefaults.standard.set(Date().dayKey, forKey: syncKey)
-                toast("Discovery Wire playlist updated — \(count) tracks.")
+            do {
+                let count = try await spotify.syncDiscoveryWirePlaylist(
+                    tracks: wire.map { (title: $0.title, artist: $0.artist) })
+                if count > 0 {
+                    UserDefaults.standard.set(Date().dayKey, forKey: syncKey)
+                    toast("Discovery Wire playlist updated — \(count) tracks.")
+                } else {
+                    toast("Wire playlist: none of today's tracks matched on Spotify.")
+                }
+            } catch HTTPError.status(let code) where code == 403 {
+                toast("Spotify refused the playlist (403) — disconnect and reconnect to grant playlist access.")
+            } catch HTTPError.status(let code) {
+                toast("Wire playlist sync failed — Spotify error \(code).")
+            } catch {
+                toast("Wire playlist sync failed: \(error.localizedDescription)")
             }
         }
     }

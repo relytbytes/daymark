@@ -204,19 +204,9 @@ final class SpotifyService {
     /// Search the track on Spotify and add it to Daymark Discoveries.
     func addToDiscoveries(title: String, artist: String) async throws -> Bool {
         let token = try await validToken()
-        let query = "track:\(title) artist:\(artist)"
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        struct Search: Decodable {
-            struct Tracks: Decodable {
-                struct Item: Decodable { let uri: String }
-                let items: [Item]?
-            }
-            let tracks: Tracks?
+        guard let uri = await searchTrackURI(title: title, artist: artist, token: token) else {
+            return false
         }
-        let found = try await HTTP.json(Search.self,
-            URL(string: "https://api.spotify.com/v1/search?type=track&limit=1&q=\(query)")!,
-            headers: ["Authorization": "Bearer \(token)"])
-        guard let uri = found.tracks?.items?.first?.uri else { return false }
 
         let playlist = try await discoveriesPlaylistID()
         var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!, timeoutInterval: 20)
@@ -277,10 +267,15 @@ final class SpotifyService {
         return created.id
     }
 
-    /// Match one discovery track to a Spotify URI.
+    /// Match one discovery track to a Spotify URI. URLComponents handles
+    /// the encoding — titles with & or ? would corrupt a hand-built query.
     private func searchTrackURI(title: String, artist: String, token: String) async -> String? {
-        let query = "track:\(title) artist:\(artist)"
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        var components = URLComponents(string: "https://api.spotify.com/v1/search")!
+        components.queryItems = [
+            URLQueryItem(name: "type", value: "track"),
+            URLQueryItem(name: "limit", value: "1"),
+            URLQueryItem(name: "q", value: "track:\(title) artist:\(artist)"),
+        ]
         struct Search: Decodable {
             struct Tracks: Decodable {
                 struct Item: Decodable { let uri: String }
@@ -288,8 +283,8 @@ final class SpotifyService {
             }
             let tracks: Tracks?
         }
-        let found = try? await HTTP.json(Search.self,
-            URL(string: "https://api.spotify.com/v1/search?type=track&limit=1&q=\(query)")!,
+        guard let url = components.url else { return nil }
+        let found = try? await HTTP.json(Search.self, url,
             headers: ["Authorization": "Bearer \(token)"])
         return found?.tracks?.items?.first?.uri
     }
