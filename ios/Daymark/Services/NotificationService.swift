@@ -32,7 +32,7 @@ enum NotificationService {
         if morning {
             let content = UNMutableNotificationContent()
             content.title = "Morning Brief"
-            content.body = "Your day is laid out — three moves, the timeline, and what's worth knowing."
+            content.body = "Today's priorities, the timeline, and what came in overnight."
             content.sound = .default
             var components = DateComponents()
             components.hour = 7
@@ -44,7 +44,7 @@ enum NotificationService {
         if evening {
             let content = UNMutableNotificationContent()
             content.title = "Evening Review"
-            content.body = "Close the loops, set tomorrow's first move, and step away."
+            content.body = "The day's results and tomorrow's setup are ready."
             content.sound = .default
             var components = DateComponents()
             components.hour = 20

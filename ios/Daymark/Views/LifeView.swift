@@ -239,7 +239,7 @@ struct LifeView: View {
             SectionRuleHeader(title: "Practical · Yours")
                 .padding(.bottom, 4)
             if reminders.isEmpty {
-                EmptyNote(text: "Nothing practical is nagging. Capture the thing that cannot slip.")
+                EmptyNote(text: "No reminders saved. Add one from Capture.")
             } else {
                 ForEach(reminders) { item in
                     VStack(spacing: 0) {

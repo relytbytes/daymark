@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=19" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,8 +18,8 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=19" />
-    <script src="./config.js?v=19"></script>
+    <link rel="stylesheet" href="./styles.css?v=20" />
+    <script src="./config.js?v=20"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -58,7 +58,7 @@
             <p class="masthead-date" id="dateLabel">THURSDAY · JULY 2</p>
             <span class="masthead-phase">
               <span class="live-pulse" aria-hidden="true"></span>
-              <strong id="phaseLabel">Plan the day</strong>
+              <strong id="phaseLabel">Morning edition</strong>
             </span>
           </div>
           <h1 class="masthead-title" id="viewTitle">Good morning, <i>Ty.</i></h1>
@@ -78,8 +78,8 @@
         <section class="hero" id="today" data-view-section="today">
           <div class="hero-copy">
             <p class="eyebrow">Lead · Your day</p>
-            <h1 id="heroTitle">Make the day smaller, Ty.</h1>
-            <p class="hero-note" id="heroNote">Three priorities. One focused block. Everything else can wait its turn.</p>
+            <h1 id="heroTitle">The morning brief.</h1>
+            <p class="hero-note" id="heroNote">Today’s priorities, the calendar, and what came in overnight.</p>
           </div>
 
           <div class="hero-orbit" aria-label="Brief completion">
@@ -223,7 +223,7 @@
                   <span class="action-content">
                     <span class="action-topline"><span>TOMORROW</span><time>2 min</time></span>
                     <strong>Choose the first move</strong>
-                    <small>Put one specific task at 9:00 AM before the day fills up.</small>
+                    <small>Put one specific task on the 9:00 AM line.</small>
                   </span>
                   <span class="action-arrow" aria-hidden="true"></span>
                 </label>
@@ -494,7 +494,7 @@
                 </a>
                 <button class="local-reminder" id="practicalReminder" type="button" data-open-reminder>
                   <span class="local-icon local-icon--bell" aria-hidden="true">!</span>
-                  <div><small>PRACTICAL · YOURS</small><strong id="practicalReminderTitle">Add a practical reminder</strong><p id="practicalReminderNote">Tap to capture the thing that cannot slip.</p></div>
+                  <div><small>PRACTICAL · YOURS</small><strong id="practicalReminderTitle">Add a practical reminder</strong><p id="practicalReminderNote">Tap to add a reminder.</p></div>
                 </button>
               </div>
 
@@ -740,8 +740,8 @@
 
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
-          <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 19</small>
+          <p>That’s the brief.</p>
+          <small>Daymark · Build 20</small>
         </footer>
       </main>
 
@@ -856,6 +856,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=19" defer></script>
+    <script src="./app.js?v=20" defer></script>
   </body>
 </html>

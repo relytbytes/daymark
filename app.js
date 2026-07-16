@@ -628,7 +628,7 @@ function renderPracticalReminder() {
   document.querySelector("#practicalReminderTitle").textContent =
     reminder?.title || "Add a practical reminder";
   document.querySelector("#practicalReminderNote").textContent =
-    reminder?.note || "Tap to capture the thing that cannot slip.";
+    reminder?.note || "Tap to add a reminder.";
   document
     .querySelector("#practicalReminder")
     .classList.toggle("has-reminder", Boolean(reminder));
@@ -755,44 +755,44 @@ function updateLiveDay(date = new Date()) {
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
   const phaseContent = {
     morning: {
-      label: "Plan the day",
-      title: isWeekend ? "Give the day some room, Ty." : "Make the day smaller, Ty.",
-      note: "Three priorities. One focused block. Everything else can wait its turn.",
-      priorityKicker: "START HERE",
-      priorityTitle: "Today’s essential three",
-      signalKicker: "WHAT’S IN MOTION",
+      label: "Morning edition",
+      title: "The morning brief.",
+      note: "Today’s priorities, the calendar, and what came in overnight.",
+      priorityKicker: "PRIORITIES",
+      priorityTitle: "Today’s three",
+      signalKicker: "IN MOTION",
       signalTitle: "Calendar + priority mail",
-      readingKicker: "LATER TONIGHT · 28 MIN",
+      readingKicker: "SAVED READING · 28 MIN",
     },
     afternoon: {
-      label: "Protect the middle",
-      title: "Protect the next hour, Ty.",
-      note: "Review what moved, close one loop, and keep the rest from multiplying.",
-      priorityKicker: "MIDDAY CHECK",
-      priorityTitle: "What matters this afternoon",
-      signalKicker: "THE NEXT FEW HOURS",
+      label: "Midday edition",
+      title: "The midday check.",
+      note: "What moved this morning, and what the afternoon holds.",
+      priorityKicker: "PRIORITIES",
+      priorityTitle: "This afternoon’s three",
+      signalKicker: "NEXT UP",
       signalTitle: "Calendar + priority mail",
-      readingKicker: "FOR LATER · 28 MIN",
+      readingKicker: "SAVED READING · 28 MIN",
     },
     evening: {
-      label: "Land the day",
-      title: "Land the day cleanly, Ty.",
-      note: "Close what matters, capture the rest, and leave tomorrow one clear first move.",
-      priorityKicker: "CLOSE THE LOOPS",
-      priorityTitle: "Finish the day clean",
-      signalKicker: "WHAT MOVED",
+      label: "Evening edition",
+      title: "The evening edition.",
+      note: "The day’s results, open items, and tomorrow’s first event.",
+      priorityKicker: "OPEN ITEMS",
+      priorityTitle: "Still open today",
+      signalKicker: "THE LEDGER",
       signalTitle: "Day in review",
-      readingKicker: "WIND DOWN · 28 MIN",
+      readingKicker: "SAVED READING · 28 MIN",
     },
     night: {
-      label: "You are done",
-      title: "You’re done for today, Ty.",
-      note: "Nothing here needs another hour. Set tomorrow’s first move and step away.",
-      priorityKicker: "RESET",
-      priorityTitle: "Leave tomorrow lighter",
+      label: "Late edition",
+      title: "The late edition.",
+      note: "Tomorrow’s schedule is set. Nothing here needs attention tonight.",
+      priorityKicker: "TOMORROW",
+      priorityTitle: "Tomorrow’s setup",
       signalKicker: "TOMORROW",
-      signalTitle: "A clean start is ready",
-      readingKicker: "BEDTIME READING · 28 MIN",
+      signalTitle: "Tomorrow’s schedule",
+      readingKicker: "SAVED READING · 28 MIN",
     },
   }[phase];
 

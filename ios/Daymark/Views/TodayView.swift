@@ -185,7 +185,7 @@ struct TodayView: View {
             } else {
                 let entries = app.timelineEntries()
                 if entries.isEmpty {
-                    EmptyNote(text: "A clear calendar. The day is yours to shape.")
+                    EmptyNote(text: "No events on the calendar today.")
                 } else {
                     ForEach(entries) { entry in
                         timelineRow(entry)

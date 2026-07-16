@@ -359,7 +359,7 @@ final class AppState {
                 CaptureItem(kind: kind, title: title, url: url, note: note),
                 at: 0
             )
-            toast("Captured. It can wait its turn.")
+            toast("Captured.")
         }
     }
 

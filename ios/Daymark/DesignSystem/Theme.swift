@@ -62,10 +62,10 @@ enum DayPhase: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .morning: return "Plan the day"
-        case .afternoon: return "Protect the middle"
-        case .evening: return "Land the day"
-        case .night: return "You are done"
+        case .morning: return "Morning edition"
+        case .afternoon: return "Midday edition"
+        case .evening: return "Evening edition"
+        case .night: return "Late edition"
         }
     }
 
@@ -74,7 +74,7 @@ enum DayPhase: String, CaseIterable {
         case .morning: return "Good morning"
         case .afternoon: return "Good afternoon"
         case .evening: return "Good evening"
-        case .night: return "Winding down"
+        case .night: return "Good evening"
         }
     }
 

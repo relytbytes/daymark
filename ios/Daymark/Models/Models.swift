@@ -195,7 +195,7 @@ struct EssentialTask: Identifiable, Hashable {
         EssentialTask(id: "e-veraya", kicker: "Veraya", title: "Capture today's decision",
                       detail: "Write what changed, why, and the next test."),
         EssentialTask(id: "e-tomorrow", kicker: "Tomorrow", title: "Choose the first move",
-                      detail: "Put one specific task at 9:00 AM before the day fills up."),
+                      detail: "Put one specific task on the 9:00 AM line."),
     ]
 
     static func forPhase(_ phase: DayPhase) -> [EssentialTask] {

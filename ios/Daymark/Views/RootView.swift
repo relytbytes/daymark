@@ -176,7 +176,7 @@ struct SectionPage<Content: View>: View {
     private var footer: some View {
         VStack(spacing: 8) {
             BrandMark().padding(.top, 44)
-            Text("Enough for today.")
+            Text("That\u{2019}s the brief.")
                 .font(DS.deck(15))
                 .foregroundStyle(Palette.muted)
             Text("DAYMARK KEEPS THE SIGNAL. YOU KEEP THE DAY.")

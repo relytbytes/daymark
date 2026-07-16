@@ -47,17 +47,17 @@ extension AppState {
         case .morning, .afternoon:
             let headline: String
             if moves == 0 {
-                headline = "The essentials are done — everything else is a bonus"
+                headline = "All three priorities are done"
             } else if meetings == 0 {
-                headline = "\(movesWord) move\(moves == 1 ? "" : "s") and a clear calendar. Protect it."
+                headline = "\(movesWord) \(moves == 1 ? "priority" : "priorities") open, no meetings on the calendar"
             } else {
-                headline = "\(movesWord) move\(moves == 1 ? "" : "s") and \(meetings) meeting\(meetings == 1 ? "" : "s") stand between you and a clear week"
+                headline = "\(movesWord) \(moves == 1 ? "priority" : "priorities") open, \(meetings) meeting\(meetings == 1 ? "" : "s") ahead"
             }
-            var deck = "One focused block is set aside to advance the Veraya milestone."
+            let deck: String
             if let next = nextMeeting {
-                deck = "First up: \(next.title) at \(next.start.timeText()). \(deck)"
+                deck = "First up: \(next.title) at \(next.start.timeText())."
             } else {
-                deck += " The rest can wait its turn."
+                deck = "No meetings scheduled today."
             }
             return LeadStory(kicker: "Lead · Your day", headline: headline, deck: deck)
 
@@ -65,16 +65,16 @@ extension AppState {
             return LeadStory(
                 kicker: "Lead · The close",
                 headline: moves == 0
-                    ? "The day is landed. Log it and let go."
-                    : "Land the day cleanly — \(moves) loop\(moves == 1 ? "" : "s") left to close",
-                deck: "Close what matters, capture the rest, and leave tomorrow one clear first move."
+                    ? "Everything on today's list is done"
+                    : "\(movesWord) item\(moves == 1 ? "" : "s") still open",
+                deck: "The results, the open items, and tomorrow's first event."
             )
 
         case .night:
             return LeadStory(
                 kicker: "Lead · After hours",
-                headline: "You're done for today.",
-                deck: "Nothing here needs another hour. Set tomorrow's first move and step away."
+                headline: "The late edition",
+                deck: "Tomorrow's schedule is set. Nothing here needs attention tonight."
             )
         }
     }
