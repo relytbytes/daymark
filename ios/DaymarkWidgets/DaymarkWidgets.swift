@@ -300,6 +300,11 @@ struct GlanceWidgetView: View {
                 Text(entry.tempF.map { "\($0)°" } ?? "—")
                     .font(.system(size: 42, weight: .bold, design: .serif))
                     .foregroundStyle(WPalette.ink)
+                if let feels = feelsParen {
+                    Text(feels)
+                        .font(.system(size: 15, weight: .bold, design: .serif))
+                        .foregroundStyle(WPalette.muted)
+                }
                 Image(systemName: entry.symbol)
                     .font(.system(size: 17))
                     .foregroundStyle(WPalette.gold)
@@ -335,16 +340,15 @@ struct GlanceWidgetView: View {
                     Text(entry.tempF.map { "\($0)°" } ?? "—")
                         .font(.system(size: 48, weight: .bold, design: .serif))
                         .foregroundStyle(WPalette.ink)
+                    if let feels = feelsParen {
+                        Text(feels)
+                            .font(.system(size: 17, weight: .bold, design: .serif))
+                            .foregroundStyle(WPalette.muted)
+                    }
                     Image(systemName: entry.symbol)
                         .font(.system(size: 19))
                         .foregroundStyle(WPalette.gold)
                 }
-                Text(conditionFeelsLine)
-                    .font(.system(size: 11, weight: .heavy))
-                    .tracking(0.3)
-                    .foregroundStyle(WPalette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 Text(rangeLine)
                     .font(.system(size: 9.5, weight: .heavy))
                     .tracking(0.3)
@@ -404,7 +408,7 @@ struct GlanceWidgetView: View {
 
     private var inline: some View {
         Label {
-            Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(entry.feels.map { " FEELS \($0)°" } ?? "")\(entry.high.flatMap { high in entry.low.map { " · H\(high) L\($0)" } } ?? "")")
+            Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(feelsParen.map { " \($0)" } ?? "")\(entry.high.flatMap { high in entry.low.map { " · H\(high) L\($0)" } } ?? "")")
         } icon: {
             Image(systemName: entry.symbol)
         }
@@ -415,7 +419,7 @@ struct GlanceWidgetView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Image(systemName: entry.symbol).font(.system(size: 11))
-                Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(entry.feels.map { " · FEELS \($0)°" } ?? "")")
+                Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(feelsParen.map { " \($0)" } ?? "")")
                     .font(.system(size: 12, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -458,13 +462,14 @@ struct GlanceWidgetView: View {
         Rectangle().fill(WPalette.line).frame(height: 1)
     }
 
-    /// Medium widget line 1: feels-like (the condition lives in the icon).
-    private var conditionFeelsLine: String {
-        if let feels = entry.feels { return "Feels \(feels)°" }
-        return " "
+    /// Feels-like as a quiet parenthetical beside the numeral, shown only
+    /// when it meaningfully differs from the actual temperature.
+    private var feelsParen: String? {
+        guard let feels = entry.feels, let temp = entry.tempF, abs(feels - temp) >= 2 else { return nil }
+        return "(\(feels)°)"
     }
 
-    /// Medium widget line 2: high/low + rain.
+    /// High/low + rain line.
     private var rangeLine: String {
         var parts: [String] = []
         if let high = entry.high, let low = entry.low { parts.append("H \(high) · L \(low)") }
@@ -472,13 +477,7 @@ struct GlanceWidgetView: View {
         return parts.isEmpty ? " " : parts.joined(separator: " · ")
     }
 
-    private var detailLine: String {
-        var parts: [String] = []
-        if let feels = entry.feels { parts.append("Feels \(feels)°") }
-        if let high = entry.high, let low = entry.low { parts.append("H \(high) · L \(low)") }
-        if let rain = entry.rainPct, rain > 15 { parts.append("Rain \(rain)%") }
-        return parts.isEmpty ? " " : parts.joined(separator: " · ")
-    }
+    private var detailLine: String { rangeLine }
 
     private func gameRow(_ game: GameLine, compact: Bool) -> some View {
         HStack(spacing: 5) {
