@@ -293,22 +293,24 @@ struct GlanceWidgetView: View {
     // MARK: Small — the front page stamp
 
     private var small: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             masthead
             Spacer(minLength: 0)
-            HStack(alignment: .lastTextBaseline, spacing: 6) {
+            HStack(alignment: .lastTextBaseline, spacing: 7) {
                 Text(entry.tempF.map { "\($0)°" } ?? "—")
-                    .font(.system(size: 36, weight: .bold, design: .serif))
+                    .font(.system(size: 42, weight: .bold, design: .serif))
                     .foregroundStyle(WPalette.ink)
                 Image(systemName: entry.symbol)
-                    .font(.system(size: 14))
+                    .font(.system(size: 17))
                     .foregroundStyle(WPalette.gold)
+                Spacer(minLength: 0)
             }
             Text(detailLine)
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 9.5, weight: .heavy))
+                .tracking(0.3)
                 .foregroundStyle(WPalette.muted)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.7)
             rule
             if let game = entry.games.first(where: \.isLive) ?? entry.games.first {
                 gameRow(game, compact: true)
@@ -316,6 +318,9 @@ struct GlanceWidgetView: View {
                 eveningRow
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .padding(13)
+        .textCase(.uppercase)
         .containerBackground(WPalette.paper, for: .widget)
     }
 
@@ -323,24 +328,26 @@ struct GlanceWidgetView: View {
 
     private var medium: some View {
         HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 6) {
                 masthead
                 Spacer(minLength: 0)
-                HStack(alignment: .lastTextBaseline, spacing: 6) {
+                HStack(alignment: .lastTextBaseline, spacing: 8) {
                     Text(entry.tempF.map { "\($0)°" } ?? "—")
-                        .font(.system(size: 40, weight: .bold, design: .serif))
+                        .font(.system(size: 48, weight: .bold, design: .serif))
                         .foregroundStyle(WPalette.ink)
                     Image(systemName: entry.symbol)
-                        .font(.system(size: 15))
+                        .font(.system(size: 19))
                         .foregroundStyle(WPalette.gold)
                 }
                 Text(conditionFeelsLine)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(0.3)
                     .foregroundStyle(WPalette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Text(rangeLine)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 9.5, weight: .heavy))
+                    .tracking(0.3)
                     .foregroundStyle(WPalette.muted)
                     .lineLimit(1)
             }
@@ -376,6 +383,9 @@ struct GlanceWidgetView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(13)
+        .textCase(.uppercase)
         .containerBackground(WPalette.paper, for: .widget)
     }
 
@@ -393,15 +403,19 @@ struct GlanceWidgetView: View {
     }
 
     private var inline: some View {
-        Text("\(entry.tempF.map { "\($0)°" } ?? "—") \(entry.condition)\(entry.high.flatMap { high in entry.low.map { " · H\(high) L\($0)" } } ?? "")")
-            .containerBackground(.clear, for: .widget)
+        Label {
+            Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(entry.feels.map { " FEELS \($0)°" } ?? "")\(entry.high.flatMap { high in entry.low.map { " · H\(high) L\($0)" } } ?? "")")
+        } icon: {
+            Image(systemName: entry.symbol)
+        }
+        .containerBackground(.clear, for: .widget)
     }
 
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
-                Image(systemName: entry.symbol).font(.system(size: 10))
-                Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(entry.feels.flatMap { feels in entry.tempF.map { abs(feels - $0) >= 2 ? " (feels \(feels)°)" : "" } } ?? "") · \(entry.condition)")
+                Image(systemName: entry.symbol).font(.system(size: 11))
+                Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(entry.feels.map { " · FEELS \($0)°" } ?? "")")
                     .font(.system(size: 12, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -411,11 +425,13 @@ struct GlanceWidgetView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
             }
-            Text("\(entry.high.map { "H \($0)" } ?? "") \(entry.low.map { "L \($0)" } ?? "") · Sunset \(entry.sunset)")
-                .font(.system(size: 10, weight: .medium))
+            Text("\(entry.high.map { "H \($0)" } ?? "") \(entry.low.map { "L \($0)" } ?? "") · SUNSET \(entry.sunset)")
+                .font(.system(size: 10, weight: .semibold))
                 .opacity(0.8)
                 .lineLimit(1)
         }
+        .textCase(.uppercase)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .containerBackground(.clear, for: .widget)
     }
 
@@ -442,12 +458,10 @@ struct GlanceWidgetView: View {
         Rectangle().fill(WPalette.line).frame(height: 1)
     }
 
-    /// Medium widget line 1: condition + feels-like.
+    /// Medium widget line 1: feels-like (the condition lives in the icon).
     private var conditionFeelsLine: String {
-        if let feels = entry.feels, let temp = entry.tempF, abs(feels - temp) >= 2 {
-            return "\(entry.condition) · Feels \(feels)°"
-        }
-        return entry.condition
+        if let feels = entry.feels { return "Feels \(feels)°" }
+        return " "
     }
 
     /// Medium widget line 2: high/low + rain.
@@ -455,17 +469,15 @@ struct GlanceWidgetView: View {
         var parts: [String] = []
         if let high = entry.high, let low = entry.low { parts.append("H \(high) · L \(low)") }
         if let rain = entry.rainPct, rain > 15 { parts.append("Rain \(rain)%") }
-        return parts.isEmpty ? "—" : parts.joined(separator: " · ")
+        return parts.isEmpty ? " " : parts.joined(separator: " · ")
     }
 
     private var detailLine: String {
-        var parts: [String] = [entry.condition]
-        if let feels = entry.feels, let temp = entry.tempF, abs(feels - temp) >= 2 {
-            parts.append("Feels \(feels)°")
-        }
+        var parts: [String] = []
+        if let feels = entry.feels { parts.append("Feels \(feels)°") }
         if let high = entry.high, let low = entry.low { parts.append("H \(high) · L \(low)") }
         if let rain = entry.rainPct, rain > 15 { parts.append("Rain \(rain)%") }
-        return parts.joined(separator: " · ")
+        return parts.isEmpty ? " " : parts.joined(separator: " · ")
     }
 
     private func gameRow(_ game: GameLine, compact: Bool) -> some View {
@@ -521,6 +533,7 @@ struct AtAGlanceWidget: Widget {
         }
         .configurationDisplayName("At a Glance")
         .description("Durham weather, the scoreboard, sunset, and the moon.")
+        .contentMarginsDisabled()
         .supportedFamilies([
             .systemSmall, .systemMedium,
             .accessoryCircular, .accessoryInline, .accessoryRectangular,
