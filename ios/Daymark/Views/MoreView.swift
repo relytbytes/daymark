@@ -72,6 +72,14 @@ struct MoreView: View {
                                 HStack {
                                     Text(article.source.uppercased())
                                         .kickerStyle(Palette.coral, size: 8, tracking: 1.2)
+                                    if !article.otherSources.isEmpty {
+                                        Text("+\(article.otherSources.count) SOURCE\(article.otherSources.count == 1 ? "" : "S")")
+                                            .font(.system(size: 7.5, weight: .heavy)).tracking(0.6)
+                                            .foregroundStyle(Palette.muted)
+                                            .padding(.horizontal, 6).padding(.vertical, 2)
+                                            .background(Capsule().fill(Palette.wash))
+                                            .overlay(Capsule().stroke(Palette.line, lineWidth: 1))
+                                    }
                                     Spacer()
                                     if let published = article.published {
                                         Text(relativeAge(published))

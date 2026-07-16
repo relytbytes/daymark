@@ -132,6 +132,26 @@ final class SpotifyService {
         return out
     }
 
+    /// Start playback of a playlist/album context on the active device.
+    func playContext(_ raw: String) async throws {
+        // Accept a full open.spotify.com link or a spotify: URI.
+        var uri = raw.trimmingCharacters(in: .whitespaces)
+        if let url = URL(string: uri), url.host?.contains("spotify.com") == true {
+            let parts = url.pathComponents.filter { $0 != "/" }
+            if parts.count >= 2 { uri = "spotify:\(parts[parts.count - 2]):\(parts[parts.count - 1])" }
+        }
+        let token = try await validToken()
+        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/player/play")!, timeoutInterval: 15)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["context_uri": uri])
+        let (_, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw HTTPError.status(http.statusCode)
+        }
+    }
+
     /// Top artist names across a medium listening window — discovery seeds.
     func topArtists(limit: Int = 15) async throws -> [String] {
         let token = try await validToken()

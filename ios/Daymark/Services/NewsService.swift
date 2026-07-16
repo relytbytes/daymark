@@ -23,16 +23,46 @@ enum NewsService {
                 articles.append(contentsOf: batch)
             }
         }
-        // Dedupe near-identical titles, newest first, keep it a brief.
-        var seen = Set<String>()
-        return articles
-            .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
-            .filter { article in
-                let key = article.title.lowercased().prefix(60)
-                return seen.insert(String(key)).inserted
+        // Cluster the same story across feeds, newest first, keep it a brief.
+        return cluster(articles).prefix(24).map { $0 }
+    }
+
+    /// Collapse articles whose titles share most of their significant words —
+    /// the same story carried by several feeds becomes one item with a
+    /// "+N sources" note.
+    static func cluster(_ articles: [NewsArticle]) -> [NewsArticle] {
+        let stopWords: Set<String> = ["the", "a", "an", "of", "to", "in", "on", "for", "and", "as", "at", "is", "are", "with", "after", "over", "new"]
+        func tokens(_ title: String) -> Set<String> {
+            Set(title.lowercased()
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { $0.count > 2 && !stopWords.contains($0) })
+        }
+
+        let sorted = articles.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+        var out: [NewsArticle] = []
+        var outTokens: [Set<String>] = []
+
+        for article in sorted {
+            let t = tokens(article.title)
+            var merged = false
+            for index in out.indices where !t.isEmpty {
+                let overlap = t.intersection(outTokens[index]).count
+                let smaller = min(t.count, outTokens[index].count)
+                if smaller >= 3, Double(overlap) >= 0.6 * Double(smaller) {
+                    if out[index].source != article.source,
+                       !out[index].otherSources.contains(article.source) {
+                        out[index].otherSources.append(article.source)
+                    }
+                    merged = true
+                    break
+                }
             }
-            .prefix(24)
-            .map { $0 }
+            if !merged {
+                out.append(article)
+                outTokens.append(t)
+            }
+        }
+        return out
     }
 }
 

@@ -66,6 +66,7 @@ final class AppState {
     var discoveryWire: [DiscoveryTrack] = []
     var discoveryStatus: FeedStatus = .idle
     var previewingTrackID: String?
+    @ObservationIgnored var focusSoundtrackStarted = false
     @ObservationIgnored var previewPlayer: AVPlayer?
 
     var isRefreshing = false
@@ -112,6 +113,16 @@ final class AppState {
             persisted.tomorrowFirstMove = ""
         }
         if persisted.weekKey != now.weekKey {
+            if !persisted.weeklyScores.isEmpty {
+                persisted.scoreHistory[persisted.weekKey] = persisted.weeklyScores
+                // Keep roughly a year of history.
+                if persisted.scoreHistory.count > 60 {
+                    let sortedKeys = persisted.scoreHistory.keys.sorted()
+                    for key in sortedKeys.prefix(persisted.scoreHistory.count - 60) {
+                        persisted.scoreHistory.removeValue(forKey: key)
+                    }
+                }
+            }
             persisted.weekKey = now.weekKey
             persisted.weeklyScores = [:]
             persisted.sprint = [:]
@@ -339,11 +350,26 @@ final class AppState {
         persisted.focusEndsAt = Date().addingTimeInterval(TimeInterval(minutes * 60))
         NotificationService.scheduleFocusEnd(after: TimeInterval(minutes * 60), taskTitle: title)
         Task { _ = await NotificationService.requestAuthorization() }
+        // The focus soundtrack: start the chosen playlist on the active device.
+        if spotifyConnected, !persisted.settings.focusPlaylist.isEmpty {
+            Task {
+                do {
+                    try await spotify.playContext(persisted.settings.focusPlaylist)
+                    focusSoundtrackStarted = true
+                } catch {
+                    // No active device or restricted playback — the timer still runs.
+                }
+            }
+        }
     }
 
     func stopFocus() {
         persisted.focusEndsAt = nil
         NotificationService.cancelFocus()
+        if focusSoundtrackStarted {
+            focusSoundtrackStarted = false
+            Task { try? await spotify.send(.pause) }
+        }
     }
 
     // MARK: Captures

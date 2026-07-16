@@ -245,6 +245,7 @@ struct AppSettings: Codable, Hashable {
     var gameAlerts = true
     var soundcloudUser: String = ""
     var soundcloudArtists: [String] = []
+    var focusPlaylist: String = ""       // Spotify playlist link/URI for focus blocks
 
     init() {}
 
@@ -261,6 +262,7 @@ struct AppSettings: Codable, Hashable {
         gameAlerts = (try? c.decodeIfPresent(Bool.self, forKey: .gameAlerts)) ?? nil ?? true
         soundcloudUser = (try? c.decodeIfPresent(String.self, forKey: .soundcloudUser)) ?? nil ?? ""
         soundcloudArtists = (try? c.decodeIfPresent([String].self, forKey: .soundcloudArtists)) ?? nil ?? []
+        focusPlaylist = (try? c.decodeIfPresent(String.self, forKey: .focusPlaylist)) ?? nil ?? ""
     }
 
     static let defaultFeeds: [FeedSource] = [
@@ -298,6 +300,7 @@ struct PersistedState: Codable {
     var settings = AppSettings()
     var musicLikes: [String] = []              // discovery feedback: artist names, lowercased
     var musicPasses: [String] = []
+    var scoreHistory: [String: [String: Int]] = [:]   // weekKey -> category -> done
 
     init() {}
 
@@ -323,6 +326,7 @@ struct PersistedState: Codable {
         settings = (try? c.decodeIfPresent(AppSettings.self, forKey: .settings)) ?? nil ?? AppSettings()
         musicLikes = (try? c.decodeIfPresent([String].self, forKey: .musicLikes)) ?? nil ?? []
         musicPasses = (try? c.decodeIfPresent([String].self, forKey: .musicPasses)) ?? nil ?? []
+        scoreHistory = (try? c.decodeIfPresent([String: [String: Int]].self, forKey: .scoreHistory)) ?? nil ?? [:]
     }
 }
 
@@ -509,6 +513,7 @@ struct NewsArticle: Identifiable, Hashable {
     let link: URL
     let source: String
     let published: Date?
+    var otherSources: [String] = []      // same story carried elsewhere
     var id: String { link.absoluteString }
 }
 

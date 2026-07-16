@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(AppState.self) private var app
@@ -20,11 +22,47 @@ struct SettingsView: View {
     @State private var aiKeyField = AIService.isConfigured ? "••••••••••••" : ""
     @State private var aiKeyDirty = false
     @State private var newSCArtist = ""
+    @State private var importing = false
+    @State private var exportURL: ExportFile?
 
     var body: some View {
         @Bindable var app = app
         NavigationStack {
-            Form {
+            settingsForm
+        }
+        .sheet(item: $exportURL) { file in
+            ShareSheet(items: [file.url])
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+            guard case .success(let url) = result else { return }
+            let secured = url.startAccessingSecurityScopedResource()
+            defer { if secured { url.stopAccessingSecurityScopedResource() } }
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            if let data = try? Data(contentsOf: url),
+               let restored = try? decoder.decode(PersistedState.self, from: data) {
+                app.persisted = restored
+                app.toast("Backup restored.")
+            } else {
+                app.toast("That file didn't read as a Daymark backup.")
+            }
+        }
+    }
+
+    private func exportData() {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(app.persisted) else { return }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("daymark-backup-\(Date().dayKey).json")
+        try? data.write(to: url, options: .atomic)
+        exportURL = ExportFile(url: url)
+    }
+
+    private var settingsForm: some View {
+        @Bindable var app = app
+        return Form {
                 Section("You") {
                     TextField("Name for the greeting", text: $app.persisted.name)
                 }
@@ -59,6 +97,25 @@ struct SettingsView: View {
                         Text(app.calendarAccess == true ? "On" : app.calendarAccess == false ? "Off" : "—")
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                Section {
+                    TextField("Spotify playlist link for focus blocks", text: $app.persisted.settings.focusPlaylist)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("Focus soundtrack")
+                } footer: {
+                    Text("Paste a playlist link and it starts on your active Spotify device when a focus block begins, and pauses when it ends.")
+                }
+
+                Section {
+                    Button("Export Daymark data…") { exportData() }
+                    Button("Import from backup…") { importing = true }
+                } header: {
+                    Text("Backup")
+                } footer: {
+                    Text("A JSON file with tasks, pipeline, captures, reading queue, scores, and settings. Import replaces what's on this device.")
                 }
 
                 Section("Daily editions") {
@@ -227,7 +284,6 @@ struct SettingsView: View {
                     }
                 }
             }
-        }
     }
 
     @ViewBuilder
@@ -256,4 +312,22 @@ struct SettingsView: View {
             }
         }
     }
+}
+
+
+/// Identifiable wrapper so a fresh export re-presents the share sheet.
+struct ExportFile: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
+/// UIActivityViewController bridge for the backup file.
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }

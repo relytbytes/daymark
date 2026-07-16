@@ -470,6 +470,7 @@
                   <div><strong>Household</strong><small>0 of 5 tasks</small></div>
                   <div class="score-dots score-dots--gold" data-target="5" aria-label="0 of 5"></div>
                 </div>
+                <div id="scoreTrends" hidden></div>
               </article>
             </section>
 
@@ -755,7 +756,14 @@
                 <label>SoundCloud artists (comma-separated slugs)
                   <input type="text" id="deskSCArtists" autocomplete="off" spellcheck="false" placeholder="fourtet, floatingpoints" />
                 </label>
+                <label>Focus soundtrack (Spotify playlist link)
+                  <input type="text" id="deskFocusPlaylist" autocomplete="off" spellcheck="false" placeholder="https://open.spotify.com/playlist/…" />
+                </label>
                 <button class="dialog-submit" id="deskSettingsSave" type="button">Save desk settings</button>
+                <div class="desk-backup">
+                  <button class="text-button" id="deskExport" type="button">Export backup</button>
+                  <label class="text-button desk-import">Import backup<input type="file" id="deskImportFile" accept="application/json" hidden /></label>
+                </div>
                 <p class="desk-settings-note">Stored in this browser only. The AI key powers the daily plan, job coach, evening column, and horoscope.</p>
               </article>
             </section>

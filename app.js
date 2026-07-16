@@ -397,6 +397,13 @@ function rollStatePeriods(candidate, previousSchemaVersion = STATE_SCHEMA_VERSIO
   }
 
   if (candidate.weekKey !== weekKey) {
+    const hadScores = Object.values(candidate.weeklyScores || {}).some((value) => value > 0);
+    if (hadScores) {
+      candidate.scoreHistory = candidate.scoreHistory || {};
+      candidate.scoreHistory[candidate.weekKey] = { ...candidate.weeklyScores };
+      const keys = Object.keys(candidate.scoreHistory).sort();
+      while (keys.length > 60) delete candidate.scoreHistory[keys.shift()];
+    }
     candidate.weeklyScores = { ...defaultState.weeklyScores };
     candidate.decisions = {};
     candidate.weekKey = weekKey;
@@ -586,6 +593,7 @@ function toggleFocusTimer() {
     state.focusEndsAt = Date.now() + 25 * 60 * 1000;
     focusCompletionAnnounced = false;
     showToast("Twenty-five quiet minutes. Go.");
+    startFocusSoundtrack();
   }
   saveState();
   updateFocusTimer();
@@ -1879,6 +1887,63 @@ function renderSoundCloudShelf() {
 // Desk settings card
 // =====================================================================
 
+async function startFocusSoundtrack() {
+  const raw = (loadDeskSettings().focusPlaylist || "").trim();
+  if (!raw || !spotifyAccessToken) return;
+  let uri = raw;
+  try {
+    const url = new URL(raw);
+    if (url.hostname.includes("spotify.com")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (parts.length >= 2) uri = `spotify:${parts[parts.length - 2]}:${parts[parts.length - 1]}`;
+    }
+  } catch {
+    // already a spotify: URI or plain id — leave as-is
+  }
+  try {
+    await fetchSpotify("/v1/me/player/play", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_uri: uri }),
+    });
+  } catch {
+    // No active device — the timer still runs.
+  }
+}
+
+function exportDaymarkData() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    state,
+    deskSettings: { ...loadDeskSettings(), aiKey: undefined },
+    musicFeedback: discoveryFeedback(),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `daymark-backup-${formatApiDate(new Date())}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function importDaymarkData(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      if (!payload?.state?.schemaVersion) throw new Error("bad");
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload.state));
+      if (payload.deskSettings) saveDeskSettings(payload.deskSettings);
+      if (payload.musicFeedback) saveDiscoveryFeedback(payload.musicFeedback);
+      showToast("Backup restored — reloading.");
+      window.setTimeout(() => window.location.reload(), 700);
+    } catch {
+      showToast("That file didn't read as a Daymark backup.");
+    }
+  };
+  reader.readAsText(file);
+}
+
 function initializeDeskSettings() {
   const desk = loadDeskSettings();
   const sheet = document.querySelector("#deskLandedSheet");
@@ -1893,6 +1958,14 @@ function initializeDeskSettings() {
   if (key) key.value = desk.aiKey ? "••••••••••••" : "";
   if (scUser) scUser.value = desk.soundcloudUser || "";
   if (scArtists) scArtists.value = desk.soundcloudArtists || "";
+  const focusPlaylist = document.querySelector("#deskFocusPlaylist");
+  if (focusPlaylist) focusPlaylist.value = desk.focusPlaylist || "";
+  document.querySelector("#deskExport")?.addEventListener("click", exportDaymarkData);
+  document.querySelector("#deskImportFile")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (file) importDaymarkData(file);
+    event.target.value = "";
+  });
 
   save.addEventListener("click", () => {
     const partial = {
@@ -1900,6 +1973,7 @@ function initializeDeskSettings() {
       aiProvider: provider?.value || "openai",
       soundcloudUser: scUser?.value.trim().toLowerCase() || "",
       soundcloudArtists: scArtists?.value.trim() || "",
+      focusPlaylist: document.querySelector("#deskFocusPlaylist")?.value.trim() || "",
     };
     const keyValue = key?.value.trim() || "";
     if (keyValue && !keyValue.startsWith("•")) partial.aiKey = keyValue;
@@ -3798,6 +3872,39 @@ function renderWeeklyScorecard() {
       dots.append(button);
     }
   });
+
+  renderScoreTrends();
+}
+
+const SCORE_TARGETS = { jobs: 5, veraya: 4, writing: 3, fitness: 4, household: 5 };
+
+function renderScoreTrends() {
+  const host = document.querySelector("#scoreTrends");
+  const history = state.scoreHistory || {};
+  const weeks = Object.keys(history).sort().slice(-7);
+  if (!host) return;
+  if (!weeks.length) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  host.innerHTML =
+    '<p class="trend-title">EIGHT-WEEK TREND</p>' +
+    Object.keys(SCORE_TARGETS)
+      .map((key) => {
+        const values = weeks.map((week) => history[week]?.[key] || 0);
+        values.push(Number(state.weeklyScores[key]) || 0);
+        const target = SCORE_TARGETS[key];
+        const bars = values
+          .map((value, index) => {
+            const ratio = Math.min(1, value / target);
+            const isCurrent = index === values.length - 1;
+            return `<i class="${isCurrent ? "is-current" : ratio >= 1 ? "is-hit" : ""}" style="height:${Math.max(3, Math.round(22 * ratio))}px"></i>`;
+          })
+          .join("");
+        return `<div class="trend-row"><span>${key}</span><div class="trend-bars">${bars}</div></div>`;
+      })
+      .join("");
 }
 
 function hydrateDecisions() {

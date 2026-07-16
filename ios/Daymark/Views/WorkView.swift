@@ -378,10 +378,48 @@ struct WorkView: View {
                     .padding(.vertical, 11)
                     if category.key != ScoreCategory.defaults.last?.key { Hairline() }
                 }
+
+                if !app.persisted.scoreHistory.isEmpty {
+                    Hairline()
+                    Text("EIGHT-WEEK TREND")
+                        .kickerStyle(Palette.subtle, size: 8, tracking: 1.2)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                    ForEach(ScoreCategory.defaults) { category in
+                        HStack(spacing: 10) {
+                            Text(category.label)
+                                .font(DS.label(11, weight: .semibold))
+                                .foregroundStyle(Palette.muted)
+                                .frame(width: 76, alignment: .leading)
+                            trendBars(for: category)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
             }
             .editorialPanel()
         }
         .padding(.top, 26)
+    }
+
+    /// Last 8 weeks (history + current) as a compact bar strip, same visual
+    /// language as the markets card.
+    private func trendBars(for category: ScoreCategory) -> some View {
+        let weeks = app.persisted.scoreHistory.keys.sorted().suffix(7)
+        var values = weeks.map { app.persisted.scoreHistory[$0]?[category.key] ?? 0 }
+        values.append(app.score(category.key))
+        return HStack(alignment: .bottom, spacing: 3) {
+            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+                let ratio = min(1, Double(value) / Double(max(1, category.target)))
+                UnevenRoundedRectangle(topLeadingRadius: 2, topTrailingRadius: 2)
+                    .fill(index == values.count - 1
+                          ? category.color
+                          : (ratio >= 1 ? category.color.opacity(0.55) : Palette.paperDeep))
+                    .frame(width: 14, height: max(3, 22 * ratio))
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(height: 24, alignment: .bottom)
     }
 
     private static func decisionURL(_ id: String) -> URL? {
