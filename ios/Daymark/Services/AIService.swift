@@ -26,8 +26,26 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
 
 enum AIError: Error {
     case notConfigured
-    case badResponse(Int)
+    case badResponse(Int, String)
     case emptyReply
+
+    /// A message worth showing the user.
+    var readable: String {
+        switch self {
+        case .notConfigured:
+            return "Add an AI key in Settings first."
+        case .badResponse(let status, let detail):
+            switch status {
+            case 401: return "OpenAI rejected the key — recheck it in Settings."
+            case 429: return detail.contains("quota")
+                ? "The OpenAI account has no credits — add billing at platform.openai.com."
+                : "OpenAI rate limit — wait a moment and retry."
+            default: return "AI error \(status): \(detail.isEmpty ? "no detail" : String(detail.prefix(120)))"
+            }
+        case .emptyReply:
+            return "The AI desk returned an empty reply — try again."
+        }
+    }
 }
 
 enum AIService {
@@ -77,7 +95,7 @@ enum AIService {
         ])
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-            throw AIError.badResponse(http.statusCode)
+            throw AIError.badResponse(http.statusCode, Self.errorDetail(from: data))
         }
         struct Reply: Decodable {
             struct Choice: Decodable {
@@ -89,6 +107,24 @@ enum AIService {
         let reply = try JSONDecoder().decode(Reply.self, from: data)
         guard let text = reply.choices.first?.message.content?.nilIfEmpty else { throw AIError.emptyReply }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Pull the provider's human-readable error message out of an error body.
+    private static func errorDetail(from data: Data) -> String {
+        struct ErrorBody: Decodable {
+            struct Inner: Decodable {
+                let message: String?
+                let type: String?
+                let code: String?
+            }
+            let error: Inner?
+        }
+        guard let body = try? JSONDecoder().decode(ErrorBody.self, from: data) else {
+            return String(data: data.prefix(160), encoding: .utf8) ?? ""
+        }
+        return [body.error?.code, body.error?.type, body.error?.message]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
     // MARK: Anthropic backend
@@ -107,7 +143,7 @@ enum AIService {
         ])
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-            throw AIError.badResponse(http.statusCode)
+            throw AIError.badResponse(http.statusCode, Self.errorDetail(from: data))
         }
         struct Reply: Decodable {
             struct Block: Decodable {

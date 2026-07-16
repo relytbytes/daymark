@@ -880,10 +880,10 @@ final class AppState {
             defer { aiBusy.remove(slot) }
             do {
                 self[keyPath: keyPath] = try await work()
-            } catch AIError.notConfigured {
-                toast("Add an AI key in Settings first.")
+            } catch let error as AIError {
+                toast(error.readable)
             } catch {
-                toast("The AI desk didn't answer — try again.")
+                toast("The AI desk didn't answer: \(error.localizedDescription)")
             }
         }
     }
@@ -957,8 +957,10 @@ final class AppState {
             defer { aiBusy.remove(slot) }
             do {
                 apply(try await work())
+            } catch let error as AIError {
+                toast(error.readable)
             } catch {
-                toast("The AI desk didn't answer — try again.")
+                toast("The AI desk didn't answer: \(error.localizedDescription)")
             }
         }
     }
