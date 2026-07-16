@@ -954,7 +954,11 @@ final class AppState {
                     toast("Wire playlist: none of today's tracks matched on Spotify.")
                 }
             } catch let error as SpotifyAPIError {
-                toast(error.readable)
+                if error.status == 403, error.step == "creating the playlist" {
+                    toast("Spotify won't let Daymark create playlists — make one named 'Daymark Discovery Wire' in Spotify and it will be kept filled.")
+                } else {
+                    toast(error.readable)
+                }
             } catch HTTPError.status(let code) {
                 toast("Wire playlist sync failed — Spotify error \(code).")
             } catch {
