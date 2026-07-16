@@ -373,6 +373,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Daymark reads workouts, exercise minutes, and steps to fill in your weekly fitness score automatically. Nothing leaves the device.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Daymark uses the camera to attach a photo to a capture.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -404,6 +405,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Daymark reads workouts, exercise minutes, and steps to fill in your weekly fitness score automatically. Nothing leaves the device.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Daymark uses the camera to attach a photo to a capture.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

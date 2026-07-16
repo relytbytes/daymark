@@ -159,6 +159,9 @@ final class AppState {
             persisted.dayKey = now.dayKey
             persisted.tasks = [:]
             persisted.taskNotes = [:]
+            for capture in persisted.captures where capture.done {
+                CaptureImages.delete(capture.imageFile)
+            }
             persisted.captures.removeAll { $0.done }
             persisted.focusEndsAt = nil
             persisted.focusTaskID = nil
@@ -517,7 +520,7 @@ final class AppState {
 
     // MARK: Captures
 
-    func addCapture(kind: CaptureKind, title: String, url: String?, note: String?) {
+    func addCapture(kind: CaptureKind, title: String, url: String?, note: String?, imageFile: String? = nil) {
         switch kind {
         case .job:
             persisted.applications.insert(
@@ -525,13 +528,15 @@ final class AppState {
                                url: url, status: .interested, nextStep: "Qualify this lead"),
                 at: 0
             )
+            CaptureImages.delete(imageFile)      // pipeline entries don't carry photos
             toast("Added to the job pipeline.")
         case .reading:
             persisted.readingQueue.insert(ReadingItem(title: title, url: url), at: 0)
+            CaptureImages.delete(imageFile)
             toast("Saved to your reading queue.")
         default:
             persisted.captures.insert(
-                CaptureItem(kind: kind, title: title, url: url, note: note),
+                CaptureItem(kind: kind, title: title, url: url, note: note, imageFile: imageFile),
                 at: 0
             )
             toast("Captured.")
@@ -544,6 +549,9 @@ final class AppState {
     }
 
     func removeCapture(_ id: UUID) {
+        if let item = persisted.captures.first(where: { $0.id == id }) {
+            CaptureImages.delete(item.imageFile)
+        }
         persisted.captures.removeAll { $0.id == id }
     }
 
