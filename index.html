@@ -20,6 +20,7 @@
     />
     <link rel="stylesheet" href="./styles.css?v=21" />
     <script src="./config.js?v=21"></script>
+    <script src="./astro.js?v=21" defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -494,7 +495,10 @@
                   <span><small>RAIN</small><b id="weatherRain">—%</b></span>
                   <span><small>SUNSET</small><b id="weatherSunset">—</b></span>
                 </div>
-                <a class="source-link weather-source-link" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather by Open-Meteo</a>
+                <div class="weather-links">
+                  <button class="text-button" id="openSkyDesk" type="button">Full Sky Desk ↗</button>
+                  <a class="source-link weather-source-link" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather by Open-Meteo</a>
+                </div>
               </article>
 
               <div class="local-list">
@@ -927,6 +931,19 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <div class="sky-overlay" id="skyOverlay" hidden>
+      <div class="sky-sheet" role="dialog" aria-modal="true" aria-label="The Sky Desk">
+        <div class="sky-head">
+          <div>
+            <p class="section-kicker">THE SKY DESK · DURHAM</p>
+            <h2>Above the Bull City.</h2>
+          </div>
+          <button class="dialog-close" id="skyClose" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="sky-body" id="skyBody"></div>
+      </div>
+    </div>
 
     <script src="./app.js?v=21" defer></script>
   </body>

@@ -4938,3 +4938,74 @@ body[data-phase="night"] #eveningActions {
   font-family: inherit;
 }
 .desk-settings-note { margin: 0; color: var(--muted); font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+
+/* ---- The Sky Desk ---- */
+.weather-links { display: flex; align-items: center; justify-content: space-between; }
+.sky-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: end center;
+  background: rgba(20, 20, 18, 0.42);
+}
+.sky-sheet {
+  width: min(560px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--paper);
+  border-radius: 22px 22px 0 0;
+  padding: 22px 20px 34px;
+}
+.sky-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
+.sky-head h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 27px; font-weight: 400; letter-spacing: -0.04em; }
+.sky-section {
+  margin: 22px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+.sky-section::after { content: ""; flex: 1; height: 1px; background: var(--ink); }
+.sky-stats { display: flex; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.sky-stats > div { flex: 1; text-align: center; padding: 10px 4px; }
+.sky-stats > div + div { border-left: 1px solid var(--line); }
+.sky-stats small { display: block; color: var(--muted); font-size: 7.5px; font-weight: 800; letter-spacing: 0.1em; margin-bottom: 3px; }
+.sky-stats strong { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.sky-rainline { margin: 12px 0 0; font-family: var(--serif-note); font-size: 15px; font-style: italic; color: var(--ink); }
+.sky-week { display: grid; gap: 0; }
+.sky-day {
+  display: grid;
+  grid-template-columns: 44px 26px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.sky-day:last-child { border-bottom: 1px solid var(--line); }
+.sky-day span { font-weight: 700; }
+.sky-day em { color: var(--blue); font-size: 10px; font-style: normal; font-weight: 800; }
+.sky-day b { font-variant-numeric: tabular-nums; }
+.sky-moon { padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
+.sky-moon strong { display: block; font-family: var(--serif); font-size: 18px; font-weight: 500; }
+.sky-moon span { color: var(--muted); font-size: 11px; font-weight: 600; }
+.sky-almanac { display: grid; }
+.sky-almanac > div { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.sky-almanac span { color: var(--ink); font-weight: 600; }
+.sky-almanac b { font-variant-numeric: tabular-nums; }
+.sky-planets > div { display: flex; gap: 9px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.sky-planets i { width: 7px; height: 7px; border-radius: 50%; background: var(--paper-deep); }
+.sky-planets .is-up { color: var(--ink); font-weight: 600; }
+.sky-planets .is-up i { background: var(--coral); }
+.sky-planets b { margin-left: auto; font-size: 11px; font-weight: 700; }
+.sky-astrology { padding: 14px; background: var(--wash); border-left: 3px solid var(--coral); border-radius: 0 12px 12px 0; }
+.sky-astrology-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: var(--coral); font-size: 9px; font-weight: 900; letter-spacing: 0.14em; }
+.sky-rx { padding: 3px 8px; border-radius: 999px; background: var(--coral-soft); font-style: normal; }
+.sky-astrology p { margin: 0 0 8px; font-size: 12px; font-weight: 600; }
+.sky-horoscope { font-family: var(--serif-note); font-size: 14px; font-style: italic; color: var(--muted); line-height: 1.5; }
+.sky-horoscope.is-written { color: var(--ink); font-style: normal; }

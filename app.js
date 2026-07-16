@@ -1914,6 +1914,208 @@ function initializeDeskSettings() {
   });
 }
 
+// =====================================================================
+// The Sky Desk (web): deep weather + tonight's sky + the astrology desk.
+// =====================================================================
+
+let lastWeatherPayload = null;
+let lastAirQuality = null;
+
+async function fetchAirQuality() {
+  try {
+    const data = await fetchJson(
+      "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=35.9940&longitude=-78.8986" +
+        "&current=us_aqi,pm2_5,grass_pollen,ragweed_pollen,birch_pollen,oak_pollen&timezone=America%2FNew_York",
+    );
+    const c = data.current || {};
+    const pollens = [
+      ["Grass", c.grass_pollen],
+      ["Ragweed", c.ragweed_pollen],
+      ["Birch", c.birch_pollen],
+      ["Oak", c.oak_pollen],
+    ].filter(([, value]) => typeof value === "number");
+    pollens.sort((a, b) => b[1] - a[1]);
+    lastAirQuality = {
+      aqi: typeof c.us_aqi === "number" ? Math.round(c.us_aqi) : null,
+      pm25: typeof c.pm2_5 === "number" ? Math.round(c.pm2_5) : null,
+      pollenName: pollens[0] && pollens[0][1] > 0.5 ? pollens[0][0] : null,
+      pollenLevel: pollens[0] ? pollens[0][1] : 0,
+    };
+  } catch {
+    lastAirQuality = null;
+  }
+}
+
+function rainWindowSentence(payload) {
+  const times = payload?.hourly?.time || [];
+  const probs = payload?.hourly?.precipitation_probability || [];
+  const amounts = payload?.hourly?.precipitation || [];
+  const now = Date.now();
+  const upcoming = [];
+  for (let i = 0; i < times.length && upcoming.length < 12; i += 1) {
+    const t = new Date(times[i]).getTime();
+    if (t >= now) upcoming.push({ t, rainy: (probs[i] || 0) >= 40 || (amounts[i] || 0) >= 0.5 });
+  }
+  if (!upcoming.length) return "";
+  const hourText = (ms) =>
+    new Date(ms).toLocaleTimeString("en-US", { hour: "numeric" }).toLowerCase().replace(" ", "");
+  const first = upcoming.findIndex((h) => h.rainy);
+  if (first === -1) return "Dry for the next 12 hours.";
+  if (first === 0) {
+    const clears = upcoming.findIndex((h, i) => i > 0 && !h.rainy);
+    return clears === -1
+      ? "Rain continuing through the next 12 hours."
+      : `Rain now — clearing by ${hourText(upcoming[clears].t)}.`;
+  }
+  const ends = upcoming.findIndex((h, i) => i > first && !h.rainy);
+  return ends === -1
+    ? `Rain starts ~${hourText(upcoming[first].t)}.`
+    : `Dry until ~${hourText(upcoming[first].t)} — clears by ${hourText(upcoming[ends].t)}.`;
+}
+
+function openSkyDesk() {
+  const overlay = document.querySelector("#skyOverlay");
+  const body = document.querySelector("#skyBody");
+  if (!overlay || !body) return;
+  overlay.hidden = false;
+  document.body.style.overflow = "hidden";
+  renderSkyDesk(body);
+}
+
+function closeSkyDesk() {
+  const overlay = document.querySelector("#skyOverlay");
+  if (overlay) overlay.hidden = true;
+  document.body.style.overflow = "";
+}
+
+function renderSkyDesk(body) {
+  const payload = lastWeatherPayload;
+  const astro = window.DaymarkAstro
+    ? window.DaymarkAstro.snapshot(35.994, -78.8986)
+    : null;
+  const timeText = (date) =>
+    date ? date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "—";
+
+  let html = "";
+
+  if (payload) {
+    const current = payload.current || {};
+    const daily = payload.daily || {};
+    html += `
+      <div class="sky-stats">
+        <div><small>NOW</small><strong>${Math.round(current.temperature_2m ?? 0)}°</strong></div>
+        <div><small>WIND</small><strong>${Math.round(current.wind_speed_10m ?? 0)} mph</strong></div>
+        <div><small>HUMIDITY</small><strong>${current.relative_humidity_2m ?? "—"}%</strong></div>
+        <div><small>UV MAX</small><strong>${daily.uv_index_max?.[0] != null ? Math.round(daily.uv_index_max[0]) : "—"}</strong></div>
+      </div>
+      <p class="sky-rainline">${escapeHtml(rainWindowSentence(payload))}</p>
+    `;
+
+    // 7-day outlook
+    const week = [];
+    for (let i = 1; i < Math.min(8, (daily.time || []).length); i += 1) {
+      week.push(`
+        <div class="sky-day">
+          <span>${new Date(`${daily.time[i]}T12:00`).toLocaleDateString("en-US", { weekday: "short" })}</span>
+          <i class="wx">${weatherIcon(daily.weather_code?.[i] ?? 0)}</i>
+          <em>${(daily.precipitation_probability_max?.[i] ?? 0) > 20 ? `${daily.precipitation_probability_max[i]}%` : ""}</em>
+          <b>${Math.round(daily.temperature_2m_min?.[i] ?? 0)}°–${Math.round(daily.temperature_2m_max?.[i] ?? 0)}°</b>
+        </div>
+      `);
+    }
+    html += `<h3 class="sky-section">THE WEEK AHEAD</h3><div class="sky-week">${week.join("")}</div>`;
+  }
+
+  if (lastAirQuality) {
+    html += `
+      <h3 class="sky-section">THE AIR</h3>
+      <div class="sky-stats">
+        <div><small>AQI</small><strong>${lastAirQuality.aqi ?? "—"}</strong></div>
+        <div><small>PM2.5</small><strong>${lastAirQuality.pm25 ?? "—"}</strong></div>
+        <div><small>POLLEN</small><strong>${escapeHtml(lastAirQuality.pollenName || "Low")}</strong></div>
+      </div>
+    `;
+  }
+
+  if (astro) {
+    html += `
+      <h3 class="sky-section">SUN &amp; MOON</h3>
+      <div class="sky-moon">
+        <strong>${escapeHtml(astro.moon.phase)}</strong>
+        <span>${Math.round(astro.moon.illumination * 100)}% lit · day ${Math.round(astro.moon.ageDays)} · Moon in ${escapeHtml(astro.moon.sign)}</span>
+      </div>
+      <div class="sky-almanac">
+        <div><span>Sunrise</span><b>${timeText(astro.sun.sunrise)}</b></div>
+        <div><span>Sunset</span><b>${timeText(astro.sun.sunset)}</b></div>
+        <div><span>Moonrise</span><b>${timeText(astro.moon.moonrise)}</b></div>
+        <div><span>Moonset</span><b>${timeText(astro.moon.moonset)}</b></div>
+      </div>
+      <h3 class="sky-section">TONIGHT'S SKY</h3>
+      <div class="sky-planets">
+        ${astro.planets
+          .map(
+            (planet) => `
+          <div class="${planet.visible ? "is-up" : ""}">
+            <i></i><span>${escapeHtml(planet.name)}</span>
+            <b>${planet.visible ? (planet.rise && planet.rise > new Date() ? `Rises ${timeText(planet.rise)}` : "Up tonight") : "Not visible"}</b>
+          </div>
+        `,
+          )
+          .join("")}
+      </div>
+      <h3 class="sky-section">THE ASTROLOGY DESK</h3>
+      <div class="sky-astrology">
+        <div class="sky-astrology-head">
+          <span>TAURUS · APRIL 21</span>
+          ${astro.mercuryRetrograde ? '<em class="sky-rx">MERCURY RX</em>' : ""}
+        </div>
+        <p>Sun in ${escapeHtml(astro.sunSign)} · Moon in ${escapeHtml(astro.moon.sign)}${astro.mercuryRetrograde ? " · Mercury retrograde" : ""}</p>
+        <p class="sky-horoscope" id="skyHoroscope">${
+          aiConfigured()
+            ? "The desk can write today's horoscope from these transits."
+            : "Add an AI key in Desk settings and the desk writes today's horoscope from these transits."
+        }</p>
+        ${aiConfigured() ? '<button class="ai-desk-run" id="skyHoroscopeRun" type="button">WRITE TODAY\'S HOROSCOPE</button>' : ""}
+      </div>
+    `;
+  }
+
+  body.innerHTML = html;
+
+  const run = body.querySelector("#skyHoroscopeRun");
+  if (run && astro) {
+    run.addEventListener("click", async () => {
+      run.disabled = true;
+      run.textContent = "WRITING…";
+      try {
+        const transits =
+          `Sun in ${astro.sunSign}. Moon in ${astro.moon.sign}, ${astro.moon.phase} ` +
+          `(${Math.round(astro.moon.illumination * 100)}% lit, day ${Math.round(astro.moon.ageDays)}). ` +
+          `Mercury retrograde: ${astro.mercuryRetrograde ? "yes" : "no"}. ` +
+          `Planets visible tonight: ${astro.planets.filter((p) => p.visible).map((p) => p.name).join(", ") || "none"}.`;
+        const text = await aiComplete(
+          AI_VOICE,
+          `Ty is a Taurus (born April 21, 1986). Today's real computed sky:\n\n${transits}\n\n` +
+            "Write today's horoscope for him: 3-4 sentences, editorial and a little playful, " +
+            "grounded in these actual transits. No generic filler.",
+          300,
+        );
+        const target = body.querySelector("#skyHoroscope");
+        if (target) {
+          target.textContent = text;
+          target.classList.add("is-written");
+        }
+        run.textContent = "REWRITE";
+      } catch {
+        showToast("The AI desk didn't answer — check the key in Desk settings.");
+        run.textContent = "WRITE TODAY'S HOROSCOPE";
+      } finally {
+        run.disabled = false;
+      }
+    });
+  }
+}
+
 function hasSpotifyClientId() {
   const clientId = window.DAYMARK_CONFIG?.spotifyClientId?.trim() || "";
   return Boolean(clientId && !clientId.startsWith("PASTE_") && /^[a-z0-9]+$/i.test(clientId));
@@ -3243,9 +3445,10 @@ function updateSyncState() {
 function getWeatherUrl() {
   return (
     "https://api.open-meteo.com/v1/forecast?latitude=35.9940&longitude=-78.8986" +
-    "&current=temperature_2m,apparent_temperature,weather_code" +
-    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset,sunrise" +
-    "&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=2"
+    "&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m" +
+    "&hourly=precipitation_probability,precipitation" +
+    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset,sunrise,weather_code,uv_index_max" +
+    "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FNew_York&forecast_days=8"
   );
 }
 
@@ -3384,12 +3587,15 @@ async function refreshWeather(force = false) {
   try {
     const data = await fetchJson(getWeatherUrl());
     const updatedAt = new Date();
+    lastWeatherPayload = data;
     renderWeather(data, "live", updatedAt);
     writeLiveCache(WEATHER_CACHE_KEY, data);
     publicFeedStatus.weather = "live";
+    fetchAirQuality();
   } catch {
     const cached = readLiveCache(WEATHER_CACHE_KEY);
     if (cached?.data) {
+      lastWeatherPayload = cached.data;
       renderWeather(cached.data, "cached", cached.savedAt);
       publicFeedStatus.weather = "cached";
     } else {
@@ -4017,6 +4223,11 @@ updateFocusTimer();
 restoreGoogleSession();
 initializeSpotify();
 initializeDeskSettings();
+document.querySelector("#openSkyDesk")?.addEventListener("click", openSkyDesk);
+document.querySelector("#skyClose")?.addEventListener("click", closeSkyDesk);
+document.querySelector("#skyOverlay")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) closeSkyDesk();
+});
 refreshAIDesk();
 renderSoundCloudShelf();
 refreshAllData(true);

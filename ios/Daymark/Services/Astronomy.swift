@@ -241,7 +241,9 @@ enum Astronomy {
             // Visible tonight = above horizon at some point between sunset and dawn.
             var visible = false
             if let dusk = sun.sunset {
-                let end = sun.civilDawn ?? dusk.addingTimeInterval(10 * 3600)
+                var end = sun.civilDawn ?? dusk.addingTimeInterval(9 * 3600)
+                // After midnight "today's dawn" precedes tonight's sunset — night ends at the NEXT dawn.
+                if end <= dusk { end = end.addingTimeInterval(24 * 3600) }
                 var t = dusk
                 while t <= end {
                     if altitudeFn(julianDay(t), latitude, longitude) > 5 { visible = true; break }
