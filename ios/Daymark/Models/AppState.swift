@@ -8,6 +8,9 @@
 import SwiftUI
 import Observation
 import AVFoundation
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
 
 @MainActor
 @Observable
@@ -363,6 +366,7 @@ final class AppState {
         persisted.focusEndsAt = Date().addingTimeInterval(TimeInterval(minutes * 60))
         NotificationService.scheduleFocusEnd(after: TimeInterval(minutes * 60), taskTitle: title)
         Task { _ = await NotificationService.requestAuthorization() }
+        startFocusActivity(endsAt: persisted.focusEndsAt ?? Date(), title: title)
         // The focus soundtrack: start the chosen playlist on the active device.
         if spotifyConnected, !persisted.settings.focusPlaylist.isEmpty {
             Task {
@@ -379,10 +383,36 @@ final class AppState {
     func stopFocus() {
         persisted.focusEndsAt = nil
         NotificationService.cancelFocus()
+        endFocusActivity()
         if focusSoundtrackStarted {
             focusSoundtrackStarted = false
             Task { try? await spotify.send(.pause) }
         }
+    }
+
+    // MARK: Focus Live Activity
+
+    private func startFocusActivity(endsAt: Date, title: String) {
+        #if canImport(ActivityKit)
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        endFocusActivity()
+        let attributes = FocusActivityAttributes(startedAt: Date())
+        let state = FocusActivityAttributes.ContentState(endsAt: endsAt, taskTitle: title)
+        _ = try? Activity.request(
+            attributes: attributes,
+            content: .init(state: state, staleDate: endsAt)
+        )
+        #endif
+    }
+
+    private func endFocusActivity() {
+        #if canImport(ActivityKit)
+        Task {
+            for activity in Activity<FocusActivityAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+        #endif
     }
 
     // MARK: Captures
