@@ -21,6 +21,9 @@ struct SpiritView: View {
     @State private var tarotBusy = false
     @State private var meditation: String?
     @State private var meditationBusy = false
+    @State private var oracleReading: String?
+    @State private var oracleBusy = false
+    @State private var oracleError: String?
 
     var body: some View {
         NavigationStack {
@@ -38,7 +41,13 @@ struct SpiritView: View {
                 .padding(.bottom, 40)
             }
             .background(Palette.paper)
-            .scrollDismissesKeyboard(.interactively)
+            .scrollDismissesKeyboard(.immediately)
+            // Tapping anywhere outside a field drops the keyboard;
+            // simultaneous so buttons and links keep working.
+            .simultaneousGesture(TapGesture().onEnded {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            })
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -269,11 +278,68 @@ struct SpiritView: View {
                     .font(DS.deck(14))
                     .foregroundStyle(Palette.muted)
                     .lineSpacing(3)
+
+                if let oracleReading {
+                    InkRule().padding(.vertical, 8)
+                    Text(oracleReading)
+                        .font(DS.deck(14))
+                        .foregroundStyle(Palette.ink)
+                        .lineSpacing(4)
+                        .textSelection(.enabled)
+                } else if oracleBusy {
+                    HStack(spacing: 10) {
+                        ProgressView().controlSize(.small)
+                        Text("Reading deeper…")
+                            .font(DS.deck(13))
+                            .foregroundStyle(Palette.muted)
+                    }
+                    .padding(.top, 8)
+                } else if let oracleError {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(oracleError)
+                            .font(DS.label(11, weight: .medium))
+                            .foregroundStyle(Palette.down)
+                        Button {
+                            Task { await loadOracleReading(force: true) }
+                        } label: {
+                            Text("READ AGAIN")
+                                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
+                                .foregroundStyle(Palette.ink)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.top, 8)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .editorialPanel()
         }
         .padding(.top, 24)
+        .task { await loadOracleReading(force: false) }
+    }
+
+    /// The desk unfolds the daily card once per day; the reading is
+    /// cached so reopening the page never redraws or re-bills.
+    private func loadOracleReading(force: Bool) async {
+        let card = Oracle.daily()
+        let cacheKey = "daymark-oracle-reading-\(Date().dayKey)-\(card.name)"
+        if !force, let cached = UserDefaults.standard.string(forKey: cacheKey), !cached.isEmpty {
+            oracleReading = cached
+            return
+        }
+        guard AIService.isConfigured, !oracleBusy else { return }
+        oracleBusy = true
+        oracleError = nil
+        defer { oracleBusy = false }
+        do {
+            let text = try await AIDesk.oracleReading(card: card.name, message: card.message)
+            oracleReading = text
+            UserDefaults.standard.set(text, forKey: cacheKey)
+        } catch let error as AIError {
+            oracleError = error.readable
+        } catch {
+            oracleError = error.localizedDescription
+        }
     }
 
     // MARK: Crystal

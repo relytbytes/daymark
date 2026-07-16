@@ -302,6 +302,24 @@ enum AIDesk {
         )
     }
 
+    /// A deeper unfolding of the daily oracle card.
+    static func oracleReading(card: String, message: String) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            Today's oracle card for Ty is "\(card)". Its keynote line: "\(message)"
+
+            Write the deeper reading in two short paragraphs. First, unfold the
+            card's symbolism — what this image asks of a person, beyond the
+            keynote. Second, ground it in an ordinary day: where it might show
+            up in work, the job search, the body, or the home, and one concrete
+            way to honor it before the day ends. Warm, specific, no doom, no
+            hedging disclaimers.
+            """,
+            maxTokens: 400
+        )
+    }
+
     /// A short guided meditation composed for today.
     static func meditation(theme: String) async throws -> String {
         try await AIService.complete(
