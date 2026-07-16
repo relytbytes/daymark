@@ -307,8 +307,6 @@ function buildGlanceGrid(view) {
 
 function renderMasthead(view) {
   const nextView = VIEW_CONFIG[view] ? view : "today";
-  const tag = document.querySelector("#viewKicker");
-  if (tag) tag.textContent = VIEW_CONFIG[nextView].tag;
   setMastheadTitle(nextView);
   buildGlanceGrid(nextView);
   syncGlances();

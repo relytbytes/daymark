@@ -327,6 +327,11 @@ final class AppState {
 
     func toggleEssential(_ id: String) {
         persisted.tasks[id] = !(persisted.tasks[id] ?? false)
+        // Completing the pinned focus task releases the pin so the next
+        // open item takes its place.
+        if persisted.focusTaskID == id, essentialDone(id) {
+            persisted.focusTaskID = nil
+        }
     }
 
     var essentialsForNow: [EssentialTask] { EssentialTask.forPhase(DayPhase.current()) }
@@ -352,11 +357,15 @@ final class AppState {
     var focusRunning: Bool { focusRemaining != nil }
 
     var focusTaskTitle: String {
+        // A pinned focus task only holds the slot while it's still open —
+        // checking it off advances the bulletin to the next open item.
         if let id = persisted.focusTaskID,
+           !essentialDone(id),
            let task = (EssentialTask.morning + EssentialTask.evening).first(where: { $0.id == id }) {
             return task.title
         }
-        return essentialsForNow.first { !essentialDone($0.id) }?.title ?? "Choose the next useful move"
+        return essentialsForNow.first { !essentialDone($0.id) }?.title
+            ?? "All three are done."
     }
 
     func startFocus(cappedToMinutes cap: Int? = nil) {

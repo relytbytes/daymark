@@ -52,8 +52,6 @@ struct MastheadTopline: View {
                 Text("DAYMARK").kickerStyle(Palette.subtle, size: 9, tracking: 1.6)
             }
             Spacer()
-            Text(tag.uppercased()).kickerStyle(Palette.subtle, size: 9, tracking: 1.3)
-                .lineLimit(1)
             if let onRefresh {
                 Button(action: onRefresh) {
                     Image(systemName: "arrow.triangle.2.circlepath")
