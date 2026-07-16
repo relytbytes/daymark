@@ -39,6 +39,7 @@ struct GameLine: Hashable {
 struct GlanceEntry: TimelineEntry {
     let date: Date
     var tempF: Int?
+    var feels: Int?
     var condition = "—"
     var symbol = "sun.max.fill"
     var high: Int?
@@ -60,7 +61,7 @@ struct GlanceEntry: TimelineEntry {
 
 struct GlanceProvider: TimelineProvider {
     func placeholder(in context: Context) -> GlanceEntry {
-        GlanceEntry(date: Date(), tempF: 85, condition: "Clear", high: 96, low: 74, rainPct: 20,
+        GlanceEntry(date: Date(), tempF: 85, feels: 92, condition: "Clear", high: 96, low: 74, rainPct: 20,
                     sunset: "8:31 PM",
                     games: [GameLine(label: "DBACKS", text: "at Padres · 9:40 PM"),
                             GameLine(label: "BULLS", text: "DUR 6–3 MEM · Bot 7", isLive: true)])
@@ -79,6 +80,7 @@ struct GlanceProvider: TimelineProvider {
 
             if let weather = await weather {
                 entry.tempF = weather.tempF
+                entry.feels = weather.feels
                 entry.condition = weather.condition
                 entry.symbol = weather.symbol
                 entry.high = weather.high
@@ -102,6 +104,7 @@ struct GlanceProvider: TimelineProvider {
 
     private struct WeatherBits {
         var tempF: Int?
+        var feels: Int?
         var condition = "—"
         var symbol = "sun.max.fill"
         var high: Int?
@@ -115,6 +118,7 @@ struct GlanceProvider: TimelineProvider {
         struct Response: Decodable {
             struct Current: Decodable {
                 let temperature_2m: Double
+                let apparent_temperature: Double?
                 let weather_code: Int
             }
             struct Daily: Decodable {
@@ -130,7 +134,7 @@ struct GlanceProvider: TimelineProvider {
         components.queryItems = [
             URLQueryItem(name: "latitude", value: "35.9940"),
             URLQueryItem(name: "longitude", value: "-78.8986"),
-            URLQueryItem(name: "current", value: "temperature_2m,weather_code"),
+            URLQueryItem(name: "current", value: "temperature_2m,apparent_temperature,weather_code"),
             URLQueryItem(name: "daily", value: "sunset,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
             URLQueryItem(name: "temperature_unit", value: "fahrenheit"),
             URLQueryItem(name: "timezone", value: "America/New_York"),
@@ -140,6 +144,7 @@ struct GlanceProvider: TimelineProvider {
               let response = try? JSONDecoder().decode(Response.self, from: data) else { return nil }
         var bits = WeatherBits()
         bits.tempF = Int(response.current.temperature_2m.rounded())
+        bits.feels = response.current.apparent_temperature.map { Int($0.rounded()) }
         (bits.condition, bits.symbol) = Self.condition(response.current.weather_code)
         bits.high = response.daily.temperature_2m_max?.first.map { Int($0.rounded()) }
         bits.low = response.daily.temperature_2m_min?.first.map { Int($0.rounded()) }
@@ -329,10 +334,12 @@ struct GlanceWidgetView: View {
                         .font(.system(size: 15))
                         .foregroundStyle(WPalette.gold)
                 }
-                Text(entry.condition)
+                Text(conditionFeelsLine)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(WPalette.ink)
-                Text(detailLine)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(rangeLine)
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(WPalette.muted)
                     .lineLimit(1)
@@ -386,7 +393,7 @@ struct GlanceWidgetView: View {
     }
 
     private var inline: some View {
-        Text("\(entry.tempF.map { "\($0)°" } ?? "—") \(entry.condition) · ☀︎ \(entry.sunset)")
+        Text("\(entry.tempF.map { "\($0)°" } ?? "—") \(entry.condition)\(entry.high.flatMap { high in entry.low.map { " · H\(high) L\($0)" } } ?? "")")
             .containerBackground(.clear, for: .widget)
     }
 
@@ -394,17 +401,20 @@ struct GlanceWidgetView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Image(systemName: entry.symbol).font(.system(size: 10))
-                Text("\(entry.tempF.map { "\($0)°" } ?? "—") · \(entry.condition)")
+                Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(entry.feels.flatMap { feels in entry.tempF.map { abs(feels - $0) >= 2 ? " (feels \(feels)°)" : "" } } ?? "") · \(entry.condition)")
                     .font(.system(size: 12, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             if let game = entry.games.first(where: \.isLive) ?? entry.games.first {
                 Text("\(game.isLive ? "● " : "")\(game.text)")
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
             }
-            Text("Sunset \(entry.sunset)")
+            Text("\(entry.high.map { "H \($0)" } ?? "") \(entry.low.map { "L \($0)" } ?? "") · Sunset \(entry.sunset)")
                 .font(.system(size: 10, weight: .medium))
                 .opacity(0.8)
+                .lineLimit(1)
         }
         .containerBackground(.clear, for: .widget)
     }
@@ -432,11 +442,30 @@ struct GlanceWidgetView: View {
         Rectangle().fill(WPalette.line).frame(height: 1)
     }
 
-    private var detailLine: String {
+    /// Medium widget line 1: condition + feels-like.
+    private var conditionFeelsLine: String {
+        if let feels = entry.feels, let temp = entry.tempF, abs(feels - temp) >= 2 {
+            return "\(entry.condition) · Feels \(feels)°"
+        }
+        return entry.condition
+    }
+
+    /// Medium widget line 2: high/low + rain.
+    private var rangeLine: String {
         var parts: [String] = []
         if let high = entry.high, let low = entry.low { parts.append("H \(high) · L \(low)") }
         if let rain = entry.rainPct, rain > 15 { parts.append("Rain \(rain)%") }
-        return parts.isEmpty ? entry.condition : parts.joined(separator: " · ")
+        return parts.isEmpty ? "—" : parts.joined(separator: " · ")
+    }
+
+    private var detailLine: String {
+        var parts: [String] = [entry.condition]
+        if let feels = entry.feels, let temp = entry.tempF, abs(feels - temp) >= 2 {
+            parts.append("Feels \(feels)°")
+        }
+        if let high = entry.high, let low = entry.low { parts.append("H \(high) · L \(low)") }
+        if let rain = entry.rainPct, rain > 15 { parts.append("Rain \(rain)%") }
+        return parts.joined(separator: " · ")
     }
 
     private func gameRow(_ game: GameLine, compact: Bool) -> some View {
