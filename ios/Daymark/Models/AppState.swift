@@ -30,6 +30,8 @@ final class AppState {
 
     var weather: WeatherSnapshot?
     var weatherStatus: FeedStatus = .idle
+    var airQuality: AirQuality?
+    var astro: AstroSnapshot?
 
     var calendarAccess: Bool?
     var eventsToday: [CalendarEventLite] = []
@@ -139,6 +141,10 @@ final class AppState {
         } catch {
             weatherStatus = degrade(weatherStatus)
         }
+        // Air quality rides along; a miss never degrades the weather card.
+        airQuality = try? await WeatherService.fetchAirQuality()
+        // Sky math is local and instant.
+        astro = Astronomy.snapshot(latitude: AppConfig.homeLatitude, longitude: AppConfig.homeLongitude)
     }
 
     func refreshCalendar() async {

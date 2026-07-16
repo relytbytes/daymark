@@ -13,6 +13,7 @@ struct LifeView: View {
     @Environment(AppState.self) private var app
     @Binding var showSettings: Bool
     @State private var openURLItem: SheetLink?
+    @State private var showSky = false
 
     var body: some View {
         let phase = DayPhase.current()
@@ -39,6 +40,9 @@ struct LifeView: View {
         .sheet(item: $openURLItem) { item in
             SafariView(url: item.url).ignoresSafeArea()
         }
+        .sheet(isPresented: $showSky) {
+            SkyView()
+        }
     }
 
     // MARK: Weather feature
@@ -53,22 +57,31 @@ struct LifeView: View {
             .padding(.bottom, 6)
 
             if let weather = app.weather {
-                HStack(alignment: .bottom, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("\(weather.tempF)°")
-                            .font(DS.display(56))
-                            .foregroundStyle(Palette.ink)
-                        Text("\(weather.description)\(abs(weather.feels - weather.tempF) >= 3 ? " · feels \(weather.feels)°" : "")")
-                            .font(DS.label(12, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0x4A4940))
+                Button {
+                    showSky = true
+                } label: {
+                    HStack(alignment: .bottom, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(weather.tempF)°")
+                                .font(DS.display(56))
+                                .foregroundStyle(Palette.ink)
+                            Text("\(weather.description)\(abs(weather.feels - weather.tempF) >= 3 ? " · feels \(weather.feels)°" : "")")
+                                .font(DS.label(12, weight: .semibold))
+                                .foregroundStyle(Color(hex: 0x4A4940))
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 4) {
+                            detailLine("H \(weather.high) · L \(weather.low)")
+                            detailLine("Rain \(weather.rainPct)%")
+                            detailLine("Sunset \(weather.sunset.clockText())")
+                            Text("FULL SKY DESK ↗")
+                                .kickerStyle(Palette.coral, size: 8, tracking: 1.1)
+                                .padding(.top, 2)
+                        }
                     }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        detailLine("H \(weather.high) · L \(weather.low)")
-                        detailLine("Rain \(weather.rainPct)%")
-                        detailLine("Sunset \(weather.sunset.clockText())")
-                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .padding(.bottom, 14)
             } else {
                 EmptyNote(text: app.weatherStatus == .unavailable

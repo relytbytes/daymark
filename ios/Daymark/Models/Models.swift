@@ -257,7 +257,43 @@ struct HourForecast: Identifiable, Hashable {
     let temp: Int
     let precip: Int
     let code: Int
+    var precipAmount: Double = 0
     var id: Date { time }
+}
+
+struct DayForecast: Identifiable, Hashable {
+    let date: Date
+    let high: Int
+    let low: Int
+    let rainPct: Int
+    let code: Int
+    var id: Date { date }
+    var symbol: String { weatherSymbol(code) }
+}
+
+struct AirQuality: Hashable {
+    let usAQI: Int?
+    let pm25: Double?
+    let ozone: Double?
+    let topPollenName: String?
+    let topPollenLevel: Double
+
+    var aqiLabel: String {
+        guard let aqi = usAQI else { return "—" }
+        switch aqi {
+        case ..<51: return "Good"
+        case ..<101: return "Moderate"
+        case ..<151: return "Unhealthy for some"
+        case ..<201: return "Unhealthy"
+        default: return "Very unhealthy"
+        }
+    }
+
+    var pollenLabel: String {
+        guard let name = topPollenName else { return "Low" }
+        let level = topPollenLevel > 50 ? "High" : topPollenLevel > 10 ? "Moderate" : "Low"
+        return "\(level) · \(name)"
+    }
 }
 
 struct WeatherSnapshot {
@@ -270,6 +306,11 @@ struct WeatherSnapshot {
     let sunrise: Date
     let sunset: Date
     let hourly: [HourForecast]
+    var humidity: Int? = nil
+    var windMph: Int = 0
+    var uvIndexMax: Double? = nil
+    var week: [DayForecast] = []
+    var rainWindow: String = ""
 
     var description: String { weatherDescription(code) }
     var symbol: String { weatherSymbol(code) }
