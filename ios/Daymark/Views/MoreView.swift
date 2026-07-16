@@ -35,6 +35,8 @@ struct MoreView: View {
             marketsSection
             sportsSection
             spotifySection
+            discoverySection
+            soundcloudSection
             readingSection
             watchSection
         }
@@ -436,6 +438,146 @@ struct MoreView: View {
             if let url = URL(string: "https://www.youtube.com/results?search_query=\(q)") {
                 UIApplication.shared.open(url)
             }
+        }
+    }
+}
+
+extension MoreView {
+    // MARK: The Discovery Wire
+
+    @ViewBuilder
+    var discoverySection: some View {
+        if app.spotifyConnected {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    SectionRuleHeader(title: "The Discovery Wire")
+                    AgeStamp(status: app.discoveryStatus)
+                }
+                .padding(.bottom, 4)
+
+                if app.discoveryWire.isEmpty {
+                    EmptyNote(text: app.discoveryStatus == .unavailable
+                              ? "The wire came back empty — it retries on the next refresh."
+                              : "Reading your listening history and walking the artist graph…")
+                } else {
+                    Text("Ten for today, seeded by what you actually play. Thumbs teach tomorrow's wire.")
+                        .font(DS.deck(13))
+                        .foregroundStyle(Palette.muted)
+                        .padding(.bottom, 6)
+                    ForEach(app.discoveryWire) { track in
+                        discoveryRow(track)
+                    }
+                    Hairline()
+                }
+            }
+            .padding(.top, 26)
+        }
+    }
+
+    private func discoveryRow(_ track: DiscoveryTrack) -> some View {
+        VStack(spacing: 0) {
+            Hairline()
+            HStack(spacing: 11) {
+                Button {
+                    app.togglePreview(track)
+                } label: {
+                    ZStack(alignment: .bottomTrailing) {
+                        AsyncImage(url: track.artworkURL) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            Rectangle().fill(Palette.paperDeep)
+                        }
+                        .frame(width: 46, height: 46)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Image(systemName: app.previewingTrackID == track.id ? "pause.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 17))
+                            .foregroundStyle(.white, Palette.ink.opacity(0.85))
+                            .offset(x: 4, y: 4)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(track.previewURL == nil)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(track.title)
+                        .font(DS.label(13.5, weight: .semibold))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(1)
+                    Text(track.artist)
+                        .font(DS.label(11.5, weight: .medium))
+                        .foregroundStyle(Palette.muted)
+                        .lineLimit(1)
+                    Text(track.reason.uppercased())
+                        .kickerStyle(track.isWildcard ? Palette.violet : Palette.subtle, size: 7.5, tracking: 0.8)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 4)
+
+                HStack(spacing: 12) {
+                    Button { app.discoveryLike(track) } label: {
+                        Image(systemName: app.persisted.musicLikes.contains(track.artist.lowercased())
+                              ? "hand.thumbsup.fill" : "hand.thumbsup")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Palette.green)
+                    }
+                    Button { app.discoveryPass(track) } label: {
+                        Image(systemName: "hand.thumbsdown")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Palette.subtle)
+                    }
+                    Menu {
+                        if let url = track.spotifySearchURL {
+                            Button("Open in Spotify") { UIApplication.shared.open(url) }
+                        }
+                        if let url = track.soundcloudSearchURL {
+                            Button("Find on SoundCloud") { UIApplication.shared.open(url) }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Palette.ink)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.vertical, 9)
+        }
+    }
+
+    // MARK: SoundCloud shelf
+
+    @ViewBuilder
+    var soundcloudSection: some View {
+        let user = app.persisted.settings.soundcloudUser.trimmingCharacters(in: .whitespaces)
+        let artists = app.persisted.settings.soundcloudArtists.filter { !$0.isEmpty }
+        if !user.isEmpty || !artists.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionRuleHeader(title: "The SoundCloud Shelf")
+                    .padding(.bottom, 10)
+
+                if !user.isEmpty {
+                    Text("YOUR LIKES").kickerStyle(Palette.subtle, size: 8, tracking: 1.2)
+                        .padding(.bottom, 6)
+                    SoundCloudWidget(resourceURL: "https://soundcloud.com/\(user)/likes", height: 166)
+                        .frame(height: 166)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.bottom, 14)
+                }
+
+                ForEach(artists, id: \.self) { artist in
+                    Text(artist.uppercased()).kickerStyle(Palette.subtle, size: 8, tracking: 1.2)
+                        .padding(.bottom, 6)
+                    SoundCloudWidget(resourceURL: "https://soundcloud.com/\(artist)", height: 166)
+                        .frame(height: 166)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.bottom, 14)
+                }
+
+                Text("Played by SoundCloud's own embedded player — their API has been closed to new apps for years, so this is the supported route.")
+                    .font(DS.label(10, weight: .regular))
+                    .foregroundStyle(Palette.subtle)
+            }
+            .padding(.top, 26)
         }
     }
 }

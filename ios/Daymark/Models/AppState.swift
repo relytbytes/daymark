@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Observation
+import AVFoundation
 
 @MainActor
 @Observable
@@ -62,6 +63,10 @@ final class AppState {
     var recentTracks: [RecentTrack] = []
     var spotifyStatus: FeedStatus = .idle
     var spotifyConnected = false
+    var discoveryWire: [DiscoveryTrack] = []
+    var discoveryStatus: FeedStatus = .idle
+    var previewingTrackID: String?
+    @ObservationIgnored var previewPlayer: AVPlayer?
 
     var isRefreshing = false
     var toastMessage: String?
@@ -134,6 +139,7 @@ final class AppState {
             group.addTask { await self.refreshMail() }
             group.addTask { await self.refreshLanded() }
             group.addTask { await self.refreshSpotify() }
+            group.addTask { await self.refreshDiscovery() }
             for await _ in group {}
         }
     }
@@ -567,6 +573,94 @@ final class AppState {
     /// Roles most worth attention: hot stages and high priority first.
     var landedFocusQueue: [LandedRole] {
         landedRoles.filter(\.isHot).prefix(5).map { $0 }
+    }
+
+    // MARK: The Discovery Wire
+
+    private static let discoveryCacheKey = "daymark-discovery-wire"
+    private static let discoveryDayKey = "daymark-discovery-day"
+    private static let discoverySurfacedKey = "daymark-discovery-surfaced"
+
+    /// Ten new tracks a day, cached by day so the wire only rebuilds each morning.
+    func refreshDiscovery(force: Bool = false) async {
+        guard spotifyConnected else { return }
+        let defaults = UserDefaults.standard
+
+        if !force,
+           defaults.string(forKey: Self.discoveryDayKey) == Date().dayKey,
+           let data = defaults.data(forKey: Self.discoveryCacheKey),
+           let cached = try? JSONDecoder().decode([DiscoveryTrack].self, from: data),
+           !cached.isEmpty {
+            discoveryWire = cached
+            if case .idle = discoveryStatus { discoveryStatus = .live(Date()) }
+            return
+        }
+
+        if discoveryWire.isEmpty { discoveryStatus = .checking }
+        let seeds = (try? await spotify.topArtists()) ?? []
+        let recentArtists = recentTracks.map(\.artist)
+        guard !seeds.isEmpty || !recentArtists.isEmpty else {
+            discoveryStatus = degrade(discoveryStatus)
+            return
+        }
+
+        var exclude = Set((seeds + recentArtists).map { $0.lowercased() })
+        exclude.formUnion(persisted.musicPasses)
+        let surfaced = defaults.stringArray(forKey: Self.discoverySurfacedKey) ?? []
+        exclude.formUnion(surfaced.suffix(120))     // don't repeat the last ~2 weeks
+
+        let wire = await DiscoveryService.dailyWire(
+            seeds: seeds.isEmpty ? recentArtists : seeds,
+            liked: persisted.musicLikes,
+            exclude: exclude
+        )
+        guard !wire.isEmpty else {
+            discoveryStatus = degrade(discoveryStatus)
+            return
+        }
+        discoveryWire = wire
+        discoveryStatus = .live(Date())
+        defaults.set(Date().dayKey, forKey: Self.discoveryDayKey)
+        defaults.set(try? JSONEncoder().encode(wire), forKey: Self.discoveryCacheKey)
+        defaults.set(surfaced + wire.map { $0.artist.lowercased() }, forKey: Self.discoverySurfacedKey)
+    }
+
+    func discoveryLike(_ track: DiscoveryTrack) {
+        let key = track.artist.lowercased()
+        if !persisted.musicLikes.contains(key) { persisted.musicLikes.append(key) }
+        persisted.musicPasses.removeAll { $0 == key }
+        toast("Noted — more like \(track.artist).")
+    }
+
+    func discoveryPass(_ track: DiscoveryTrack) {
+        let key = track.artist.lowercased()
+        if !persisted.musicPasses.contains(key) { persisted.musicPasses.append(key) }
+        persisted.musicLikes.removeAll { $0 == key }
+        discoveryWire.removeAll { $0.id == track.id }
+    }
+
+    /// Toggle the 30-second preview for a track; one preview at a time.
+    func togglePreview(_ track: DiscoveryTrack) {
+        if previewingTrackID == track.id {
+            previewPlayer?.pause()
+            previewingTrackID = nil
+            return
+        }
+        guard let url = track.previewURL else { return }
+        previewPlayer?.pause()
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let player = AVPlayer(url: url)
+        player.play()
+        previewPlayer = player
+        previewingTrackID = track.id
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                if self?.previewingTrackID == track.id { self?.previewingTrackID = nil }
+            }
+        }
     }
 
     // MARK: - AI desk

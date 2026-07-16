@@ -243,6 +243,25 @@ struct AppSettings: Codable, Hashable {
     var eveningReview = true
     var travelETA = false
     var gameAlerts = true
+    var soundcloudUser: String = ""
+    var soundcloudArtists: [String] = []
+
+    init() {}
+
+    /// Tolerant decoding: a missing key never fails the whole document, so adding
+    /// fields in an update can never reset on-device state.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        vipSenders = (try? c.decodeIfPresent([String].self, forKey: .vipSenders)) ?? nil ?? []
+        feeds = (try? c.decodeIfPresent([FeedSource].self, forKey: .feeds)) ?? nil ?? AppSettings.defaultFeeds
+        watchlist = (try? c.decodeIfPresent([WatchSymbol].self, forKey: .watchlist)) ?? nil ?? AppSettings.defaultWatchlist
+        morningBrief = (try? c.decodeIfPresent(Bool.self, forKey: .morningBrief)) ?? nil ?? true
+        eveningReview = (try? c.decodeIfPresent(Bool.self, forKey: .eveningReview)) ?? nil ?? true
+        travelETA = (try? c.decodeIfPresent(Bool.self, forKey: .travelETA)) ?? nil ?? false
+        gameAlerts = (try? c.decodeIfPresent(Bool.self, forKey: .gameAlerts)) ?? nil ?? true
+        soundcloudUser = (try? c.decodeIfPresent(String.self, forKey: .soundcloudUser)) ?? nil ?? ""
+        soundcloudArtists = (try? c.decodeIfPresent([String].self, forKey: .soundcloudArtists)) ?? nil ?? []
+    }
 
     static let defaultFeeds: [FeedSource] = [
         FeedSource(name: "NYT", url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"),
@@ -277,6 +296,34 @@ struct PersistedState: Codable {
     var clearedMailIDs: [String] = []
     var tomorrowFirstMove: String = ""
     var settings = AppSettings()
+    var musicLikes: [String] = []              // discovery feedback: artist names, lowercased
+    var musicPasses: [String] = []
+
+    init() {}
+
+    /// Tolerant decoding — see AppSettings. Adding fields never resets state.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil ?? AppConfig.ownerName
+        dayKey = (try? c.decodeIfPresent(String.self, forKey: .dayKey)) ?? nil ?? Date().dayKey
+        weekKey = (try? c.decodeIfPresent(String.self, forKey: .weekKey)) ?? nil ?? Date().weekKey
+        tasks = (try? c.decodeIfPresent([String: Bool].self, forKey: .tasks)) ?? nil ?? [:]
+        sprint = (try? c.decodeIfPresent([String: Bool].self, forKey: .sprint)) ?? nil ?? [:]
+        captures = (try? c.decodeIfPresent([CaptureItem].self, forKey: .captures)) ?? nil ?? []
+        applications = (try? c.decodeIfPresent([JobApplication].self, forKey: .applications)) ?? nil ?? []
+        decisions = (try? c.decodeIfPresent([String: String].self, forKey: .decisions)) ?? nil ?? [:]
+        readingQueue = (try? c.decodeIfPresent([ReadingItem].self, forKey: .readingQueue)) ?? nil ?? []
+        waiting = (try? c.decodeIfPresent([WaitingItem].self, forKey: .waiting)) ?? nil ?? []
+        weeklyScores = (try? c.decodeIfPresent([String: Int].self, forKey: .weeklyScores)) ?? nil ?? [:]
+        focusTaskID = try? c.decodeIfPresent(String.self, forKey: .focusTaskID) ?? nil
+        focusEndsAt = try? c.decodeIfPresent(Date.self, forKey: .focusEndsAt) ?? nil
+        focusMinutes = (try? c.decodeIfPresent(Int.self, forKey: .focusMinutes)) ?? nil ?? 25
+        clearedMailIDs = (try? c.decodeIfPresent([String].self, forKey: .clearedMailIDs)) ?? nil ?? []
+        tomorrowFirstMove = (try? c.decodeIfPresent(String.self, forKey: .tomorrowFirstMove)) ?? nil ?? ""
+        settings = (try? c.decodeIfPresent(AppSettings.self, forKey: .settings)) ?? nil ?? AppSettings()
+        musicLikes = (try? c.decodeIfPresent([String].self, forKey: .musicLikes)) ?? nil ?? []
+        musicPasses = (try? c.decodeIfPresent([String].self, forKey: .musicPasses)) ?? nil ?? []
+    }
 }
 
 // MARK: - Live feed snapshots

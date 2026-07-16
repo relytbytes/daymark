@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var aiProvider = AIService.provider
     @State private var aiKeyField = AIService.isConfigured ? "••••••••••••" : ""
     @State private var aiKeyDirty = false
+    @State private var newSCArtist = ""
 
     var body: some View {
         @Bindable var app = app
@@ -65,6 +66,34 @@ struct SettingsView: View {
                     Toggle("Evening review · 8:30 PM", isOn: $app.persisted.settings.eveningReview)
                     Toggle("Travel time to next meeting", isOn: $app.persisted.settings.travelETA)
                     Toggle("Game alerts · first pitch & finals", isOn: $app.persisted.settings.gameAlerts)
+                }
+
+                Section {
+                    TextField("your-soundcloud-username", text: $app.persisted.settings.soundcloudUser)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    ForEach(Array(app.persisted.settings.soundcloudArtists.enumerated()), id: \.offset) { index, artist in
+                        Text(artist)
+                    }
+                    .onDelete { offsets in
+                        app.persisted.settings.soundcloudArtists.remove(atOffsets: offsets)
+                    }
+                    HStack {
+                        TextField("artist-url-slug (e.g. fourtet)", text: $newSCArtist)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        Button("Add") {
+                            if let slug = newSCArtist.nilIfEmpty?.lowercased() {
+                                app.persisted.settings.soundcloudArtists.append(slug)
+                                newSCArtist = ""
+                            }
+                        }
+                        .disabled(newSCArtist.nilIfEmpty == nil)
+                    }
+                } header: {
+                    Text("SoundCloud")
+                } footer: {
+                    Text("Username lights up your likes shelf; artist slugs (the part after soundcloud.com/) get a recent-uploads player each. No API key exists for SoundCloud — playback runs through their official embedded widget.")
                 }
 
                 Section {

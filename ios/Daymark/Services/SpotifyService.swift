@@ -132,6 +132,18 @@ final class SpotifyService {
         return out
     }
 
+    /// Top artist names across a medium listening window — discovery seeds.
+    func topArtists(limit: Int = 15) async throws -> [String] {
+        let token = try await validToken()
+        let url = URL(string: "https://api.spotify.com/v1/me/top/artists?time_range=medium_term&limit=\(limit)")!
+        struct TopArtists: Decodable {
+            struct Artist: Decodable { let name: String }
+            let items: [Artist]?
+        }
+        let response = try await HTTP.json(TopArtists.self, url, headers: ["Authorization": "Bearer \(token)"])
+        return (response.items ?? []).map(\.name)
+    }
+
     // MARK: Controls (best effort against the active device)
 
     enum Control { case play, pause, next, previous }
