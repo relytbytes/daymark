@@ -379,16 +379,18 @@ struct GlanceWidgetView: View {
         VStack(alignment: .leading, spacing: 6) {
             masthead
             Spacer(minLength: 0)
-            HStack(alignment: .lastTextBaseline, spacing: 6) {
+            HStack(alignment: .center, spacing: 7) {
                 Text(entry.tempF.map { "\($0)°" } ?? "—")
                     .font(.system(size: 38, weight: .bold, design: .serif))
                     .foregroundStyle(WPalette.ink)
                     .fixedSize()
                     .layoutPriority(2)
-                feelsTag(size: 14)
-                Image(systemName: entry.symbol)
-                    .font(.system(size: 15))
-                    .foregroundStyle(WPalette.gold)
+                VStack(alignment: .leading, spacing: 3) {
+                    Image(systemName: entry.symbol)
+                        .font(.system(size: 19))
+                        .foregroundStyle(WPalette.gold)
+                    feelsTag(size: 13)
+                }
                 Spacer(minLength: 0)
             }
             Text(detailLine)
@@ -420,16 +422,18 @@ struct GlanceWidgetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 masthead
                 Spacer(minLength: 0)
-                HStack(alignment: .lastTextBaseline, spacing: 7) {
+                HStack(alignment: .center, spacing: 8) {
                     Text(entry.tempF.map { "\($0)°" } ?? "—")
                         .font(.system(size: 44, weight: .bold, design: .serif))
                         .foregroundStyle(WPalette.ink)
                         .fixedSize()
                         .layoutPriority(2)
-                    feelsTag(size: 16)
-                    Image(systemName: entry.symbol)
-                        .font(.system(size: 17))
-                        .foregroundStyle(WPalette.gold)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Image(systemName: entry.symbol)
+                            .font(.system(size: 22))
+                            .foregroundStyle(WPalette.gold)
+                        feelsTag(size: 15)
+                    }
                 }
                 Text(rangeLine)
                     .font(.system(size: 9.5, weight: .heavy))
@@ -495,16 +499,18 @@ struct GlanceWidgetView: View {
             masthead
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .lastTextBaseline, spacing: 6) {
+                    HStack(alignment: .center, spacing: 8) {
                         Text(entry.tempF.map { "\($0)°" } ?? "—")
                             .font(.system(size: 40, weight: .bold, design: .serif))
                             .foregroundStyle(WPalette.ink)
                             .fixedSize()
                             .layoutPriority(2)
-                        feelsTag(size: 15)
-                        Image(systemName: entry.symbol)
-                            .font(.system(size: 16))
-                            .foregroundStyle(WPalette.gold)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Image(systemName: entry.symbol)
+                                .font(.system(size: 21))
+                                .foregroundStyle(WPalette.gold)
+                            feelsTag(size: 15)
+                        }
                     }
                     Text(detailLine)
                         .font(.system(size: 9, weight: .heavy))
@@ -519,9 +525,17 @@ struct GlanceWidgetView: View {
                     ForEach(entry.games, id: \.label) { game in
                         gameRow(game, compact: true)
                     }
-                    skyRow(icon: "sunrise.fill", text: "Sunrise \(entry.sunrise)")
-                    skyRow(icon: "sunset.fill", text: "Sunset \(entry.sunset)")
-                    if !entry.moonName.isEmpty {
+                    // Games take the column first; the sky yields a line
+                    // per game (sunrise goes first, the moon second, and
+                    // sunset holds out to the last).
+                    let skyLinesAvailable = max(0, 3 - entry.games.count)
+                    if skyLinesAvailable >= 3 {
+                        skyRow(icon: "sunrise.fill", text: "Sunrise \(entry.sunrise)")
+                    }
+                    if skyLinesAvailable >= 1 {
+                        skyRow(icon: "sunset.fill", text: "Sunset \(entry.sunset)")
+                    }
+                    if skyLinesAvailable >= 2, !entry.moonName.isEmpty {
                         skyRow(icon: entry.moonSymbol, text: entry.moonName)
                     }
                 }
@@ -687,7 +701,7 @@ struct GlanceWidgetView: View {
     private var rangeLine: String {
         var parts: [String] = []
         if let high = entry.high, let low = entry.low { parts.append("H \(high) · L \(low)") }
-        if let rain = entry.rainPct, rain > 15 { parts.append("Rain \(rain)%") }
+        if let rain = entry.rainPct { parts.append("Rain \(rain)%") }
         return parts.isEmpty ? " " : parts.joined(separator: " · ")
     }
 
