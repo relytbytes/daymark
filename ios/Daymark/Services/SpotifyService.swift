@@ -348,11 +348,24 @@ final class SpotifyService {
         guard !matched.isEmpty else { return 0 }
 
         let playlist = try await wirePlaylistID()
-        _ = try await api("PUT",
-            URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!,
-            token: token,
-            body: ["uris": matched],
-            step: "filling the playlist")
+        do {
+            _ = try await api("PUT",
+                URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!,
+                token: token,
+                body: ["uris": matched],
+                step: "filling the playlist (\(playlist.suffix(6)))")
+        } catch let error as SpotifyAPIError where error.status == 403 || error.status == 404 {
+            // The cached playlist may be deleted or not actually ours —
+            // drop the cache, re-resolve by name, and retry once.
+            UserDefaults.standard.removeObject(forKey: "daymark-wire-playlist")
+            let fresh = try await wirePlaylistID()
+            guard fresh != playlist else { throw error }
+            _ = try await api("PUT",
+                URL(string: "https://api.spotify.com/v1/playlists/\(fresh)/tracks")!,
+                token: token,
+                body: ["uris": matched],
+                step: "filling the playlist on retry (\(fresh.suffix(6)))")
+        }
         return matched.count
     }
 
