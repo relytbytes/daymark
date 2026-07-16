@@ -171,8 +171,20 @@ final class AppState {
         if persisted.settings.travelETA, let next = nextMeeting {
             if let minutes = await travelService.minutes(to: next) {
                 travel = TravelEstimate(eventID: next.id, minutes: minutes)
+                if let leaveBy {
+                    NotificationService.scheduleLeaveBy(
+                        at: leaveBy.time, eventTitle: next.title, driveMinutes: minutes)
+                }
             }
         }
+    }
+
+    /// When to walk out the door for the next meeting: start − drive − 5 min buffer.
+    var leaveBy: (time: Date, minutes: Int)? {
+        guard let travel, let next = nextMeeting, travel.eventID == next.id else { return nil }
+        let time = next.start.addingTimeInterval(TimeInterval(-(travel.minutes + 5) * 60))
+        guard time > Date() else { return nil }
+        return (time, travel.minutes)
     }
 
     func refreshBaseball() async {
@@ -180,7 +192,9 @@ final class AppState {
         do {
             async let game = BaseballService.dbacksGame()
             async let tables = BaseballService.standings()
-            dbacksGame = try await game
+            let fresh = try await game
+            announceGameTransitions(old: dbacksGame, new: fresh, team: "D-backs")
+            dbacksGame = fresh
             (nlWest, wildcard) = try await tables
             baseballStatus = .live(Date())
         } catch {
@@ -191,10 +205,27 @@ final class AppState {
     func refreshBulls() async {
         if bullsGame == nil { bullsStatus = .checking }
         do {
-            bullsGame = try await BaseballService.bullsGame()
+            let fresh = try await BaseballService.bullsGame()
+            announceGameTransitions(old: bullsGame, new: fresh, team: "Bulls")
+            bullsGame = fresh
             bullsStatus = .live(Date())
         } catch {
             bullsStatus = degrade(bullsStatus)
+        }
+    }
+
+    /// Schedule first-pitch alerts for upcoming games; announce finals when a
+    /// refresh observes the transition.
+    private func announceGameTransitions(old: GameInfo?, new: GameInfo?, team: String) {
+        guard persisted.settings.gameAlerts, let new else { return }
+        if new.state == "Preview", let start = new.date, start > Date() {
+            NotificationService.scheduleGameAlerts(games: [
+                (id: String(new.id), title: "\(new.away.name) at \(new.home.name) — \(team), \(start.timeText())", start: start)
+            ])
+        }
+        if new.state == "Final", let old, old.id == new.id, old.state != "Final" {
+            let headline = "\(new.away.name) \(new.away.score ?? 0), \(new.home.name) \(new.home.score ?? 0)"
+            NotificationService.notifyFinal(id: String(new.id), headline: headline)
         }
     }
 
@@ -295,11 +326,12 @@ final class AppState {
         return essentialsForNow.first { !essentialDone($0.id) }?.title ?? "Choose the next useful move"
     }
 
-    func startFocus() {
+    func startFocus(cappedToMinutes cap: Int? = nil) {
         let title = focusTaskTitle
+        let minutes = cap.map { max(5, min($0, persisted.focusMinutes)) } ?? persisted.focusMinutes
         persisted.focusTaskID = essentialsForNow.first { !essentialDone($0.id) }?.id
-        persisted.focusEndsAt = Date().addingTimeInterval(TimeInterval(persisted.focusMinutes * 60))
-        NotificationService.scheduleFocusEnd(after: TimeInterval(persisted.focusMinutes * 60), taskTitle: title)
+        persisted.focusEndsAt = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        NotificationService.scheduleFocusEnd(after: TimeInterval(minutes * 60), taskTitle: title)
         Task { _ = await NotificationService.requestAuthorization() }
     }
 

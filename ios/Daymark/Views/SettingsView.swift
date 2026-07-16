@@ -64,6 +64,7 @@ struct SettingsView: View {
                     Toggle("Morning brief · 7:30 AM", isOn: $app.persisted.settings.morningBrief)
                     Toggle("Evening review · 8:30 PM", isOn: $app.persisted.settings.eveningReview)
                     Toggle("Travel time to next meeting", isOn: $app.persisted.settings.travelETA)
+                    Toggle("Game alerts · first pitch & finals", isOn: $app.persisted.settings.gameAlerts)
                 }
 
                 Section {

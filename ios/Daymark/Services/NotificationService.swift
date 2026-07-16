@@ -54,6 +54,50 @@ enum NotificationService {
         }
     }
 
+    // MARK: Leave-by
+
+    /// One-shot nudge 10 minutes before the computed leave-by time.
+    static func scheduleLeaveBy(at leaveBy: Date, eventTitle: String, driveMinutes: Int) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["daymark.leaveby"])
+        let fireAt = leaveBy.addingTimeInterval(-10 * 60)
+        guard fireAt > Date() else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Leave by \(leaveBy.timeText())"
+        content.body = "\(eventTitle) — about \(driveMinutes) min drive from home."
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: fireAt.timeIntervalSinceNow, repeats: false)
+        center.add(UNNotificationRequest(identifier: "daymark.leaveby", content: content, trigger: trigger))
+    }
+
+    // MARK: Game alerts
+
+    /// First-pitch notifications for today's D-backs and Bulls games.
+    static func scheduleGameAlerts(games: [(id: String, title: String, start: Date)]) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: games.map { "daymark.game.\($0.id)" })
+        for game in games where game.start > Date() {
+            let content = UNMutableNotificationContent()
+            content.title = "First pitch"
+            content.body = game.title
+            content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: game.start.timeIntervalSinceNow, repeats: false)
+            center.add(UNNotificationRequest(identifier: "daymark.game.\(game.id)", content: content, trigger: trigger))
+        }
+    }
+
+    /// Fired the moment the app observes a final score while refreshing.
+    static func notifyFinal(id: String, headline: String) {
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = "Final"
+        content.body = headline
+        content.sound = .default
+        center.add(UNNotificationRequest(identifier: "daymark.final.\(id)", content: content, trigger: nil))
+    }
+
     // MARK: Focus timer
 
     static func scheduleFocusEnd(after seconds: TimeInterval, taskTitle: String) {

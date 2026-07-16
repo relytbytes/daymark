@@ -262,7 +262,7 @@ struct TodayView: View {
                 }
                 Spacer()
                 if !app.focusRunning {
-                    QuietButton(label: "Focus") { app.startFocus() }
+                    QuietButton(label: "Focus") { app.startFocus(cappedToMinutes: minutes) }
                 }
             }
             .fixedSize(horizontal: false, vertical: true)

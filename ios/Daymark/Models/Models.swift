@@ -242,6 +242,7 @@ struct AppSettings: Codable, Hashable {
     var morningBrief = true
     var eveningReview = true
     var travelETA = false
+    var gameAlerts = true
 
     static let defaultFeeds: [FeedSource] = [
         FeedSource(name: "NYT", url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"),

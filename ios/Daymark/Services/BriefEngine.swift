@@ -151,7 +151,13 @@ extension AppState {
         [
             weatherCell(),
             nowCell(),
-            GlanceCellModel(
+            leaveBy.map { leave in
+                GlanceCellModel(
+                    id: "leaveby", label: "Leave by",
+                    value: leave.time.clockText(),
+                    sub: "\(leave.minutes) min drive", accent: true
+                )
+            } ?? GlanceCellModel(
                 id: "daylight", label: "Daylight",
                 value: weather?.daylightText ?? "—",
                 sub: weather?.sunWindowText ?? "Durham"
