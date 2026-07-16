@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=20" />
+    <link rel="manifest" href="./manifest.webmanifest?v=21" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,8 +18,8 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20" />
-    <script src="./config.js?v=20"></script>
+    <link rel="stylesheet" href="./styles.css?v=21" />
+    <script src="./config.js?v=21"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -241,6 +241,8 @@
               </article>
             </section>
 
+            <section class="section-block" id="aiPlanMount" data-view-section="today" hidden></section>
+
             <section class="section-block" id="signals" data-view-section="today">
               <div class="section-heading">
                 <div>
@@ -291,6 +293,22 @@
               </div>
               <p class="connection-note">Spotify can renew its session on this device. Google requires a quick reconnect when its short-lived browser access expires.</p>
             </section>
+
+            <section class="section-block" id="landed" data-view-section="work" hidden>
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">LIVE FROM LANDED</p>
+                  <h2>The pipeline</h2>
+                </div>
+                <a class="text-button" href="https://job-search-command-center-brown.vercel.app" target="_blank" rel="noreferrer">Open Landed</a>
+              </div>
+              <article class="panel">
+                <p class="landed-summary" id="landedSummary"></p>
+                <div class="application-list" id="landedList"></div>
+              </article>
+            </section>
+
+            <section class="section-block" id="aiCoachMount" data-view-section="work" hidden></section>
 
             <section class="section-block" id="jobs" data-view-section="work">
               <div class="section-heading">
@@ -684,6 +702,60 @@
               </article>
             </section>
 
+            <section class="section-block" id="discovery" data-view-section="more" hidden>
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">NEW MUSIC · SEEDED BY YOUR LISTENING</p>
+                  <h2>The Discovery Wire</h2>
+                </div>
+                <span class="section-note" id="discoveryStatus"></span>
+              </div>
+              <article class="panel">
+                <div id="discoveryList"></div>
+              </article>
+            </section>
+
+            <section class="section-block" id="soundcloudShelf" data-view-section="more" hidden>
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">SOUNDCLOUD · OFFICIAL EMBED</p>
+                  <h2>The SoundCloud shelf</h2>
+                </div>
+              </div>
+              <div id="soundcloudWidgets"></div>
+            </section>
+
+            <section class="section-block" id="deskSettings" data-view-section="more">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">DEVICE-LOCAL · NEVER COMMITTED</p>
+                  <h2>Desk settings</h2>
+                </div>
+              </div>
+              <article class="panel desk-settings">
+                <label>Landed sheet ID
+                  <input type="text" id="deskLandedSheet" autocomplete="off" spellcheck="false" placeholder="from docs.google.com/spreadsheets/d/THIS_PART/edit" />
+                </label>
+                <label>AI provider
+                  <select id="deskAIProvider">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                  </select>
+                </label>
+                <label>AI API key
+                  <input type="password" id="deskAIKey" autocomplete="off" placeholder="sk-…" />
+                </label>
+                <label>SoundCloud username
+                  <input type="text" id="deskSCUser" autocomplete="off" spellcheck="false" placeholder="your-profile-slug" />
+                </label>
+                <label>SoundCloud artists (comma-separated slugs)
+                  <input type="text" id="deskSCArtists" autocomplete="off" spellcheck="false" placeholder="fourtet, floatingpoints" />
+                </label>
+                <button class="dialog-submit" id="deskSettingsSave" type="button">Save desk settings</button>
+                <p class="desk-settings-note">Stored in this browser only. The AI key powers the daily plan, job coach, evening column, and horoscope.</p>
+              </article>
+            </section>
+
             <section class="section-block reading-section" id="reading" data-view-section="more">
               <div class="section-heading">
                 <div>
@@ -741,7 +813,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>That’s the brief.</p>
-          <small>Daymark · Build 20</small>
+          <small>Daymark · Build 21</small>
         </footer>
       </main>
 
@@ -856,6 +928,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=20" defer></script>
+    <script src="./app.js?v=21" defer></script>
   </body>
 </html>

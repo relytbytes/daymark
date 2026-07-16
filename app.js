@@ -5,7 +5,8 @@ const DURHAM_SPORTS_CACHE_KEY = "daymark-durham-sports-cache-v1";
 const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
 const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
 const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
-const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
+const GOOGLE_SCOPE_VERSION = "sheets-v1";
+const DESK_SETTINGS_KEY = "daymark-desk-settings-v1";
 const GOOGLE_SCOPE_VERSION_STORAGE_KEY = "daymark-google-scope-version";
 const STATE_SCHEMA_VERSION = 16;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -20,7 +21,24 @@ const REFRESH_SCHEDULER_INTERVAL_MS = 15 * 1000;
 const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/gmail.modify",
+  "https://www.googleapis.com/auth/spreadsheets.readonly",
 ].join(" ");
+
+// Device-local desk settings (never committed: the repo is public).
+// { landedSheetId, aiProvider, aiKey, soundcloudUser, soundcloudArtists }
+function loadDeskSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(DESK_SETTINGS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDeskSettings(partial) {
+  const merged = { ...loadDeskSettings(), ...partial };
+  localStorage.setItem(DESK_SETTINGS_KEY, JSON.stringify(merged));
+  return merged;
+}
 const SPOTIFY_SCOPES = [
   "user-read-private",
   "user-read-currently-playing",
@@ -1345,12 +1363,82 @@ function renderGoogleDisconnected() {
   document.querySelector("#tomorrowFirstValue").textContent = "NOT CONNECTED";
 }
 
+async function refreshLanded() {
+  const sheetId = loadDeskSettings().landedSheetId;
+  const section = document.querySelector("#landed");
+  if (!sheetId || !section) {
+    if (section) section.hidden = true;
+    return;
+  }
+  try {
+    const data = await fetchGoogleJson(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/Tracker!A2:L`,
+    );
+    const rows = (data.values || [])
+      .map((row, index) => ({
+        id: `r${index}`,
+        company: (row[0] || "").trim(),
+        role: (row[1] || "").trim(),
+        track: (row[6] || "").trim(),
+        status: (row[7] || "").trim() || "Interested",
+        priority: (row[8] || "").trim(),
+        next: (row[10] || "").trim(),
+      }))
+      .filter((role) => role.company);
+    lastLandedRows = rows;
+    renderLanded(rows);
+  } catch {
+    const summary = document.querySelector("#landedSummary");
+    if (summary) summary.textContent = "Could not reach the Landed sheet — check access and the sheet ID.";
+    section.hidden = false;
+  }
+}
+
+function landedStageRank(status) {
+  const stage = status.toLowerCase();
+  if (stage.includes("offer")) return 0;
+  if (stage.includes("interview")) return 1;
+  if (stage.includes("screen")) return 2;
+  if (stage.includes("progress")) return 3;
+  if (stage.includes("applied")) return 4;
+  return 5;
+}
+
+function renderLanded(rows) {
+  const section = document.querySelector("#landed");
+  const summary = document.querySelector("#landedSummary");
+  const list = document.querySelector("#landedList");
+  if (!section || !summary || !list) return;
+  section.hidden = false;
+
+  const hot = rows
+    .filter((role) => landedStageRank(role.status) <= 2 || role.priority.toLowerCase() === "high")
+    .sort((a, b) => landedStageRank(a.status) - landedStageRank(b.status))
+    .slice(0, 5);
+  summary.textContent = `${rows.length} open roles · ${hot.length} worth attention today`;
+  list.innerHTML = hot
+    .map((role) => {
+      const green = landedStageRank(role.status) <= 1;
+      return `
+        <div class="application-row">
+          <div>
+            <strong>${escapeHtml(role.company)} — ${escapeHtml(role.role)}</strong>
+            <small>${escapeHtml(role.next || role.track || "")}</small>
+          </div>
+          <span class="landed-chip ${green ? "is-hot" : ""}">${escapeHtml(role.status)}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 async function loadGoogleData() {
   document.querySelector("#calendarStatus").textContent = "SYNCING";
   document.querySelector("#emailStatus").textContent = "SYNCING";
   const [calendarResult, emailResult] = await Promise.allSettled([
     fetchCalendarData(),
     fetchPriorityEmailData(),
+    refreshLanded(),
   ]);
 
   if (calendarResult.status === "fulfilled") renderCalendar(calendarResult.value);
@@ -1381,6 +1469,449 @@ async function refreshPriorityMail() {
   } finally {
     button.classList.remove("is-spinning");
   }
+}
+
+// =====================================================================
+// The AI desk (web): provider-agnostic completion + editorial features.
+// =====================================================================
+
+const AI_VOICE =
+  "You are the desk editor of Daymark, Ty's personal morning-paper app. Write in a " +
+  "literate, warm, concise editorial voice — a great local columnist, not an assistant. " +
+  "Never invent facts that are not in the briefing data. Keep dates and times exactly as given.";
+
+function aiConfigured() {
+  const desk = loadDeskSettings();
+  return Boolean(desk.aiKey);
+}
+
+async function aiComplete(system, user, maxTokens = 500) {
+  const desk = loadDeskSettings();
+  if (!desk.aiKey) throw new Error("no-key");
+  if ((desk.aiProvider || "openai") === "anthropic") {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": desk.aiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content: user }],
+      }),
+    });
+    if (!response.ok) throw new Error(`ai-${response.status}`);
+    const data = await response.json();
+    return (data.content || [])
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("")
+      .trim();
+  }
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${desk.aiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      max_tokens: maxTokens,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  if (!response.ok) throw new Error(`ai-${response.status}`);
+  const data = await response.json();
+  return (data.choices?.[0]?.message?.content || "").trim();
+}
+
+function renderAIDeskCard(mountId, kicker, emptyPrompt, buildPrompt) {
+  const mount = document.querySelector(`#${mountId}`);
+  if (!mount) return;
+  if (!aiConfigured()) {
+    mount.hidden = true;
+    return;
+  }
+  mount.hidden = false;
+  if (!mount.dataset.built) {
+    mount.dataset.built = "true";
+    mount.innerHTML = `
+      <article class="panel ai-desk-card">
+        <div class="ai-desk-head">
+          <span>${escapeHtml(kicker.toUpperCase())}</span>
+          <button type="button" class="ai-desk-run">WRITE IT</button>
+        </div>
+        <p class="ai-desk-body">${escapeHtml(emptyPrompt)}</p>
+      </article>
+    `;
+    const button = mount.querySelector(".ai-desk-run");
+    const body = mount.querySelector(".ai-desk-body");
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      button.textContent = "WRITING…";
+      try {
+        const { system, user } = buildPrompt();
+        const text = await aiComplete(system, user);
+        body.textContent = text;
+        body.classList.add("is-written");
+        button.textContent = "REWRITE";
+      } catch {
+        showToast("The AI desk didn't answer — check the key in Desk settings.");
+        button.textContent = "WRITE IT";
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+}
+
+function refreshAIDesk() {
+  renderAIDeskCard(
+    "aiPlanMount",
+    "The AI desk · today's plan",
+    "Have the desk read your open items and propose today's three priorities plus a first move.",
+    () => {
+      const captures = state.captures.filter((item) => !item.done).map((item) => item.title).join("\n");
+      const apps = state.applications
+        .filter((app) => !app.archived && app.status !== "Closed")
+        .map((app) => `${app.status}: ${app.organization} — ${app.role} (next: ${app.nextStep || "?"})`)
+        .join("\n");
+      return {
+        system: AI_VOICE,
+        user: `Open captures:\n${captures || "(none)"}\n\nJob pipeline:\n${apps || "(none)"}\n\nPropose today's plan: exactly three priorities (one line each, imperative), then one "First move" — the single most specific 9 AM action.`,
+      };
+    },
+  );
+  renderAIDeskCard(
+    "aiCoachMount",
+    "The AI desk · job coach",
+    "Which roles deserve attention today, and what exactly to do for each.",
+    () => {
+      const landed = lastLandedRows.length
+        ? lastLandedRows
+            .map((role) => `${role.status} · ${role.company} · ${role.role} · priority ${role.priority || "—"} · next: ${role.next || "—"}`)
+            .join("\n")
+        : state.applications
+            .filter((app) => !app.archived && app.status !== "Closed")
+            .map((app) => `${app.status} · ${app.organization} · ${app.role} · next: ${app.nextStep || "—"}`)
+            .join("\n");
+      return {
+        system: AI_VOICE,
+        user: `Ty's job pipeline:\n${landed || "(empty)"}\n\nAs his job-search coach, name the 2-3 roles that most deserve attention today and say exactly what to do for each (one sentence per role). Flag anything going stale. Be direct.`,
+      };
+    },
+  );
+}
+
+// =====================================================================
+// The Discovery Wire (web): Deezer graph via JSONP (their API has no
+// CORS header), seeded by Spotify listening + thumbs feedback.
+// =====================================================================
+
+let lastLandedRows = [];
+const DISCOVERY_CACHE_KEY = "daymark-discovery-web-v1";
+let discoveryAudio = null;
+let discoveryPlayingId = null;
+
+function deezer(path) {
+  return new Promise((resolve) => {
+    const callback = `dz${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const cleanup = () => {
+      delete window[callback];
+      script.remove();
+    };
+    const timer = window.setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, 8000);
+    window[callback] = (data) => {
+      window.clearTimeout(timer);
+      cleanup();
+      resolve(data);
+    };
+    script.src = `https://api.deezer.com/${path}${path.includes("?") ? "&" : "?"}output=jsonp&callback=${callback}`;
+    script.onerror = () => {
+      window.clearTimeout(timer);
+      cleanup();
+      resolve(null);
+    };
+    document.head.append(script);
+  });
+}
+
+function discoveryFeedback() {
+  try {
+    return JSON.parse(localStorage.getItem("daymark-music-feedback")) || { likes: [], passes: [] };
+  } catch {
+    return { likes: [], passes: [] };
+  }
+}
+
+function saveDiscoveryFeedback(feedback) {
+  localStorage.setItem("daymark-music-feedback", JSON.stringify(feedback));
+}
+
+async function buildDiscoveryWire() {
+  const status = document.querySelector("#discoveryStatus");
+  const seedsFromSpotify = (lastSpotifyData.top || [])
+    .map((item) => item?.artists?.[0]?.name)
+    .filter(Boolean);
+  const recentArtists = (lastSpotifyData.recent || [])
+    .map((item) => item?.track?.artists?.[0]?.name)
+    .filter(Boolean);
+  const feedback = discoveryFeedback();
+  const seeds = [...new Set([...feedback.likes.slice(-4), ...seedsFromSpotify, ...recentArtists])].slice(0, 8);
+  if (!seeds.length) return [];
+
+  const exclude = new Set(
+    [...seedsFromSpotify, ...recentArtists, ...feedback.passes].map((name) => name.toLowerCase()),
+  );
+  const surfaced = JSON.parse(localStorage.getItem("daymark-discovery-surfaced") || "[]");
+  surfaced.slice(-120).forEach((name) => exclude.add(name));
+
+  if (status) status.textContent = "WALKING THE ARTIST GRAPH…";
+  const wire = [];
+  const wildcardTarget = 2;
+
+  for (const seed of seeds.sort(() => Math.random() - 0.5)) {
+    if (wire.filter((t) => !t.wildcard).length >= 8) break;
+    const found = await deezer(`search/artist?q=${encodeURIComponent(seed)}&limit=1`);
+    const artist = found?.data?.[0];
+    if (!artist) continue;
+    const related = await deezer(`artist/${artist.id}/related?limit=12`);
+    for (const candidate of (related?.data || []).sort(() => Math.random() - 0.5).slice(0, 3)) {
+      if (wire.filter((t) => !t.wildcard).length >= 8) break;
+      const key = candidate.name.toLowerCase();
+      if (exclude.has(key)) continue;
+      const top = await deezer(`artist/${candidate.id}/top?limit=3`);
+      const tracks = top?.data || [];
+      if (!tracks.length) continue;
+      const pick = tracks.length > 1 && Math.random() > 0.5 ? tracks[1] : tracks[0];
+      exclude.add(key);
+      wire.push({
+        id: String(pick.id),
+        title: pick.title,
+        artist: candidate.name,
+        preview: pick.preview || "",
+        art: pick.album?.cover_medium || "",
+        reason: `Related to ${seed}`,
+        wildcard: false,
+      });
+    }
+    // Wildcards: hop once more from the first seed's far relations.
+    if (wire.filter((t) => t.wildcard).length < wildcardTarget && related?.data?.length > 5) {
+      const bridge = related.data[Math.floor(Math.random() * related.data.length)];
+      const hop2 = await deezer(`artist/${bridge.id}/related?limit=10`);
+      for (const candidate of (hop2?.data || []).sort(() => Math.random() - 0.5)) {
+        if (wire.filter((t) => t.wildcard).length >= wildcardTarget) break;
+        const key = candidate.name.toLowerCase();
+        if (exclude.has(key)) continue;
+        const top = await deezer(`artist/${candidate.id}/top?limit=2`);
+        const pick = top?.data?.[0];
+        if (!pick) continue;
+        exclude.add(key);
+        wire.push({
+          id: String(pick.id),
+          title: pick.title,
+          artist: candidate.name,
+          preview: pick.preview || "",
+          art: pick.album?.cover_medium || "",
+          reason: `Wildcard via ${bridge.name}`,
+          wildcard: true,
+        });
+      }
+    }
+  }
+
+  localStorage.setItem(
+    "daymark-discovery-surfaced",
+    JSON.stringify([...surfaced, ...wire.map((t) => t.artist.toLowerCase())].slice(-200)),
+  );
+  return wire.sort(() => Math.random() - 0.5);
+}
+
+async function refreshDiscovery(force = false) {
+  const section = document.querySelector("#discovery");
+  if (!section || !spotifyAccessToken) return;
+  const dayKey = new Date().toISOString().slice(0, 10);
+  try {
+    const cached = JSON.parse(localStorage.getItem(DISCOVERY_CACHE_KEY));
+    if (!force && cached?.day === dayKey && cached.wire?.length) {
+      renderDiscovery(cached.wire);
+      return;
+    }
+  } catch {
+    // rebuild below
+  }
+  const wire = await buildDiscoveryWire();
+  if (wire.length) {
+    localStorage.setItem(DISCOVERY_CACHE_KEY, JSON.stringify({ day: dayKey, wire }));
+    renderDiscovery(wire);
+  }
+}
+
+function renderDiscovery(wire) {
+  const section = document.querySelector("#discovery");
+  const list = document.querySelector("#discoveryList");
+  const status = document.querySelector("#discoveryStatus");
+  if (!section || !list) return;
+  section.hidden = false;
+  if (status) status.textContent = "TEN FOR TODAY · THUMBS TEACH TOMORROW";
+  const feedback = discoveryFeedback();
+
+  list.innerHTML = wire
+    .map((track) => {
+      const liked = feedback.likes.includes(track.artist.toLowerCase());
+      const query = encodeURIComponent(`${track.artist} ${track.title}`);
+      return `
+        <div class="discovery-row" data-track-id="${escapeHtml(track.id)}">
+          <button class="discovery-art" type="button" data-preview="${escapeHtml(track.preview)}" aria-label="Preview">
+            ${track.art ? `<img src="${escapeHtml(track.art)}" alt="" width="46" height="46" />` : ""}
+            <span class="discovery-playmark" aria-hidden="true">▶</span>
+          </button>
+          <div class="discovery-copy">
+            <strong>${escapeHtml(track.title)}</strong>
+            <small>${escapeHtml(track.artist)}</small>
+            <em class="${track.wildcard ? "is-wildcard" : ""}">${escapeHtml(track.reason.toUpperCase())}</em>
+          </div>
+          <div class="discovery-actions">
+            <button type="button" class="discovery-like${liked ? " is-on" : ""}" data-artist="${escapeHtml(track.artist)}" aria-label="More like this">👍</button>
+            <button type="button" class="discovery-pass" data-artist="${escapeHtml(track.artist)}" aria-label="Less like this">👎</button>
+            <a href="spotify:search:${query}" aria-label="Open in Spotify">SP</a>
+            <a href="https://soundcloud.com/search?q=${query}" target="_blank" rel="noreferrer" aria-label="Find on SoundCloud">SC</a>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  list.querySelectorAll(".discovery-art").forEach((button) => {
+    button.addEventListener("click", () => {
+      const url = button.dataset.preview;
+      const row = button.closest(".discovery-row");
+      const trackId = row?.dataset.trackId;
+      if (!url) return;
+      if (discoveryPlayingId === trackId) {
+        discoveryAudio?.pause();
+        discoveryPlayingId = null;
+        row.classList.remove("is-previewing");
+        return;
+      }
+      discoveryAudio?.pause();
+      list.querySelectorAll(".is-previewing").forEach((el) => el.classList.remove("is-previewing"));
+      discoveryAudio = new Audio(url);
+      discoveryAudio.play();
+      discoveryPlayingId = trackId;
+      row.classList.add("is-previewing");
+      discoveryAudio.addEventListener("ended", () => {
+        discoveryPlayingId = null;
+        row.classList.remove("is-previewing");
+      });
+    });
+  });
+  list.querySelectorAll(".discovery-like").forEach((button) => {
+    button.addEventListener("click", () => {
+      const feedbackNow = discoveryFeedback();
+      const key = button.dataset.artist.toLowerCase();
+      if (!feedbackNow.likes.includes(key)) feedbackNow.likes.push(key);
+      feedbackNow.passes = feedbackNow.passes.filter((name) => name !== key);
+      saveDiscoveryFeedback(feedbackNow);
+      button.classList.add("is-on");
+      showToast(`Noted — more like ${button.dataset.artist}.`);
+    });
+  });
+  list.querySelectorAll(".discovery-pass").forEach((button) => {
+    button.addEventListener("click", () => {
+      const feedbackNow = discoveryFeedback();
+      const key = button.dataset.artist.toLowerCase();
+      if (!feedbackNow.passes.includes(key)) feedbackNow.passes.push(key);
+      feedbackNow.likes = feedbackNow.likes.filter((name) => name !== key);
+      saveDiscoveryFeedback(feedbackNow);
+      button.closest(".discovery-row")?.remove();
+    });
+  });
+}
+
+// =====================================================================
+// SoundCloud shelf (web): official widget iframes for likes + artists.
+// =====================================================================
+
+function renderSoundCloudShelf() {
+  const desk = loadDeskSettings();
+  const section = document.querySelector("#soundcloudShelf");
+  const host = document.querySelector("#soundcloudWidgets");
+  if (!section || !host) return;
+  const artists = (desk.soundcloudArtists || "")
+    .split(",")
+    .map((slug) => slug.trim().toLowerCase())
+    .filter(Boolean);
+  const resources = [];
+  if (desk.soundcloudUser) {
+    resources.push({ label: "YOUR LIKES", url: `https://soundcloud.com/${desk.soundcloudUser}/likes` });
+  }
+  artists.forEach((slug) => resources.push({ label: slug.toUpperCase(), url: `https://soundcloud.com/${slug}` }));
+  if (!resources.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  host.innerHTML = resources
+    .map(
+      (resource) => `
+        <p class="sc-label">${escapeHtml(resource.label)}</p>
+        <iframe
+          class="sc-widget"
+          title="SoundCloud: ${escapeHtml(resource.label)}"
+          width="100%" height="166" frameborder="no" scrolling="no" allow="autoplay"
+          src="https://w.soundcloud.com/player/?url=${encodeURIComponent(resource.url)}&color=%23c8102e&auto_play=false&hide_related=true&show_comments=false&show_reposts=false&visual=false"
+        ></iframe>
+      `,
+    )
+    .join("");
+}
+
+// =====================================================================
+// Desk settings card
+// =====================================================================
+
+function initializeDeskSettings() {
+  const desk = loadDeskSettings();
+  const sheet = document.querySelector("#deskLandedSheet");
+  const provider = document.querySelector("#deskAIProvider");
+  const key = document.querySelector("#deskAIKey");
+  const scUser = document.querySelector("#deskSCUser");
+  const scArtists = document.querySelector("#deskSCArtists");
+  const save = document.querySelector("#deskSettingsSave");
+  if (!save) return;
+  if (sheet) sheet.value = desk.landedSheetId || "";
+  if (provider) provider.value = desk.aiProvider || "openai";
+  if (key) key.value = desk.aiKey ? "••••••••••••" : "";
+  if (scUser) scUser.value = desk.soundcloudUser || "";
+  if (scArtists) scArtists.value = desk.soundcloudArtists || "";
+
+  save.addEventListener("click", () => {
+    const partial = {
+      landedSheetId: sheet?.value.trim() || "",
+      aiProvider: provider?.value || "openai",
+      soundcloudUser: scUser?.value.trim().toLowerCase() || "",
+      soundcloudArtists: scArtists?.value.trim() || "",
+    };
+    const keyValue = key?.value.trim() || "";
+    if (keyValue && !keyValue.startsWith("•")) partial.aiKey = keyValue;
+    if (!keyValue) partial.aiKey = "";
+    saveDeskSettings(partial);
+    if (key) key.value = loadDeskSettings().aiKey ? "••••••••••••" : "";
+    showToast("Desk settings saved to this browser.");
+    refreshAIDesk();
+    renderSoundCloudShelf();
+    refreshLanded();
+    refreshDiscovery(true);
+  });
 }
 
 function hasSpotifyClientId() {
@@ -2299,7 +2830,10 @@ async function refreshSpotify(force = false) {
     if (profileResult.status === "fulfilled" && profileResult.value) {
       lastSpotifyData.profile = profileResult.value;
     }
-    if (refreshLibrary) lastSpotifyLibraryRefreshAt = Date.now();
+    if (refreshLibrary) {
+      lastSpotifyLibraryRefreshAt = Date.now();
+      refreshDiscovery();
+    }
     renderSpotifyPanel(lastSpotifyData);
   } catch (error) {
     if (!spotifyRefreshToken && Date.now() >= spotifyTokenExpiresAt) {
@@ -3482,6 +4016,9 @@ renderFocusRail();
 updateFocusTimer();
 restoreGoogleSession();
 initializeSpotify();
+initializeDeskSettings();
+refreshAIDesk();
+renderSoundCloudShelf();
 refreshAllData(true);
 window.setInterval(() => {
   updateClock();
