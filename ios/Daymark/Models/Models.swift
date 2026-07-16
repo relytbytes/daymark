@@ -60,6 +60,22 @@ struct CaptureItem: Identifiable, Codable, Hashable {
     var done = false
 }
 
+/// One discovery that crossed the wire — the listening history Spotify's
+/// dev-mode gate won't let us keep in a playlist.
+struct WireArchiveEntry: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var day: String            // dayKey, e.g. "2026-07-16"
+    var title: String
+    var artist: String
+    var reason: String = ""
+    var verdict: String?       // "like" / "pass" / nil (unjudged)
+
+    var spotifySearchURL: URL? {
+        let q = "\(artist) \(title)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        return URL(string: "spotify:search:\(q)")
+    }
+}
+
 /// Photos attached to captures, stored as JPEGs in Application Support.
 enum CaptureImages {
     static var directory: URL {
@@ -356,6 +372,7 @@ struct PersistedState: Codable {
     var musicPasses: [String] = []
     var scoreHistory: [String: [String: Int]] = [:]   // weekKey -> category -> done
     var taskNotes: [String: String] = [:]      // EssentialTask.id -> today's note
+    var wireArchive: [WireArchiveEntry] = []   // discovery listening history
     var sprintNotes: [String: String] = [:]    // SprintMilestone.id -> working note
     var sprintLedger: String = ""              // the desk's running sprint summary
     var sprintLedgerAt: Date?
@@ -386,6 +403,7 @@ struct PersistedState: Codable {
         musicPasses = (try? c.decodeIfPresent([String].self, forKey: .musicPasses)) ?? nil ?? []
         scoreHistory = (try? c.decodeIfPresent([String: [String: Int]].self, forKey: .scoreHistory)) ?? nil ?? [:]
         taskNotes = (try? c.decodeIfPresent([String: String].self, forKey: .taskNotes)) ?? nil ?? [:]
+        wireArchive = (try? c.decodeIfPresent([WireArchiveEntry].self, forKey: .wireArchive)) ?? nil ?? []
         sprintNotes = (try? c.decodeIfPresent([String: String].self, forKey: .sprintNotes)) ?? nil ?? [:]
         sprintLedger = (try? c.decodeIfPresent(String.self, forKey: .sprintLedger)) ?? nil ?? ""
         sprintLedgerAt = try? c.decodeIfPresent(Date.self, forKey: .sprintLedgerAt) ?? nil
