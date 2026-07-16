@@ -88,6 +88,16 @@ struct SettingsView: View {
                         connect: { Task { await app.connectSpotify() } },
                         disconnect: { app.disconnectSpotify() }
                     )
+                    if NestService.isConfigured {
+                        connectionRow(
+                            title: "Nest thermostat",
+                            connected: app.nest.isConnected,
+                            configured: true,
+                            note: "Indoor temperature and HVAC state on the weather desk.",
+                            connect: { Task { try? await app.nest.connect(); app.toast(app.nest.isConnected ? "Nest connected." : "Nest connection didn't complete.") } },
+                            disconnect: { app.nest.disconnect() }
+                        )
+                    }
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Calendar")

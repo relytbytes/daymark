@@ -22,6 +22,10 @@ enum AppConfig {
     /// GOOGLE_SHEET_ID env var; read-only from Daymark.
     static let landedSheetID: String = (plist["LandedSheetID"] as? String)?.nilIfEmpty ?? ""
     static var landedConfigured: Bool { !landedSheetID.isEmpty }
+
+    /// Google Device Access project id (console.nest.google.com) — Nest stays
+    /// dormant until this is set.
+    static let nestProjectID: String = (plist["NestProjectID"] as? String)?.nilIfEmpty ?? ""
     static let homeLatitude: Double = plist["HomeLatitude"] as? Double ?? 35.9940
     static let homeLongitude: Double = plist["HomeLongitude"] as? Double ?? -78.8986
 

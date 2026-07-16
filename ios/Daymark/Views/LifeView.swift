@@ -32,6 +32,7 @@ struct LifeView: View {
             }
 
             weatherFeature
+            trainingDesk
             hourlyStrip
             aroundTown
             bullsSection
@@ -71,6 +72,9 @@ struct LifeView: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
+                            if let nest = app.nestReading {
+                                detailLine("Indoor \(nest.indoorF)°\(nest.hvacActive ? " · running" : "")")
+                            }
                             detailLine("H \(weather.high) · L \(weather.low)")
                             detailLine("Rain \(weather.rainPct)%")
                             detailLine("Sunset \(weather.sunset.clockText())")
@@ -91,6 +95,94 @@ struct LifeView: View {
             Hairline()
         }
         .padding(.top, 22)
+    }
+
+    // MARK: Training desk (live from Cadence's app group)
+
+    @ViewBuilder
+    private var trainingDesk: some View {
+        if let cadence = app.cadence {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    SectionRuleHeader(title: "The Training Desk")
+                    Text("CADENCE · WK \(cadence.wk)")
+                        .kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                }
+                .padding(.bottom, 10)
+
+                VStack(spacing: 10) {
+                    HStack(alignment: .lastTextBaseline, spacing: 8) {
+                        Text(String(format: "%.1f", cadence.w))
+                            .font(DS.display(30))
+                            .foregroundStyle(Palette.ink)
+                        Text(String(format: "%+.1f LB/WK", cadence.delta))
+                            .font(.system(size: 9, weight: .heavy)).tracking(0.6)
+                            .foregroundStyle(cadence.delta <= 0 ? Palette.green : Palette.coral)
+                        Spacer()
+                        StatusChip(text: "\(cadence.streak)-day streak",
+                                   foreground: Color(hex: 0x0E7A54), background: Palette.greenSoft)
+                    }
+
+                    HStack(spacing: 8) {
+                        workoutChip("AM", title: cadence.amT, done: cadence.amDone)
+                        workoutChip("PM", title: cadence.pmT, done: cadence.pmDone)
+                    }
+
+                    HStack(spacing: 0) {
+                        fuelCell("CAL", cadence.cal, cadence.calT)
+                        fuelDivider
+                        fuelCell("PROTEIN", cadence.pro, cadence.proT)
+                        fuelDivider
+                        fuelCell("WATER", cadence.water, cadence.waterT)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .overlay(alignment: .top) { Hairline() }
+                }
+                .editorialPanel(padding: 14)
+            }
+            .padding(.top, 24)
+        }
+    }
+
+    private var fuelDivider: some View {
+        Rectangle().fill(Palette.hairlineSoft).frame(width: 1).padding(.vertical, 6)
+    }
+
+    private func workoutChip(_ slot: String, title: String, done: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 12))
+                .foregroundStyle(done ? Palette.green : Palette.subtle)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(slot).kickerStyle(Palette.subtle, size: 7, tracking: 1.0)
+                Text(title)
+                    .font(DS.label(11, weight: .semibold))
+                    .foregroundStyle(done ? Palette.muted : Palette.ink)
+                    .strikethrough(done, color: Palette.subtle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity)
+        .background(Palette.wash)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func fuelCell(_ label: String, _ value: Int, _ target: Int) -> some View {
+        VStack(spacing: 3) {
+            Text(label).kickerStyle(Palette.subtle, size: 7, tracking: 0.9)
+            Text("\(value)")
+                .font(DS.display(15))
+                .monospacedDigit()
+                .foregroundStyle(value >= target ? Palette.green : Palette.ink)
+            Text("OF \(target)")
+                .font(.system(size: 7, weight: .heavy)).tracking(0.6)
+                .foregroundStyle(Palette.subtle)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 
     private func detailLine(_ text: String) -> some View {

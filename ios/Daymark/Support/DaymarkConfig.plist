@@ -15,6 +15,10 @@
 	     Leave empty to hide the Landed pipeline section. -->
 	<key>LandedSheetID</key>
 	<string></string>
+	<!-- Nest: the Device Access project ID from console.nest.google.com
+	     ($5 one-time registration). Empty = Nest hidden. -->
+	<key>NestProjectID</key>
+	<string></string>
 	<!-- Home coordinates for weather + travel (Durham, NC by default). -->
 	<key>HomeLatitude</key>
 	<real>35.9940</real>

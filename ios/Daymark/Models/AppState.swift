@@ -28,6 +28,7 @@ final class AppState {
     let google = GoogleService()
     let spotify = SpotifyService()
     let health = HealthService()
+    let nest = NestService()
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var toastTask: Task<Void, Never>?
 
@@ -37,6 +38,8 @@ final class AppState {
     var weatherStatus: FeedStatus = .idle
     var airQuality: AirQuality?
     var astro: AstroSnapshot?
+    var nestReading: NestReading?
+    var cadence: CadenceSnapshot?
 
     var calendarAccess: Bool?
     var eventsToday: [CalendarEventLite] = []
@@ -206,6 +209,10 @@ final class AppState {
         // Sky math is local and instant.
         astro = Astronomy.snapshot(latitude: AppConfig.homeLatitude, longitude: AppConfig.homeLongitude)
         await refreshFitnessScore()
+        cadence = CadenceBridge.read()
+        if NestService.isConfigured, nest.isConnected {
+            nestReading = try? await nest.thermostat()
+        }
     }
 
     func refreshFitnessScore() async {
