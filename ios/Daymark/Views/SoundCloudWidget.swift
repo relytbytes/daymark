@@ -52,3 +52,19 @@ struct SoundCloudWidget: UIViewRepresentable {
         webView.load(URLRequest(url: url))
     }
 }
+
+
+/// RainViewer's embeddable live radar, centered on home.
+struct RadarWebView: UIViewRepresentable {
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        webView.scrollView.isScrollEnabled = false
+        let url = URL(string:
+            "https://www.rainviewer.com/map.html?loc=\(AppConfig.homeLatitude),\(AppConfig.homeLongitude),8"
+            + "&oCS=1&c=3&o=83&lm=1&layer=radar&sm=1&sn=1")!
+        webView.load(URLRequest(url: url))
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+}

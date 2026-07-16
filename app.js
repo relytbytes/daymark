@@ -2100,6 +2100,11 @@ function renderSkyDesk(body) {
     html += `<h3 class="sky-section">THE WEEK AHEAD</h3><div class="sky-week">${week.join("")}</div>`;
   }
 
+  html += `
+    <h3 class="sky-section">RADAR</h3>
+    <iframe class="sky-radar" title="Durham radar (RainViewer)" src="https://www.rainviewer.com/map.html?loc=35.994,-78.8986,8&oCS=1&c=3&o=83&lm=1&layer=radar&sm=1&sn=1" loading="lazy" allow="fullscreen"></iframe>
+  `;
+
   if (lastAirQuality) {
     html += `
       <h3 class="sky-section">THE AIR</h3>

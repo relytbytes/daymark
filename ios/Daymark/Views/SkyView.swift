@@ -25,6 +25,7 @@ struct SkyView: View {
                         weekSection(weather)
                     }
                     airSection
+                    radarSection
                     almanacSection
                     planetsSection
                     astrologySection
@@ -249,6 +250,23 @@ struct SkyView: View {
             }
             .padding(.top, 24)
         }
+    }
+
+    // MARK: Radar
+
+    private var radarSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionRuleHeader(title: "Radar")
+                .padding(.bottom, 10)
+            RadarWebView()
+                .frame(height: 300)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.line, lineWidth: 1))
+            Text("LIVE RADAR · RAINVIEWER")
+                .kickerStyle(Palette.subtle, size: 7, tracking: 1.2)
+                .padding(.top, 6)
+        }
+        .padding(.top, 24)
     }
 
     // MARK: Sun & moon almanac
