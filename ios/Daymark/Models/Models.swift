@@ -247,6 +247,7 @@ struct AppSettings: Codable, Hashable {
     var soundcloudUser: String = ""
     var soundcloudArtists: [String] = []
     var focusPlaylist: String = ""       // Spotify playlist link/URI for focus blocks
+    var feedsRevision: Int = AppSettings.currentFeedsRevision
 
     init() {}
 
@@ -264,14 +265,23 @@ struct AppSettings: Codable, Hashable {
         soundcloudUser = (try? c.decodeIfPresent(String.self, forKey: .soundcloudUser)) ?? nil ?? ""
         soundcloudArtists = (try? c.decodeIfPresent([String].self, forKey: .soundcloudArtists)) ?? nil ?? []
         focusPlaylist = (try? c.decodeIfPresent(String.self, forKey: .focusPlaylist)) ?? nil ?? ""
+        feedsRevision = (try? c.decodeIfPresent(Int.self, forKey: .feedsRevision)) ?? nil ?? 1
     }
 
     static let defaultFeeds: [FeedSource] = [
         FeedSource(name: "NYT", url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"),
         FeedSource(name: "NPR", url: "https://feeds.npr.org/1001/rss.xml"),
         FeedSource(name: "Jacobin", url: "https://jacobin.com/feed/"),
+        FeedSource(name: "CounterPunch", url: "https://www.counterpunch.org/feed/"),
+        FeedSource(name: "The Intercept", url: "https://theintercept.com/feed/?rss"),
+        FeedSource(name: "The Nation", url: "https://www.thenation.com/feed/?post_type=article"),
+        FeedSource(name: "Guardian US", url: "https://www.theguardian.com/us-news/rss"),
         FeedSource(name: "Longreads", url: "https://longreads.com/feed/"),
     ]
+
+    /// Bumped when defaultFeeds gains sources; existing installs merge
+    /// the newcomers once and never resurrect feeds the user deleted.
+    static let currentFeedsRevision = 2
 
     static let defaultWatchlist: [WatchSymbol] = [
         WatchSymbol(symbol: "^spx", label: "S&P 500"),

@@ -2,12 +2,22 @@
 //  MarketsService.swift
 //  Daymark
 //
-//  Watchlist quotes from Stooq CSV (no key; delayed data, labeled as such).
+//  Watchlist quotes from Yahoo Finance's chart API (no key; delayed
+//  data, labeled as such). Stooq, the previous source, now sits behind
+//  a JavaScript proof-of-work wall and can't be fetched natively.
 //
 
 import Foundation
 
 enum MarketsService {
+    /// Legacy Stooq-style index symbols map to Yahoo's tickers; plain
+    /// stock symbols pass through unchanged.
+    private static let yahooAliases = [
+        "^spx": "^GSPC",
+        "^dji": "^DJI",
+        "^ndq": "^IXIC",
+    ]
+
     static func fetch(_ symbols: [WatchSymbol]) async -> [MarketQuote] {
         var quotes: [MarketQuote] = []
         await withTaskGroup(of: MarketQuote?.self) { group in
@@ -24,27 +34,38 @@ enum MarketsService {
     }
 
     private static func quote(for symbol: WatchSymbol) async -> MarketQuote? {
-        // Last ~3 weeks of daily closes; the final row is the latest session.
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd"
-        let d1 = formatter.string(from: Date().addingDays(-21))
-        let d2 = formatter.string(from: Date())
-        let encoded = symbol.symbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? symbol.symbol
-        guard let url = URL(string: "https://stooq.com/q/d/l/?s=\(encoded)&i=d&d1=\(d1)&d2=\(d2)"),
-              let data = try? await HTTP.data(url),
-              let text = String(data: data, encoding: .utf8)
+        let ticker = yahooAliases[symbol.symbol.lowercased()] ?? symbol.symbol.uppercased()
+        let encoded = ticker.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ticker
+        guard let url = URL(string:
+            "https://query1.finance.yahoo.com/v8/finance/chart/\(encoded)?range=1mo&interval=1d")
+        else { return nil }
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+                         forHTTPHeaderField: "User-Agent")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse).map({ (200...299).contains($0.statusCode) }) != false
         else { return nil }
 
-        // CSV: Date,Open,High,Low,Close,Volume
-        let closes: [Double] = text
-            .split(separator: "\n")
-            .dropFirst()
-            .compactMap { line in
-                let cells = line.split(separator: ",", omittingEmptySubsequences: false)
-                guard cells.count >= 5 else { return nil }
-                return Double(String(cells[4]))
+        struct Chart: Decodable {
+            struct Wrapper: Decodable { let result: [Result]? }
+            struct Result: Decodable {
+                struct Indicators: Decodable {
+                    struct Quote: Decodable { let close: [Double?]? }
+                    let quote: [Quote]?
+                }
+                let indicators: Indicators?
             }
-        guard closes.count >= 2, let last = closes.last else { return nil }
+            let chart: Wrapper
+        }
+        // The final close is the live/latest session; the one before it
+        // is the prior close the change is measured against.
+        guard let parsed = try? JSONDecoder().decode(Chart.self, from: data),
+              let closes = parsed.chart.result?.first?.indicators?.quote?.first?.close?
+                  .compactMap({ $0 }),
+              closes.count >= 2,
+              let last = closes.last
+        else { return nil }
+
         let previous = closes[closes.count - 2]
         let change = last - previous
         let pct = previous != 0 ? (change / previous) * 100 : 0

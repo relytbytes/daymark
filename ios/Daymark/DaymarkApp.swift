@@ -47,6 +47,9 @@ struct DaymarkApp: App {
                     if !app.focusRunning { app.startFocus() }
                 }
                 Task { await app.refreshAll(force: false) }
+                app.startPlaybackTicker()
+            } else {
+                app.stopPlaybackTicker()
             }
         }
     }

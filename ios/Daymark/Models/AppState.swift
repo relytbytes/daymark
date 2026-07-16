@@ -99,7 +99,20 @@ final class AppState {
         persisted = JSONStore.load() ?? PersistedState()
         googleConnected = google.isConnected
         spotifyConnected = spotify.isConnected
+        mergeNewDefaultFeeds()
         rolloverIfNeeded()
+    }
+
+    /// One-time merge when an update ships new default feeds: add the
+    /// newcomers (keyed by URL) without resurrecting deleted ones.
+    private func mergeNewDefaultFeeds() {
+        guard persisted.settings.feedsRevision < AppSettings.currentFeedsRevision else { return }
+        let existing = Set(persisted.settings.feeds.map(\.url))
+        for feed in AppSettings.defaultFeeds where !existing.contains(feed.url) {
+            persisted.settings.feeds.append(feed)
+        }
+        persisted.settings.feedsRevision = AppSettings.currentFeedsRevision
+        scheduleSave()
     }
 
     // MARK: Persistence
@@ -351,6 +364,31 @@ final class AppState {
         } catch {
             spotifyStatus = degrade(spotifyStatus)
         }
+    }
+
+    // While the app is on screen, poll now-playing so the player card
+    // advances when Spotify moves to the next track. Playback only —
+    // recents and everything else stay on the normal refresh cadence.
+    private var playbackTicker: Task<Void, Never>?
+
+    func startPlaybackTicker() {
+        playbackTicker?.cancel()
+        playbackTicker = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                guard let self, !Task.isCancelled else { return }
+                guard self.spotifyConnected else { continue }
+                if let live = try? await self.spotify.playback() {
+                    self.playback = live
+                    self.spotifyStatus = .live(Date())
+                }
+            }
+        }
+    }
+
+    func stopPlaybackTicker() {
+        playbackTicker?.cancel()
+        playbackTicker = nil
     }
 
     // MARK: Toast

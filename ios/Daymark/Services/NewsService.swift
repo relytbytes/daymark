@@ -23,8 +23,34 @@ enum NewsService {
                 articles.append(contentsOf: batch)
             }
         }
-        // Cluster the same story across feeds, newest first, keep it a brief.
-        return cluster(articles).prefix(24).map { $0 }
+        // Cluster the same story across feeds, then interleave sources so
+        // one prolific feed can't flood the brief.
+        return interleave(cluster(articles), cap: 24)
+    }
+
+    /// Round-robin across sources, preserving each source's newest-first
+    /// order: everyone's lead story makes the brief before anyone's third.
+    static func interleave(_ articles: [NewsArticle], cap: Int) -> [NewsArticle] {
+        var bySource: [String: [NewsArticle]] = [:]
+        var sourceOrder: [String] = []
+        for article in articles {
+            if bySource[article.source] == nil { sourceOrder.append(article.source) }
+            bySource[article.source, default: []].append(article)
+        }
+        var out: [NewsArticle] = []
+        var round = 0
+        while out.count < cap {
+            var tookAny = false
+            for source in sourceOrder {
+                guard let list = bySource[source], round < list.count else { continue }
+                out.append(list[round])
+                tookAny = true
+                if out.count == cap { break }
+            }
+            if !tookAny { break }
+            round += 1
+        }
+        return out
     }
 
     /// Collapse articles whose titles share most of their significant words —
@@ -158,6 +184,12 @@ final class RSSParser: NSObject, XMLParserDelegate {
         for formatter in formatters {
             if let date = formatter.date(from: text) { return date }
         }
-        return isoFormatter.date(from: text)
+        if let date = isoFormatter.date(from: text) { return date }
+        // Atom feeds with long fractional seconds (Jacobin emits
+        // ".291239Z") defeat every fixed format — strip the fraction.
+        if let fraction = text.range(of: #"\.\d+"#, options: .regularExpression) {
+            return isoFormatter.date(from: text.replacingCharacters(in: fraction, with: ""))
+        }
+        return nil
     }
 }
