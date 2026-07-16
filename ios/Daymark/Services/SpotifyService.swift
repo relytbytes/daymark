@@ -22,6 +22,8 @@ final class SpotifyService {
         "user-read-currently-playing",
         "user-read-recently-played",
         "user-top-read",
+        "playlist-read-private",
+        "playlist-modify-private",
     ].joined(separator: " ")
 
     // MARK: Connect / disconnect
@@ -150,6 +152,83 @@ final class SpotifyService {
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw HTTPError.status(http.statusCode)
         }
+    }
+
+    // MARK: Daymark Discoveries playlist
+
+    private static let discoveriesName = "Daymark Discoveries"
+
+    /// Find or create the Discoveries playlist; returns its id.
+    private func discoveriesPlaylistID() async throws -> String {
+        if let cached = UserDefaults.standard.string(forKey: "daymark-discoveries-playlist") {
+            return cached
+        }
+        let token = try await validToken()
+        struct Playlists: Decodable {
+            struct Item: Decodable {
+                let id: String
+                let name: String
+            }
+            let items: [Item]?
+        }
+        let list = try await HTTP.json(Playlists.self,
+            URL(string: "https://api.spotify.com/v1/me/playlists?limit=50")!,
+            headers: ["Authorization": "Bearer \(token)"])
+        if let existing = list.items?.first(where: { $0.name == Self.discoveriesName }) {
+            UserDefaults.standard.set(existing.id, forKey: "daymark-discoveries-playlist")
+            return existing.id
+        }
+
+        struct Me: Decodable { let id: String }
+        let me = try await HTTP.json(Me.self, URL(string: "https://api.spotify.com/v1/me")!,
+                                     headers: ["Authorization": "Bearer \(token)"])
+        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/users/\(me.id)/playlists")!, timeoutInterval: 20)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "name": Self.discoveriesName,
+            "public": false,
+            "description": "Thumbs-ups from Daymark's Discovery Wire.",
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw HTTPError.status((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        struct Created: Decodable { let id: String }
+        let created = try JSONDecoder().decode(Created.self, from: data)
+        UserDefaults.standard.set(created.id, forKey: "daymark-discoveries-playlist")
+        return created.id
+    }
+
+    /// Search the track on Spotify and add it to Daymark Discoveries.
+    func addToDiscoveries(title: String, artist: String) async throws -> Bool {
+        let token = try await validToken()
+        let query = "track:\(title) artist:\(artist)"
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        struct Search: Decodable {
+            struct Tracks: Decodable {
+                struct Item: Decodable { let uri: String }
+                let items: [Item]?
+            }
+            let tracks: Tracks?
+        }
+        let found = try await HTTP.json(Search.self,
+            URL(string: "https://api.spotify.com/v1/search?type=track&limit=1&q=\(query)")!,
+            headers: ["Authorization": "Bearer \(token)"])
+        guard let uri = found.tracks?.items?.first?.uri else { return false }
+
+        let playlist = try await discoveriesPlaylistID()
+        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!, timeoutInterval: 20)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["uris": [uri]])
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw HTTPError.status((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        return true
     }
 
     /// Top artist names across a medium listening window — discovery seeds.

@@ -46,6 +46,8 @@ const SPOTIFY_SCOPES = [
   "user-read-recently-played",
   "user-top-read",
   "user-modify-playback-state",
+  "playlist-read-private",
+  "playlist-modify-private",
 ].join(" ");
 const DEMO_APPLICATION_IDS = new Set(["duke-policy", "public-affairs", "foundation", "dataworks"]);
 const DAILY_TASK_IDS = new Set([
@@ -1693,6 +1695,48 @@ function deezer(path) {
   });
 }
 
+const DISCOVERIES_PLAYLIST_NAME = "Daymark Discoveries";
+
+async function addToDiscoveries(title, artist) {
+  if (!spotifyAccessToken) return false;
+  try {
+    let playlistId = localStorage.getItem("daymark-discoveries-playlist");
+    if (!playlistId) {
+      const lists = await fetchSpotify("/v1/me/playlists?limit=50");
+      const existing = (lists?.items || []).find((p) => p.name === DISCOVERIES_PLAYLIST_NAME);
+      if (existing) {
+        playlistId = existing.id;
+      } else {
+        const me = await fetchSpotify("/v1/me");
+        const created = await fetchSpotify(`/v1/users/${encodeURIComponent(me.id)}/playlists`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: DISCOVERIES_PLAYLIST_NAME,
+            public: false,
+            description: "Thumbs-ups from Daymark's Discovery Wire.",
+          }),
+        });
+        playlistId = created?.id;
+      }
+      if (playlistId) localStorage.setItem("daymark-discoveries-playlist", playlistId);
+    }
+    if (!playlistId) return false;
+    const query = encodeURIComponent(`track:${title} artist:${artist}`);
+    const found = await fetchSpotify(`/v1/search?type=track&limit=1&q=${query}`);
+    const uri = found?.tracks?.items?.[0]?.uri;
+    if (!uri) return false;
+    await fetchSpotify(`/v1/playlists/${playlistId}/tracks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uris: [uri] }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function discoveryFeedback() {
   try {
     return JSON.parse(localStorage.getItem("daymark-music-feedback")) || { likes: [], passes: [] };
@@ -1871,7 +1915,11 @@ function renderDiscovery(wire) {
       feedbackNow.passes = feedbackNow.passes.filter((name) => name !== key);
       saveDiscoveryFeedback(feedbackNow);
       button.classList.add("is-on");
-      showToast(`Noted — more like ${button.dataset.artist}.`);
+      const row = button.closest(".discovery-row");
+      const title = row?.querySelector(".discovery-copy strong")?.textContent || "";
+      addToDiscoveries(title, button.dataset.artist).then((added) => {
+        showToast(added ? "Filed to Daymark Discoveries." : `Noted — more like ${button.dataset.artist}.`);
+      });
     });
   });
   list.querySelectorAll(".discovery-pass").forEach((button) => {

@@ -40,6 +40,12 @@ struct DaymarkApp: App {
             if phase == .active {
                 app.rolloverIfNeeded()
                 MorningBriefTask.scheduleNext()
+                if UserDefaults.standard.bool(forKey: "daymark-pending-focus") {
+                    UserDefaults.standard.set(false, forKey: "daymark-pending-focus")
+                    // Reload in case an intent captured while we were closed.
+                    if let fresh = JSONStore.load() { app.persisted = fresh }
+                    if !app.focusRunning { app.startFocus() }
+                }
                 Task { await app.refreshAll(force: false) }
             }
         }

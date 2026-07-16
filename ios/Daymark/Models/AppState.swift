@@ -817,7 +817,13 @@ final class AppState {
         let key = track.artist.lowercased()
         if !persisted.musicLikes.contains(key) { persisted.musicLikes.append(key) }
         persisted.musicPasses.removeAll { $0 == key }
-        toast("Noted — more like \(track.artist).")
+        Task {
+            if let added = try? await spotify.addToDiscoveries(title: track.title, artist: track.artist), added {
+                toast("Filed to Daymark Discoveries.")
+            } else {
+                toast("Noted — more like \(track.artist).")
+            }
+        }
     }
 
     func discoveryPass(_ track: DiscoveryTrack) {
