@@ -379,13 +379,13 @@ struct GlanceWidgetView: View {
         VStack(alignment: .leading, spacing: 6) {
             masthead
             Spacer(minLength: 0)
-            HStack(alignment: .center, spacing: 7) {
+            HStack(alignment: .center, spacing: 11) {
                 Text(entry.tempF.map { "\($0)°" } ?? "—")
                     .font(.system(size: 38, weight: .bold, design: .serif))
                     .foregroundStyle(WPalette.ink)
                     .fixedSize()
                     .layoutPriority(2)
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .center, spacing: 4) {
                     Image(systemName: entry.symbol)
                         .font(.system(size: 19))
                         .foregroundStyle(WPalette.gold)
@@ -422,13 +422,13 @@ struct GlanceWidgetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 masthead
                 Spacer(minLength: 0)
-                HStack(alignment: .center, spacing: 8) {
+                HStack(alignment: .center, spacing: 13) {
                     Text(entry.tempF.map { "\($0)°" } ?? "—")
                         .font(.system(size: 44, weight: .bold, design: .serif))
                         .foregroundStyle(WPalette.ink)
                         .fixedSize()
                         .layoutPriority(2)
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .center, spacing: 4) {
                         Image(systemName: entry.symbol)
                             .font(.system(size: 22))
                             .foregroundStyle(WPalette.gold)
@@ -499,13 +499,13 @@ struct GlanceWidgetView: View {
             masthead
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .center, spacing: 8) {
+                    HStack(alignment: .center, spacing: 13) {
                         Text(entry.tempF.map { "\($0)°" } ?? "—")
                             .font(.system(size: 40, weight: .bold, design: .serif))
                             .foregroundStyle(WPalette.ink)
                             .fixedSize()
                             .layoutPriority(2)
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .center, spacing: 4) {
                             Image(systemName: entry.symbol)
                                 .font(.system(size: 21))
                                 .foregroundStyle(WPalette.gold)
