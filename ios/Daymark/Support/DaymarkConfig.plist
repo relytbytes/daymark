@@ -18,7 +18,7 @@
 	<!-- Nest: the Device Access project ID from console.nest.google.com
 	     ($5 one-time registration). Empty = Nest hidden. -->
 	<key>NestProjectID</key>
-	<string></string>
+	<string>6a902577-704d-42fe-8e0e-a89e6dce3d39</string>
 	<!-- Home coordinates for weather + travel (Durham, NC by default). -->
 	<key>HomeLatitude</key>
 	<real>35.9940</real>
