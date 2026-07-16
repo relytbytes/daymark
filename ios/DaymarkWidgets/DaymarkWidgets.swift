@@ -26,6 +26,8 @@ private enum WPalette {
     static let gold = Color(red: 0.725, green: 0.541, blue: 0.122)
     static let blue = Color(red: 0.114, green: 0.435, blue: 0.878)
     static let line = Color(red: 0.078, green: 0.078, blue: 0.070).opacity(0.14)
+    static let up = Color(red: 0.055, green: 0.624, blue: 0.431)
+    static let down = Color(red: 0.863, green: 0.149, blue: 0.149)
 }
 
 // MARK: - Entry
@@ -34,6 +36,12 @@ struct GameLine: Hashable {
     var label: String       // "DBACKS" / "BULLS"
     var text: String        // "ARI 4–2 SD · Bot 7" / "at Padres · 9:40 PM"
     var isLive = false
+}
+
+struct MarketLine: Hashable {
+    var label: String       // "S&P"
+    var price: Double
+    var changePct: Double
 }
 
 struct GlanceEntry: TimelineEntry {
@@ -45,11 +53,13 @@ struct GlanceEntry: TimelineEntry {
     var high: Int?
     var low: Int?
     var rainPct: Int?
+    var sunrise = "—"
     var sunset = "—"
     var sunsetDate: Date?
     var moonSymbol = "moon.fill"
     var moonName = ""
     var games: [GameLine] = []
+    var markets: [MarketLine] = []
     var desk: WidgetSnapshot?
 
     var isEvening: Bool {
@@ -78,6 +88,7 @@ struct GlanceProvider: TimelineProvider {
             async let weather = fetchWeather()
             async let dbacks = fetchGame(teamID: 109, sportID: 1, label: "DBACKS")
             async let bulls = fetchGame(teamID: 234, sportID: 11, label: "BULLS")
+            async let markets = fetchMarkets()
 
             if let weather = await weather {
                 entry.tempF = weather.tempF
@@ -87,10 +98,12 @@ struct GlanceProvider: TimelineProvider {
                 entry.high = weather.high
                 entry.low = weather.low
                 entry.rainPct = weather.rainPct
+                entry.sunrise = weather.sunrise
                 entry.sunset = weather.sunset
                 entry.sunsetDate = weather.sunsetDate
             }
             entry.games = [await dbacks, await bulls].compactMap { $0 }
+            entry.markets = await markets
             entry.desk = WidgetSnapshot.read()
             let (moonSymbol, moonName) = Moon.phase(on: Date())
             entry.moonSymbol = moonSymbol
@@ -112,6 +125,7 @@ struct GlanceProvider: TimelineProvider {
         var high: Int?
         var low: Int?
         var rainPct: Int?
+        var sunrise = "—"
         var sunset = "—"
         var sunsetDate: Date?
     }
@@ -124,6 +138,7 @@ struct GlanceProvider: TimelineProvider {
                 let weather_code: Int
             }
             struct Daily: Decodable {
+                let sunrise: [String]?
                 let sunset: [String]
                 let temperature_2m_max: [Double]?
                 let temperature_2m_min: [Double]?
@@ -137,7 +152,7 @@ struct GlanceProvider: TimelineProvider {
             URLQueryItem(name: "latitude", value: "35.9940"),
             URLQueryItem(name: "longitude", value: "-78.8986"),
             URLQueryItem(name: "current", value: "temperature_2m,apparent_temperature,weather_code"),
-            URLQueryItem(name: "daily", value: "sunset,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
+            URLQueryItem(name: "daily", value: "sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
             URLQueryItem(name: "temperature_unit", value: "fahrenheit"),
             URLQueryItem(name: "timezone", value: "America/New_York"),
             URLQueryItem(name: "forecast_days", value: "1"),
@@ -151,18 +166,73 @@ struct GlanceProvider: TimelineProvider {
         bits.high = response.daily.temperature_2m_max?.first.map { Int($0.rounded()) }
         bits.low = response.daily.temperature_2m_min?.first.map { Int($0.rounded()) }
         bits.rainPct = response.daily.precipitation_probability_max?.first
-        if let sunsetRaw = response.daily.sunset.first {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
-            formatter.timeZone = TimeZone(identifier: "America/New_York")
-            if let date = formatter.date(from: sunsetRaw) {
-                bits.sunsetDate = date
-                let out = DateFormatter()
-                out.dateFormat = "h:mm a"
-                bits.sunset = out.string(from: date)
-            }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        formatter.timeZone = TimeZone(identifier: "America/New_York")
+        let out = DateFormatter()
+        out.dateFormat = "h:mm a"
+        if let sunsetRaw = response.daily.sunset.first,
+           let date = formatter.date(from: sunsetRaw) {
+            bits.sunsetDate = date
+            bits.sunset = out.string(from: date)
+        }
+        if let sunriseRaw = response.daily.sunrise?.first,
+           let date = formatter.date(from: sunriseRaw) {
+            bits.sunrise = out.string(from: date)
         }
         return bits
+    }
+
+    // MARK: Markets
+
+    /// The index strip, straight from Yahoo's chart API (same source as
+    /// the app's markets desk).
+    private func fetchMarkets() async -> [MarketLine] {
+        let watch: [(ticker: String, label: String)] = [
+            ("^GSPC", "S&P"), ("^DJI", "DOW"), ("^IXIC", "NDQ"),
+        ]
+        var lines: [MarketLine] = []
+        await withTaskGroup(of: MarketLine?.self) { group in
+            for item in watch {
+                group.addTask { await Self.marketLine(ticker: item.ticker, label: item.label) }
+            }
+            for await line in group {
+                if let line { lines.append(line) }
+            }
+        }
+        let order = Dictionary(uniqueKeysWithValues: watch.enumerated().map { ($1.label, $0) })
+        return lines.sorted { (order[$0.label] ?? 9) < (order[$1.label] ?? 9) }
+    }
+
+    private static func marketLine(ticker: String, label: String) async -> MarketLine? {
+        let encoded = ticker.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ticker
+        guard let url = URL(string:
+            "https://query1.finance.yahoo.com/v8/finance/chart/\(encoded)?range=5d&interval=1d")
+        else { return nil }
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+                         forHTTPHeaderField: "User-Agent")
+        struct Chart: Decodable {
+            struct Wrapper: Decodable { let result: [Result]? }
+            struct Result: Decodable {
+                struct Indicators: Decodable {
+                    struct Quote: Decodable { let close: [Double?]? }
+                    let quote: [Quote]?
+                }
+                let indicators: Indicators?
+            }
+            let chart: Wrapper
+        }
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let parsed = try? JSONDecoder().decode(Chart.self, from: data),
+              let closes = parsed.chart.result?.first?.indicators?.quote?.first?.close?
+                  .compactMap({ $0 }),
+              closes.count >= 2,
+              let last = closes.last
+        else { return nil }
+        let previous = closes[closes.count - 2]
+        let pct = previous != 0 ? (last - previous) / previous * 100 : 0
+        return MarketLine(label: label, price: last, changePct: pct)
     }
 
     private static func condition(_ code: Int) -> (String, String) {
@@ -305,14 +375,7 @@ struct GlanceWidgetView: View {
                     .foregroundStyle(WPalette.ink)
                     .fixedSize()
                     .layoutPriority(2)
-                if let feels = feelsParen {
-                    Text(feels)
-                        .font(.system(size: 14, weight: .bold, design: .serif))
-                        .foregroundStyle(WPalette.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                        .layoutPriority(1)
-                }
+                feelsTag(size: 14)
                 Image(systemName: entry.symbol)
                     .font(.system(size: 15))
                     .foregroundStyle(WPalette.gold)
@@ -353,14 +416,7 @@ struct GlanceWidgetView: View {
                         .foregroundStyle(WPalette.ink)
                         .fixedSize()
                         .layoutPriority(2)
-                    if let feels = feelsParen {
-                        Text(feels)
-                            .font(.system(size: 16, weight: .bold, design: .serif))
-                            .foregroundStyle(WPalette.muted)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .layoutPriority(1)
-                    }
+                    feelsTag(size: 16)
                     Image(systemName: entry.symbol)
                         .font(.system(size: 17))
                         .foregroundStyle(WPalette.gold)
@@ -435,13 +491,7 @@ struct GlanceWidgetView: View {
                             .foregroundStyle(WPalette.ink)
                             .fixedSize()
                             .layoutPriority(2)
-                        if let feels = feelsParen {
-                            Text(feels)
-                                .font(.system(size: 15, weight: .bold, design: .serif))
-                                .foregroundStyle(WPalette.muted)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.6)
-                        }
+                        feelsTag(size: 15)
                         Image(systemName: entry.symbol)
                             .font(.system(size: 16))
                             .foregroundStyle(WPalette.gold)
@@ -459,7 +509,11 @@ struct GlanceWidgetView: View {
                     ForEach(entry.games, id: \.label) { game in
                         gameRow(game, compact: true)
                     }
-                    eveningRow
+                    skyRow(icon: "sunrise.fill", text: "Sunrise \(entry.sunrise)")
+                    skyRow(icon: "sunset.fill", text: "Sunset \(entry.sunset)")
+                    if !entry.moonName.isEmpty {
+                        skyRow(icon: entry.moonSymbol, text: entry.moonName)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -489,7 +543,7 @@ struct GlanceWidgetView: View {
                 Spacer(minLength: 0)
             } else {
                 VStack(alignment: .leading, spacing: 5) {
-                    ForEach(Array(events.prefix(6).enumerated()), id: \.offset) { _, event in
+                    ForEach(Array(events.prefix(entry.markets.isEmpty ? 8 : 7).enumerated()), id: \.offset) { _, event in
                         HStack(spacing: 7) {
                             Rectangle()
                                 .fill(event.start <= entry.date && entry.date < event.end ? WPalette.red : WPalette.blue)
@@ -509,6 +563,12 @@ struct GlanceWidgetView: View {
                     }
                 }
                 Spacer(minLength: 0)
+            }
+
+            // The closing markets strip — same sources as the app's desk.
+            if !entry.markets.isEmpty {
+                rule
+                marketsRow
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -532,7 +592,7 @@ struct GlanceWidgetView: View {
 
     private var inline: some View {
         Label {
-            Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(feelsParen.map { " \($0)" } ?? "")\(entry.high.flatMap { high in entry.low.map { " · H\(high) L\($0)" } } ?? "")")
+            Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(feelsText.map { " \($0)" } ?? "")\(entry.high.flatMap { high in entry.low.map { " · H\(high) L\($0)" } } ?? "")")
         } icon: {
             Image(systemName: entry.symbol)
         }
@@ -543,7 +603,7 @@ struct GlanceWidgetView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Image(systemName: entry.symbol).font(.system(size: 11))
-                Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(feelsParen.map { " \($0)" } ?? "")")
+                Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(feelsText.map { " \($0)" } ?? "")")
                     .font(.system(size: 12, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -586,11 +646,29 @@ struct GlanceWidgetView: View {
         Rectangle().fill(WPalette.line).frame(height: 1)
     }
 
-    /// Feels-like as a quiet parenthetical beside the numeral, shown only
-    /// when it meaningfully differs from the actual temperature.
-    private var feelsParen: String? {
+    /// Feels-like beside the numeral — a thermometer glyph and the bare
+    /// number, no punctuation — shown only when it meaningfully differs
+    /// from the air temperature.
+    @ViewBuilder
+    private func feelsTag(size: CGFloat) -> some View {
+        if let feels = entry.feels, let temp = entry.tempF, abs(feels - temp) >= 2 {
+            HStack(spacing: 1.5) {
+                Image(systemName: "thermometer.medium")
+                    .font(.system(size: size * 0.72))
+                    .foregroundStyle(WPalette.gold)
+                Text("\(feels)°")
+                    .font(.system(size: size, weight: .bold, design: .serif))
+                    .foregroundStyle(WPalette.muted)
+            }
+            .lineLimit(1)
+            .fixedSize()
+        }
+    }
+
+    /// Text-only feels-like for the Lock Screen accessories.
+    private var feelsText: String? {
         guard let feels = entry.feels, let temp = entry.tempF, abs(feels - temp) >= 2 else { return nil }
-        return "(\(feels)°)"
+        return "≈\(feels)°"
     }
 
     /// High/low + rain line.
@@ -635,6 +713,43 @@ struct GlanceWidgetView: View {
                 .minimumScaleFactor(0.75)
             Spacer(minLength: 0)
         }
+    }
+
+    private func skyRow(icon: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 9))
+                .foregroundStyle(WPalette.gold)
+            Text(text)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(WPalette.ink)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Delayed index quotes, one ledger line: label, level, direction.
+    private var marketsRow: some View {
+        HStack(spacing: 0) {
+            ForEach(entry.markets, id: \.label) { line in
+                HStack(spacing: 4) {
+                    Text(line.label)
+                        .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
+                        .foregroundStyle(WPalette.subtle)
+                    Text(line.price, format: .number.precision(.fractionLength(0)))
+                        .font(.system(size: 10.5, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(WPalette.ink)
+                    Text("\(line.changePct >= 0 ? "▲" : "▼")\(abs(line.changePct), specifier: "%.1f")%")
+                        .font(.system(size: 9, weight: .heavy))
+                        .monospacedDigit()
+                        .foregroundStyle(line.changePct >= 0 ? WPalette.up : WPalette.down)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
     }
 
     /// Sunset before dark; moon phase once the evening arrives.
