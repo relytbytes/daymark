@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Spotify: reused from the Daymark web app (public PKCE client id, no secret).
+	     Add the redirect URI daymark://spotify-callback in the Spotify developer dashboard. -->
+	<key>SpotifyClientID</key>
+	<string>378332274e5641d8af7bce5516f3d0da</string>
+	<!-- Google: create an OAuth client of type *iOS* in your existing Google Cloud project
+	     (the web client id cannot be used by a native app). See ios/README.md. -->
+	<key>GoogleiOSClientID</key>
+	<string>963230744949-36mauoje0msh14sbea0bccs464a9i5at.apps.googleusercontent.com</string>
+	<!-- Landed (job-search-command-center): the Google Sheet ID from its
+	     GOOGLE_SHEET_ID env var — docs.google.com/spreadsheets/d/THIS_PART/edit.
+	     Leave empty to hide the Landed pipeline section. -->
+	<key>LandedSheetID</key>
+	<string></string>
+	<!-- Nest: the Device Access project ID from console.nest.google.com
+	     ($5 one-time registration). Empty = Nest hidden. -->
+	<key>NestProjectID</key>
+	<string>6a902577-704d-42fe-8e0e-a89e6dce3d39</string>
+	<!-- Home coordinates for weather + travel (Durham, NC by default). -->
+	<key>HomeLatitude</key>
+	<real>35.9940</real>
+	<key>HomeLongitude</key>
+	<real>-78.8986</real>
+	<key>OwnerName</key>
+	<string>Ty</string>
+</dict>
+</plist>

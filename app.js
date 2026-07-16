@@ -5,7 +5,8 @@ const DURHAM_SPORTS_CACHE_KEY = "daymark-durham-sports-cache-v1";
 const GOOGLE_SESSION_KEY = "daymark-google-session-v1";
 const SPOTIFY_SESSION_KEY = "daymark-spotify-session-v1";
 const SPOTIFY_PKCE_KEY = "daymark-spotify-pkce-v1";
-const GOOGLE_SCOPE_VERSION = "gmail-modify-v1";
+const GOOGLE_SCOPE_VERSION = "sheets-v1";
+const DESK_SETTINGS_KEY = "daymark-desk-settings-v1";
 const GOOGLE_SCOPE_VERSION_STORAGE_KEY = "daymark-google-scope-version";
 const STATE_SCHEMA_VERSION = 16;
 const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -20,7 +21,24 @@ const REFRESH_SCHEDULER_INTERVAL_MS = 15 * 1000;
 const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/gmail.modify",
+  "https://www.googleapis.com/auth/spreadsheets.readonly",
 ].join(" ");
+
+// Device-local desk settings (never committed: the repo is public).
+// { landedSheetId, aiProvider, aiKey, soundcloudUser, soundcloudArtists }
+function loadDeskSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(DESK_SETTINGS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDeskSettings(partial) {
+  const merged = { ...loadDeskSettings(), ...partial };
+  localStorage.setItem(DESK_SETTINGS_KEY, JSON.stringify(merged));
+  return merged;
+}
 const SPOTIFY_SCOPES = [
   "user-read-private",
   "user-read-currently-playing",
@@ -28,6 +46,8 @@ const SPOTIFY_SCOPES = [
   "user-read-recently-played",
   "user-top-read",
   "user-modify-playback-state",
+  "playlist-read-private",
+  "playlist-modify-private",
 ].join(" ");
 const DEMO_APPLICATION_IDS = new Set(["duke-policy", "public-affairs", "foundation", "dataworks"]);
 const DAILY_TASK_IDS = new Set([
@@ -289,8 +309,6 @@ function buildGlanceGrid(view) {
 
 function renderMasthead(view) {
   const nextView = VIEW_CONFIG[view] ? view : "today";
-  const tag = document.querySelector("#viewKicker");
-  if (tag) tag.textContent = VIEW_CONFIG[nextView].tag;
   setMastheadTitle(nextView);
   buildGlanceGrid(nextView);
   syncGlances();
@@ -379,6 +397,13 @@ function rollStatePeriods(candidate, previousSchemaVersion = STATE_SCHEMA_VERSIO
   }
 
   if (candidate.weekKey !== weekKey) {
+    const hadScores = Object.values(candidate.weeklyScores || {}).some((value) => value > 0);
+    if (hadScores) {
+      candidate.scoreHistory = candidate.scoreHistory || {};
+      candidate.scoreHistory[candidate.weekKey] = { ...candidate.weeklyScores };
+      const keys = Object.keys(candidate.scoreHistory).sort();
+      while (keys.length > 60) delete candidate.scoreHistory[keys.shift()];
+    }
     candidate.weeklyScores = { ...defaultState.weeklyScores };
     candidate.decisions = {};
     candidate.weekKey = weekKey;
@@ -568,6 +593,7 @@ function toggleFocusTimer() {
     state.focusEndsAt = Date.now() + 25 * 60 * 1000;
     focusCompletionAnnounced = false;
     showToast("Twenty-five quiet minutes. Go.");
+    startFocusSoundtrack();
   }
   saveState();
   updateFocusTimer();
@@ -628,7 +654,7 @@ function renderPracticalReminder() {
   document.querySelector("#practicalReminderTitle").textContent =
     reminder?.title || "Add a practical reminder";
   document.querySelector("#practicalReminderNote").textContent =
-    reminder?.note || "Tap to capture the thing that cannot slip.";
+    reminder?.note || "Tap to add a reminder.";
   document
     .querySelector("#practicalReminder")
     .classList.toggle("has-reminder", Boolean(reminder));
@@ -755,44 +781,44 @@ function updateLiveDay(date = new Date()) {
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
   const phaseContent = {
     morning: {
-      label: "Plan the day",
-      title: isWeekend ? "Give the day some room, Ty." : "Make the day smaller, Ty.",
-      note: "Three priorities. One focused block. Everything else can wait its turn.",
-      priorityKicker: "START HERE",
-      priorityTitle: "Today’s essential three",
-      signalKicker: "WHAT’S IN MOTION",
+      label: "Morning edition",
+      title: "The morning brief.",
+      note: "Today’s priorities, the calendar, and what came in overnight.",
+      priorityKicker: "PRIORITIES",
+      priorityTitle: "Today’s three",
+      signalKicker: "IN MOTION",
       signalTitle: "Calendar + priority mail",
-      readingKicker: "LATER TONIGHT · 28 MIN",
+      readingKicker: "SAVED READING · 28 MIN",
     },
     afternoon: {
-      label: "Protect the middle",
-      title: "Protect the next hour, Ty.",
-      note: "Review what moved, close one loop, and keep the rest from multiplying.",
-      priorityKicker: "MIDDAY CHECK",
-      priorityTitle: "What matters this afternoon",
-      signalKicker: "THE NEXT FEW HOURS",
+      label: "Midday edition",
+      title: "The midday check.",
+      note: "What moved this morning, and what the afternoon holds.",
+      priorityKicker: "PRIORITIES",
+      priorityTitle: "This afternoon’s three",
+      signalKicker: "NEXT UP",
       signalTitle: "Calendar + priority mail",
-      readingKicker: "FOR LATER · 28 MIN",
+      readingKicker: "SAVED READING · 28 MIN",
     },
     evening: {
-      label: "Land the day",
-      title: "Land the day cleanly, Ty.",
-      note: "Close what matters, capture the rest, and leave tomorrow one clear first move.",
-      priorityKicker: "CLOSE THE LOOPS",
-      priorityTitle: "Finish the day clean",
-      signalKicker: "WHAT MOVED",
+      label: "Evening edition",
+      title: "The evening edition.",
+      note: "The day’s results, open items, and tomorrow’s first event.",
+      priorityKicker: "OPEN ITEMS",
+      priorityTitle: "Still open today",
+      signalKicker: "THE LEDGER",
       signalTitle: "Day in review",
-      readingKicker: "WIND DOWN · 28 MIN",
+      readingKicker: "SAVED READING · 28 MIN",
     },
     night: {
-      label: "You are done",
-      title: "You’re done for today, Ty.",
-      note: "Nothing here needs another hour. Set tomorrow’s first move and step away.",
-      priorityKicker: "RESET",
-      priorityTitle: "Leave tomorrow lighter",
+      label: "Late edition",
+      title: "The late edition.",
+      note: "Tomorrow’s schedule is set. Nothing here needs attention tonight.",
+      priorityKicker: "TOMORROW",
+      priorityTitle: "Tomorrow’s setup",
       signalKicker: "TOMORROW",
-      signalTitle: "A clean start is ready",
-      readingKicker: "BEDTIME READING · 28 MIN",
+      signalTitle: "Tomorrow’s schedule",
+      readingKicker: "SAVED READING · 28 MIN",
     },
   }[phase];
 
@@ -1345,12 +1371,82 @@ function renderGoogleDisconnected() {
   document.querySelector("#tomorrowFirstValue").textContent = "NOT CONNECTED";
 }
 
+async function refreshLanded() {
+  const sheetId = loadDeskSettings().landedSheetId;
+  const section = document.querySelector("#landed");
+  if (!sheetId || !section) {
+    if (section) section.hidden = true;
+    return;
+  }
+  try {
+    const data = await fetchGoogleJson(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values/Tracker!A2:L`,
+    );
+    const rows = (data.values || [])
+      .map((row, index) => ({
+        id: `r${index}`,
+        company: (row[0] || "").trim(),
+        role: (row[1] || "").trim(),
+        track: (row[6] || "").trim(),
+        status: (row[7] || "").trim() || "Interested",
+        priority: (row[8] || "").trim(),
+        next: (row[10] || "").trim(),
+      }))
+      .filter((role) => role.company);
+    lastLandedRows = rows;
+    renderLanded(rows);
+  } catch {
+    const summary = document.querySelector("#landedSummary");
+    if (summary) summary.textContent = "Could not reach the Landed sheet — check access and the sheet ID.";
+    section.hidden = false;
+  }
+}
+
+function landedStageRank(status) {
+  const stage = status.toLowerCase();
+  if (stage.includes("offer")) return 0;
+  if (stage.includes("interview")) return 1;
+  if (stage.includes("screen")) return 2;
+  if (stage.includes("progress")) return 3;
+  if (stage.includes("applied")) return 4;
+  return 5;
+}
+
+function renderLanded(rows) {
+  const section = document.querySelector("#landed");
+  const summary = document.querySelector("#landedSummary");
+  const list = document.querySelector("#landedList");
+  if (!section || !summary || !list) return;
+  section.hidden = false;
+
+  const hot = rows
+    .filter((role) => landedStageRank(role.status) <= 2 || role.priority.toLowerCase() === "high")
+    .sort((a, b) => landedStageRank(a.status) - landedStageRank(b.status))
+    .slice(0, 5);
+  summary.textContent = `${rows.length} open roles · ${hot.length} worth attention today`;
+  list.innerHTML = hot
+    .map((role) => {
+      const green = landedStageRank(role.status) <= 1;
+      return `
+        <div class="application-row">
+          <div>
+            <strong>${escapeHtml(role.company)} — ${escapeHtml(role.role)}</strong>
+            <small>${escapeHtml(role.next || role.track || "")}</small>
+          </div>
+          <span class="landed-chip ${green ? "is-hot" : ""}">${escapeHtml(role.status)}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 async function loadGoogleData() {
   document.querySelector("#calendarStatus").textContent = "SYNCING";
   document.querySelector("#emailStatus").textContent = "SYNCING";
   const [calendarResult, emailResult] = await Promise.allSettled([
     fetchCalendarData(),
     fetchPriorityEmailData(),
+    refreshLanded(),
   ]);
 
   if (calendarResult.status === "fulfilled") renderCalendar(calendarResult.value);
@@ -1358,6 +1454,7 @@ async function loadGoogleData() {
 
   if (emailResult.status === "fulfilled") renderPriorityEmails(emailResult.value);
   else renderGooglePanelError("email", "Gmail access needs attention.");
+  refreshAIDesk();
 
   lastGoogleRefreshAt = Date.now();
   document.querySelector("#disconnectGoogle").hidden =
@@ -1380,6 +1477,1082 @@ async function refreshPriorityMail() {
     renderGooglePanelError("email", "Gmail access needs attention.");
   } finally {
     button.classList.remove("is-spinning");
+  }
+}
+
+// =====================================================================
+// The AI desk (web): provider-agnostic completion + editorial features.
+// =====================================================================
+
+const AI_VOICE =
+  "You are the desk editor of Daymark, Ty's personal morning-paper app. Write in a " +
+  "literate, warm, concise editorial voice — a great local columnist, not an assistant. " +
+  "Never invent facts that are not in the briefing data. Keep dates and times exactly as given.";
+
+function aiConfigured() {
+  const desk = loadDeskSettings();
+  return Boolean(desk.aiKey);
+}
+
+async function aiComplete(system, user, maxTokens = 500) {
+  const desk = loadDeskSettings();
+  if (!desk.aiKey) throw new Error("no-key");
+  if ((desk.aiProvider || "openai") === "anthropic") {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": desk.aiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content: user }],
+      }),
+    });
+    if (!response.ok) throw new Error(`ai-${response.status}`);
+    const data = await response.json();
+    return (data.content || [])
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("")
+      .trim();
+  }
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${desk.aiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      max_tokens: maxTokens,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  if (!response.ok) throw new Error(`ai-${response.status}`);
+  const data = await response.json();
+  return (data.choices?.[0]?.message?.content || "").trim();
+}
+
+function renderAIDeskCard(mountId, kicker, emptyPrompt, buildPrompt) {
+  const mount = document.querySelector(`#${mountId}`);
+  if (!mount) return;
+  if (!aiConfigured()) {
+    mount.hidden = true;
+    return;
+  }
+  mount.hidden = false;
+  if (!mount.dataset.built) {
+    mount.dataset.built = "true";
+    mount.innerHTML = `
+      <article class="panel ai-desk-card">
+        <div class="ai-desk-head">
+          <span>${escapeHtml(kicker.toUpperCase())}</span>
+          <button type="button" class="ai-desk-run">WRITE IT</button>
+        </div>
+        <p class="ai-desk-body">${escapeHtml(emptyPrompt)}</p>
+      </article>
+    `;
+    const button = mount.querySelector(".ai-desk-run");
+    const body = mount.querySelector(".ai-desk-body");
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      button.textContent = "WRITING…";
+      try {
+        const { system, user } = buildPrompt();
+        const text = await aiComplete(system, user);
+        body.textContent = text;
+        body.classList.add("is-written");
+        button.textContent = "REWRITE";
+      } catch {
+        showToast("The AI desk didn't answer — check the key in Desk settings.");
+        button.textContent = "WRITE IT";
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+}
+
+function refreshAIDesk() {
+  renderAIDeskCard(
+    "aiPlanMount",
+    "The AI desk · today's plan",
+    "Have the desk read your open items and propose today's three priorities plus a first move.",
+    () => {
+      const captures = state.captures.filter((item) => !item.done).map((item) => item.title).join("\n");
+      const apps = state.applications
+        .filter((app) => !app.archived && app.status !== "Closed")
+        .map((app) => `${app.status}: ${app.organization} — ${app.role} (next: ${app.nextStep || "?"})`)
+        .join("\n");
+      return {
+        system: AI_VOICE,
+        user: `Open captures:\n${captures || "(none)"}\n\nJob pipeline:\n${apps || "(none)"}\n\nPropose today's plan: exactly three priorities (one line each, imperative), then one "First move" — the single most specific 9 AM action.`,
+      };
+    },
+  );
+  const phase = getDayPhase();
+  const triageMount = document.querySelector("#aiTriageMount");
+  if (triageMount && (!lastPriorityEmailMessages.length || !aiConfigured())) triageMount.hidden = true;
+  if (lastPriorityEmailMessages.length) {
+    renderAIDeskCard(
+      "aiTriageMount",
+      "The AI desk · mail triage",
+      "One line per message: why it matters and the next step.",
+      () => ({
+        system: AI_VOICE,
+        user:
+          "Priority inbox (sender · subject · snippet):\n" +
+          lastPriorityEmailMessages
+            .slice(0, 8)
+            .map((m) => `${getSenderName(getMessageHeader(m, "From"))} · ${getMessageHeader(m, "Subject")} · ${(m.snippet || "").slice(0, 140)}`)
+            .join("\n") +
+          "\n\nFor each message, one line: why it matters and the suggested next step. Format each as \"Sender — action.\" Skip anything that needs no action.",
+      }),
+    );
+  }
+  const eveningMount = document.querySelector("#aiEveningMount");
+  if (eveningMount && (phase === "morning" || phase === "afternoon")) eveningMount.hidden = true;
+  if (phase === "evening" || phase === "night") {
+    renderAIDeskCard(
+      "aiEveningMount",
+      "The AI desk · evening column",
+      "A short column about how the day actually went.",
+      () => {
+        const doneTasks = Object.entries(state.tasks).filter(([, v]) => v).length;
+        const scores = Object.entries(state.weeklyScores)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ");
+        return {
+          system: AI_VOICE,
+          user:
+            `The day's ledger:\nTasks checked: ${doneTasks}\nScorecard: ${scores}\n` +
+            `Open captures: ${state.captures.filter((c) => !c.done && !c.archived).length}\n\n` +
+            "Write a 3-4 sentence evening column about how the day actually went — honest, a little wry, ending with one line about tomorrow's first move.",
+        };
+      },
+    );
+  }
+  renderAIDeskCard(
+    "aiCoachMount",
+    "The AI desk · job coach",
+    "Which roles deserve attention today, and what exactly to do for each.",
+    () => {
+      const landed = lastLandedRows.length
+        ? lastLandedRows
+            .map((role) => `${role.status} · ${role.company} · ${role.role} · priority ${role.priority || "—"} · next: ${role.next || "—"}`)
+            .join("\n")
+        : state.applications
+            .filter((app) => !app.archived && app.status !== "Closed")
+            .map((app) => `${app.status} · ${app.organization} · ${app.role} · next: ${app.nextStep || "—"}`)
+            .join("\n");
+      return {
+        system: AI_VOICE,
+        user: `Ty's job pipeline:\n${landed || "(empty)"}\n\nAs his job-search coach, name the 2-3 roles that most deserve attention today and say exactly what to do for each (one sentence per role). Flag anything going stale. Be direct.`,
+      };
+    },
+  );
+}
+
+// =====================================================================
+// The Discovery Wire (web): Deezer graph via JSONP (their API has no
+// CORS header), seeded by Spotify listening + thumbs feedback.
+// =====================================================================
+
+let lastLandedRows = [];
+const DISCOVERY_CACHE_KEY = "daymark-discovery-web-v1";
+let discoveryAudio = null;
+let discoveryPlayingId = null;
+
+function deezer(path) {
+  return new Promise((resolve) => {
+    const callback = `dz${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const cleanup = () => {
+      delete window[callback];
+      script.remove();
+    };
+    const timer = window.setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, 8000);
+    window[callback] = (data) => {
+      window.clearTimeout(timer);
+      cleanup();
+      resolve(data);
+    };
+    script.src = `https://api.deezer.com/${path}${path.includes("?") ? "&" : "?"}output=jsonp&callback=${callback}`;
+    script.onerror = () => {
+      window.clearTimeout(timer);
+      cleanup();
+      resolve(null);
+    };
+    document.head.append(script);
+  });
+}
+
+const DISCOVERIES_PLAYLIST_NAME = "Daymark Discoveries";
+
+async function addToDiscoveries(title, artist) {
+  if (!spotifyAccessToken) return false;
+  try {
+    let playlistId = localStorage.getItem("daymark-discoveries-playlist");
+    if (!playlistId) {
+      const lists = await fetchSpotify("/v1/me/playlists?limit=50");
+      const existing = (lists?.items || []).find((p) => p.name === DISCOVERIES_PLAYLIST_NAME);
+      if (existing) {
+        playlistId = existing.id;
+      } else {
+        const me = await fetchSpotify("/v1/me");
+        const created = await fetchSpotify(`/v1/users/${encodeURIComponent(me.id)}/playlists`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: DISCOVERIES_PLAYLIST_NAME,
+            public: false,
+            description: "Thumbs-ups from Daymark's Discovery Wire.",
+          }),
+        });
+        playlistId = created?.id;
+      }
+      if (playlistId) localStorage.setItem("daymark-discoveries-playlist", playlistId);
+    }
+    if (!playlistId) return false;
+    const query = encodeURIComponent(`track:${title} artist:${artist}`);
+    const found = await fetchSpotify(`/v1/search?type=track&limit=1&q=${query}`);
+    const uri = found?.tracks?.items?.[0]?.uri;
+    if (!uri) return false;
+    await fetchSpotify(`/v1/playlists/${playlistId}/tracks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uris: [uri] }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function discoveryFeedback() {
+  try {
+    return JSON.parse(localStorage.getItem("daymark-music-feedback")) || { likes: [], passes: [] };
+  } catch {
+    return { likes: [], passes: [] };
+  }
+}
+
+function saveDiscoveryFeedback(feedback) {
+  localStorage.setItem("daymark-music-feedback", JSON.stringify(feedback));
+}
+
+async function buildDiscoveryWire() {
+  const status = document.querySelector("#discoveryStatus");
+  const seedsFromSpotify = (lastSpotifyData.top || [])
+    .map((item) => item?.artists?.[0]?.name)
+    .filter(Boolean);
+  const recentArtists = (lastSpotifyData.recent || [])
+    .map((item) => item?.track?.artists?.[0]?.name)
+    .filter(Boolean);
+  const feedback = discoveryFeedback();
+  const seeds = [...new Set([...feedback.likes.slice(-4), ...seedsFromSpotify, ...recentArtists])].slice(0, 8);
+  if (!seeds.length) return [];
+
+  const exclude = new Set(
+    [...seedsFromSpotify, ...recentArtists, ...feedback.passes].map((name) => name.toLowerCase()),
+  );
+  const surfaced = JSON.parse(localStorage.getItem("daymark-discovery-surfaced") || "[]");
+  surfaced.slice(-120).forEach((name) => exclude.add(name));
+
+  if (status) status.textContent = "WALKING THE ARTIST GRAPH…";
+  const wire = [];
+  const wildcardTarget = 2;
+
+  for (const seed of seeds.sort(() => Math.random() - 0.5)) {
+    if (wire.filter((t) => !t.wildcard).length >= 8) break;
+    const found = await deezer(`search/artist?q=${encodeURIComponent(seed)}&limit=1`);
+    const artist = found?.data?.[0];
+    if (!artist) continue;
+    const related = await deezer(`artist/${artist.id}/related?limit=12`);
+    for (const candidate of (related?.data || []).sort(() => Math.random() - 0.5).slice(0, 3)) {
+      if (wire.filter((t) => !t.wildcard).length >= 8) break;
+      const key = candidate.name.toLowerCase();
+      if (exclude.has(key)) continue;
+      const top = await deezer(`artist/${candidate.id}/top?limit=3`);
+      const tracks = top?.data || [];
+      if (!tracks.length) continue;
+      const pick = tracks.length > 1 && Math.random() > 0.5 ? tracks[1] : tracks[0];
+      exclude.add(key);
+      wire.push({
+        id: String(pick.id),
+        title: pick.title,
+        artist: candidate.name,
+        preview: pick.preview || "",
+        art: pick.album?.cover_medium || "",
+        reason: `Related to ${seed}`,
+        wildcard: false,
+      });
+    }
+    // Wildcards: hop once more from the first seed's far relations.
+    if (wire.filter((t) => t.wildcard).length < wildcardTarget && related?.data?.length > 5) {
+      const bridge = related.data[Math.floor(Math.random() * related.data.length)];
+      const hop2 = await deezer(`artist/${bridge.id}/related?limit=10`);
+      for (const candidate of (hop2?.data || []).sort(() => Math.random() - 0.5)) {
+        if (wire.filter((t) => t.wildcard).length >= wildcardTarget) break;
+        const key = candidate.name.toLowerCase();
+        if (exclude.has(key)) continue;
+        const top = await deezer(`artist/${candidate.id}/top?limit=2`);
+        const pick = top?.data?.[0];
+        if (!pick) continue;
+        exclude.add(key);
+        wire.push({
+          id: String(pick.id),
+          title: pick.title,
+          artist: candidate.name,
+          preview: pick.preview || "",
+          art: pick.album?.cover_medium || "",
+          reason: `Wildcard via ${bridge.name}`,
+          wildcard: true,
+        });
+      }
+    }
+  }
+
+  localStorage.setItem(
+    "daymark-discovery-surfaced",
+    JSON.stringify([...surfaced, ...wire.map((t) => t.artist.toLowerCase())].slice(-200)),
+  );
+  return wire.sort(() => Math.random() - 0.5);
+}
+
+async function refreshDiscovery(force = false) {
+  const section = document.querySelector("#discovery");
+  if (!section || !spotifyAccessToken) return;
+  const dayKey = new Date().toISOString().slice(0, 10);
+  try {
+    const cached = JSON.parse(localStorage.getItem(DISCOVERY_CACHE_KEY));
+    if (!force && cached?.day === dayKey && cached.wire?.length) {
+      renderDiscovery(cached.wire);
+      return;
+    }
+  } catch {
+    // rebuild below
+  }
+  const wire = await buildDiscoveryWire();
+  if (wire.length) {
+    localStorage.setItem(DISCOVERY_CACHE_KEY, JSON.stringify({ day: dayKey, wire }));
+    renderDiscovery(wire);
+  }
+}
+
+function renderDiscovery(wire) {
+  const section = document.querySelector("#discovery");
+  const list = document.querySelector("#discoveryList");
+  const status = document.querySelector("#discoveryStatus");
+  if (!section || !list) return;
+  section.hidden = false;
+  if (status) status.textContent = "TEN FOR TODAY · THUMBS TEACH TOMORROW";
+  const feedback = discoveryFeedback();
+
+  list.innerHTML = wire
+    .map((track) => {
+      const liked = feedback.likes.includes(track.artist.toLowerCase());
+      const query = encodeURIComponent(`${track.artist} ${track.title}`);
+      return `
+        <div class="discovery-row" data-track-id="${escapeHtml(track.id)}">
+          <button class="discovery-art" type="button" data-preview="${escapeHtml(track.preview)}" aria-label="Preview">
+            ${track.art ? `<img src="${escapeHtml(track.art)}" alt="" width="46" height="46" />` : ""}
+            <span class="discovery-playmark" aria-hidden="true">▶</span>
+          </button>
+          <div class="discovery-copy">
+            <strong>${escapeHtml(track.title)}</strong>
+            <small>${escapeHtml(track.artist)}</small>
+            <em class="${track.wildcard ? "is-wildcard" : ""}">${escapeHtml(track.reason.toUpperCase())}</em>
+          </div>
+          <div class="discovery-actions">
+            <button type="button" class="discovery-like${liked ? " is-on" : ""}" data-artist="${escapeHtml(track.artist)}" aria-label="More like this">👍</button>
+            <button type="button" class="discovery-pass" data-artist="${escapeHtml(track.artist)}" aria-label="Less like this">👎</button>
+            <a href="spotify:search:${query}" aria-label="Open in Spotify">SP</a>
+            <a href="https://soundcloud.com/search?q=${query}" target="_blank" rel="noreferrer" aria-label="Find on SoundCloud">SC</a>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  list.querySelectorAll(".discovery-art").forEach((button) => {
+    button.addEventListener("click", () => {
+      const url = button.dataset.preview;
+      const row = button.closest(".discovery-row");
+      const trackId = row?.dataset.trackId;
+      if (!url) return;
+      if (discoveryPlayingId === trackId) {
+        discoveryAudio?.pause();
+        discoveryPlayingId = null;
+        row.classList.remove("is-previewing");
+        return;
+      }
+      discoveryAudio?.pause();
+      list.querySelectorAll(".is-previewing").forEach((el) => el.classList.remove("is-previewing"));
+      discoveryAudio = new Audio(url);
+      discoveryAudio.play();
+      discoveryPlayingId = trackId;
+      row.classList.add("is-previewing");
+      discoveryAudio.addEventListener("ended", () => {
+        discoveryPlayingId = null;
+        row.classList.remove("is-previewing");
+      });
+    });
+  });
+  list.querySelectorAll(".discovery-like").forEach((button) => {
+    button.addEventListener("click", () => {
+      const feedbackNow = discoveryFeedback();
+      const key = button.dataset.artist.toLowerCase();
+      if (!feedbackNow.likes.includes(key)) feedbackNow.likes.push(key);
+      feedbackNow.passes = feedbackNow.passes.filter((name) => name !== key);
+      saveDiscoveryFeedback(feedbackNow);
+      button.classList.add("is-on");
+      const row = button.closest(".discovery-row");
+      const title = row?.querySelector(".discovery-copy strong")?.textContent || "";
+      addToDiscoveries(title, button.dataset.artist).then((added) => {
+        showToast(added ? "Filed to Daymark Discoveries." : `Noted — more like ${button.dataset.artist}.`);
+      });
+    });
+  });
+  list.querySelectorAll(".discovery-pass").forEach((button) => {
+    button.addEventListener("click", () => {
+      const feedbackNow = discoveryFeedback();
+      const key = button.dataset.artist.toLowerCase();
+      if (!feedbackNow.passes.includes(key)) feedbackNow.passes.push(key);
+      feedbackNow.likes = feedbackNow.likes.filter((name) => name !== key);
+      saveDiscoveryFeedback(feedbackNow);
+      button.closest(".discovery-row")?.remove();
+    });
+  });
+}
+
+// =====================================================================
+// SoundCloud shelf (web): official widget iframes for likes + artists.
+// =====================================================================
+
+function renderSoundCloudShelf() {
+  const desk = loadDeskSettings();
+  const section = document.querySelector("#soundcloudShelf");
+  const host = document.querySelector("#soundcloudWidgets");
+  if (!section || !host) return;
+  const artists = (desk.soundcloudArtists || "")
+    .split(",")
+    .map((slug) => slug.trim().toLowerCase())
+    .filter(Boolean);
+  const resources = [];
+  if (desk.soundcloudUser) {
+    resources.push({ label: "YOUR LIKES", url: `https://soundcloud.com/${desk.soundcloudUser}/likes` });
+  }
+  artists.forEach((slug) => resources.push({ label: slug.toUpperCase(), url: `https://soundcloud.com/${slug}` }));
+  if (!resources.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  host.innerHTML = resources
+    .map(
+      (resource) => `
+        <p class="sc-label">${escapeHtml(resource.label)}</p>
+        <iframe
+          class="sc-widget"
+          title="SoundCloud: ${escapeHtml(resource.label)}"
+          width="100%" height="166" frameborder="no" scrolling="no" allow="autoplay"
+          src="https://w.soundcloud.com/player/?url=${encodeURIComponent(resource.url)}&color=%23c8102e&auto_play=false&hide_related=true&show_comments=false&show_reposts=false&visual=false"
+        ></iframe>
+      `,
+    )
+    .join("");
+}
+
+// =====================================================================
+// Desk settings card
+// =====================================================================
+
+async function startFocusSoundtrack() {
+  const raw = (loadDeskSettings().focusPlaylist || "").trim();
+  if (!raw || !spotifyAccessToken) return;
+  let uri = raw;
+  try {
+    const url = new URL(raw);
+    if (url.hostname.includes("spotify.com")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (parts.length >= 2) uri = `spotify:${parts[parts.length - 2]}:${parts[parts.length - 1]}`;
+    }
+  } catch {
+    // already a spotify: URI or plain id — leave as-is
+  }
+  try {
+    await fetchSpotify("/v1/me/player/play", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context_uri: uri }),
+    });
+  } catch {
+    // No active device — the timer still runs.
+  }
+}
+
+function exportDaymarkData() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    state,
+    deskSettings: { ...loadDeskSettings(), aiKey: undefined },
+    musicFeedback: discoveryFeedback(),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `daymark-backup-${formatApiDate(new Date())}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function importDaymarkData(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      if (!payload?.state?.schemaVersion) throw new Error("bad");
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload.state));
+      if (payload.deskSettings) saveDeskSettings(payload.deskSettings);
+      if (payload.musicFeedback) saveDiscoveryFeedback(payload.musicFeedback);
+      showToast("Backup restored — reloading.");
+      window.setTimeout(() => window.location.reload(), 700);
+    } catch {
+      showToast("That file didn't read as a Daymark backup.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function initializeDeskSettings() {
+  const desk = loadDeskSettings();
+  const sheet = document.querySelector("#deskLandedSheet");
+  const provider = document.querySelector("#deskAIProvider");
+  const key = document.querySelector("#deskAIKey");
+  const scUser = document.querySelector("#deskSCUser");
+  const scArtists = document.querySelector("#deskSCArtists");
+  const save = document.querySelector("#deskSettingsSave");
+  if (!save) return;
+  if (sheet) sheet.value = desk.landedSheetId || "";
+  if (provider) provider.value = desk.aiProvider || "openai";
+  if (key) key.value = desk.aiKey ? "••••••••••••" : "";
+  if (scUser) scUser.value = desk.soundcloudUser || "";
+  if (scArtists) scArtists.value = desk.soundcloudArtists || "";
+  const focusPlaylist = document.querySelector("#deskFocusPlaylist");
+  if (focusPlaylist) focusPlaylist.value = desk.focusPlaylist || "";
+  document.querySelector("#deskExport")?.addEventListener("click", exportDaymarkData);
+  document.querySelector("#deskImportFile")?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (file) importDaymarkData(file);
+    event.target.value = "";
+  });
+
+  save.addEventListener("click", () => {
+    const partial = {
+      landedSheetId: sheet?.value.trim() || "",
+      aiProvider: provider?.value || "openai",
+      soundcloudUser: scUser?.value.trim().toLowerCase() || "",
+      soundcloudArtists: scArtists?.value.trim() || "",
+      focusPlaylist: document.querySelector("#deskFocusPlaylist")?.value.trim() || "",
+    };
+    const keyValue = key?.value.trim() || "";
+    if (keyValue && !keyValue.startsWith("•")) partial.aiKey = keyValue;
+    if (!keyValue) partial.aiKey = "";
+    saveDeskSettings(partial);
+    if (key) key.value = loadDeskSettings().aiKey ? "••••••••••••" : "";
+    showToast("Desk settings saved to this browser.");
+    refreshAIDesk();
+    renderSoundCloudShelf();
+    refreshLanded();
+    refreshDiscovery(true);
+  });
+}
+
+// =====================================================================
+// The Sky Desk (web): deep weather + tonight's sky + the astrology desk.
+// =====================================================================
+
+let lastWeatherPayload = null;
+let lastAirQuality = null;
+
+async function fetchAirQuality() {
+  try {
+    const data = await fetchJson(
+      "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=35.9940&longitude=-78.8986" +
+        "&current=us_aqi,pm2_5,grass_pollen,ragweed_pollen,birch_pollen,oak_pollen&timezone=America%2FNew_York",
+    );
+    const c = data.current || {};
+    const pollens = [
+      ["Grass", c.grass_pollen],
+      ["Ragweed", c.ragweed_pollen],
+      ["Birch", c.birch_pollen],
+      ["Oak", c.oak_pollen],
+    ].filter(([, value]) => typeof value === "number");
+    pollens.sort((a, b) => b[1] - a[1]);
+    lastAirQuality = {
+      aqi: typeof c.us_aqi === "number" ? Math.round(c.us_aqi) : null,
+      pm25: typeof c.pm2_5 === "number" ? Math.round(c.pm2_5) : null,
+      pollenName: pollens[0] && pollens[0][1] > 0.5 ? pollens[0][0] : null,
+      pollenLevel: pollens[0] ? pollens[0][1] : 0,
+    };
+  } catch {
+    lastAirQuality = null;
+  }
+}
+
+function rainWindowSentence(payload) {
+  const times = payload?.hourly?.time || [];
+  const probs = payload?.hourly?.precipitation_probability || [];
+  const amounts = payload?.hourly?.precipitation || [];
+  const now = Date.now();
+  const upcoming = [];
+  for (let i = 0; i < times.length && upcoming.length < 12; i += 1) {
+    const t = new Date(times[i]).getTime();
+    if (t >= now) upcoming.push({ t, rainy: (probs[i] || 0) >= 40 || (amounts[i] || 0) >= 0.5 });
+  }
+  if (!upcoming.length) return "";
+  const hourText = (ms) =>
+    String(new Date(ms).getHours()).padStart(2, "0");
+  const first = upcoming.findIndex((h) => h.rainy);
+  if (first === -1) return "Dry for the next 12 hours.";
+  if (first === 0) {
+    const clears = upcoming.findIndex((h, i) => i > 0 && !h.rainy);
+    return clears === -1
+      ? "Rain continuing through the next 12 hours."
+      : `Rain now — clearing by ${hourText(upcoming[clears].t)}.`;
+  }
+  const ends = upcoming.findIndex((h, i) => i > first && !h.rainy);
+  return ends === -1
+    ? `Rain starts ~${hourText(upcoming[first].t)}.`
+    : `Dry until ~${hourText(upcoming[first].t)} — clears by ${hourText(upcoming[ends].t)}.`;
+}
+
+// =====================================================================
+// The Dome: interactive live sky chart. Opens on the sky overhead now —
+// an equidistant azimuthal projection centered on the zenith, N at top.
+// Drag to pan (when zoomed), wheel/pinch to zoom, tap a star to name it.
+// =====================================================================
+
+let skyData = null;
+let domeState = { zoom: 1, panX: 0, panY: 0, selected: null, timer: null };
+
+async function loadSkyData() {
+  if (skyData) return skyData;
+  try {
+    const response = await fetch("./skydata.json?v=24");
+    skyData = await response.json();
+  } catch {
+    skyData = { stars: [], lines: [] };
+  }
+  return skyData;
+}
+
+function starColor(bv) {
+  if (bv < 0.0) return "#cfd8ff";
+  if (bv < 0.4) return "#eef2ff";
+  if (bv < 0.8) return "#fff7e8";
+  if (bv < 1.2) return "#ffe9c4";
+  return "#ffd9a0";
+}
+
+function renderDome(canvas) {
+  const data = skyData;
+  if (!data || !canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const cssSize = canvas.clientWidth;
+  if (canvas.width !== cssSize * dpr) {
+    canvas.width = cssSize * dpr;
+    canvas.height = cssSize * dpr;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const size = cssSize;
+  const now = new Date();
+  const { zoom, panX, panY } = domeState;
+  const R = (size / 2 - 14) * zoom;
+  const cx = size / 2 + panX;
+  const cy = size / 2 + panY;
+
+  const project = (raDec) => {
+    const h = window.DaymarkAstro.horizontal(raDec[0], raDec[1], now, 35.994, -78.8986);
+    if (h.alt < -1) return null;
+    const r = (R * (90 - h.alt)) / 90;
+    const azRad = (h.az * Math.PI) / 180;
+    return { x: cx + r * Math.sin(azRad), y: cy - r * Math.cos(azRad), alt: h.alt };
+  };
+
+  // Night ground
+  ctx.fillStyle = "#0b1020";
+  ctx.fillRect(0, 0, size, size);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Constellation lines
+  ctx.strokeStyle = "rgba(120, 140, 190, 0.35)";
+  ctx.lineWidth = 1;
+  for (const segment of data.lines) {
+    let prev = null;
+    for (const point of segment) {
+      const q = project(point);
+      if (q && prev) {
+        const jump = Math.hypot(q.x - prev.x, q.y - prev.y);
+        if (jump < R * 0.7) {
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(q.x, q.y);
+          ctx.stroke();
+        }
+      }
+      prev = q;
+    }
+  }
+
+  // Stars
+  const visibleStars = [];
+  for (const star of data.stars) {
+    const q = project(star);
+    if (!q) continue;
+    const mag = star[2];
+    const radius = Math.max(0.5, (5.4 - mag) * 0.62) * Math.sqrt(zoom);
+    ctx.beginPath();
+    ctx.fillStyle = starColor(star[3]);
+    ctx.arc(q.x, q.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    if (star[4]) visibleStars.push({ x: q.x, y: q.y, name: star[4], mag });
+    // Label the brightest when zoomed in
+    if (star[4] && (zoom >= 2 || mag < 0.8)) {
+      ctx.fillStyle = "rgba(200, 212, 245, 0.75)";
+      ctx.font = "9px -apple-system, sans-serif";
+      ctx.fillText(star[4], q.x + radius + 3, q.y + 3);
+    }
+  }
+  domeState.hitTargets = visibleStars;
+
+  // Sun / Moon / planets
+  for (const body of window.DaymarkAstro.chartBodies(now)) {
+    const q = project([body.ra, body.dec]);
+    if (!q) continue;
+    if (body.kind === "sun") {
+      ctx.beginPath();
+      ctx.fillStyle = "#ffd75e";
+      ctx.arc(q.x, q.y, 7 * Math.sqrt(zoom), 0, Math.PI * 2);
+      ctx.fill();
+    } else if (body.kind === "moon") {
+      ctx.beginPath();
+      ctx.fillStyle = "#e8ecf5";
+      ctx.arc(q.x, q.y, 6 * Math.sqrt(zoom), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.fillStyle = "#f0c36d";
+      ctx.arc(q.x, q.y, 2.6 * Math.sqrt(zoom), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = body.kind === "planet" ? "#f0c36d" : "#cfd6e8";
+    ctx.font = "700 9.5px -apple-system, sans-serif";
+    ctx.fillText(body.name.toUpperCase(), q.x + 8, q.y + 3);
+  }
+
+  // Selected star tooltip
+  if (domeState.selected) {
+    const sel = domeState.selected;
+    ctx.strokeStyle = "#c8102e";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(sel.x, sel.y, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 11px -apple-system, sans-serif";
+    ctx.fillText(`${sel.name} · mag ${sel.mag.toFixed(1)}`, Math.min(sel.x + 12, size - 120), sel.y - 10);
+  }
+  ctx.restore();
+
+  // Horizon ring + cardinals
+  ctx.strokeStyle = "rgba(200, 208, 230, 0.5)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(220, 226, 244, 0.85)";
+  ctx.font = "800 10px -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  const cardinals = [["N", 0], ["E", 90], ["S", 180], ["W", 270]];
+  for (const [label, az] of cardinals) {
+    const rad = (az * Math.PI) / 180;
+    ctx.fillText(label, cx + (R + 8) * Math.sin(rad), cy - (R + 8) * Math.cos(rad) + 3);
+  }
+  ctx.textAlign = "left";
+}
+
+function bindDome(canvas) {
+  if (canvas.dataset.bound) return;
+  canvas.dataset.bound = "true";
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  let moved = 0;
+  let pinchDist = 0;
+
+  const clampPan = () => {
+    const limit = (canvas.clientWidth / 2) * (domeState.zoom - 1);
+    domeState.panX = Math.max(-limit, Math.min(limit, domeState.panX));
+    domeState.panY = Math.max(-limit, Math.min(limit, domeState.panY));
+  };
+
+  canvas.addEventListener("pointerdown", (event) => {
+    dragging = true;
+    moved = 0;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - lastX;
+    const dy = event.clientY - lastY;
+    moved += Math.abs(dx) + Math.abs(dy);
+    lastX = event.clientX;
+    lastY = event.clientY;
+    if (domeState.zoom > 1) {
+      domeState.panX += dx;
+      domeState.panY += dy;
+      clampPan();
+      renderDome(canvas);
+    }
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    dragging = false;
+    if (moved < 6) {
+      // Tap: select the nearest named star.
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      let best = null;
+      let bestDist = 14;
+      for (const star of domeState.hitTargets || []) {
+        const dist = Math.hypot(star.x - x, star.y - y);
+        if (dist < bestDist) {
+          best = star;
+          bestDist = dist;
+        }
+      }
+      domeState.selected = best;
+      renderDome(canvas);
+    }
+  });
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    domeState.zoom = Math.max(1, Math.min(4, domeState.zoom * (event.deltaY < 0 ? 1.12 : 0.9)));
+    if (domeState.zoom === 1) { domeState.panX = 0; domeState.panY = 0; }
+    clampPan();
+    renderDome(canvas);
+  }, { passive: false });
+  canvas.addEventListener("touchmove", (event) => {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = Math.hypot(
+        event.touches[0].clientX - event.touches[1].clientX,
+        event.touches[0].clientY - event.touches[1].clientY,
+      );
+      if (pinchDist) {
+        domeState.zoom = Math.max(1, Math.min(4, domeState.zoom * (dist / pinchDist)));
+        if (domeState.zoom === 1) { domeState.panX = 0; domeState.panY = 0; }
+        clampPan();
+        renderDome(canvas);
+      }
+      pinchDist = dist;
+    }
+  }, { passive: false });
+  canvas.addEventListener("touchend", () => { pinchDist = 0; });
+}
+
+async function mountDome() {
+  const canvas = document.querySelector("#skyDome");
+  if (!canvas) return;
+  await loadSkyData();
+  bindDome(canvas);
+  renderDome(canvas);
+  window.clearInterval(domeState.timer);
+  domeState.timer = window.setInterval(() => renderDome(canvas), 60000);
+}
+
+function openSkyDesk() {
+  const overlay = document.querySelector("#skyOverlay");
+  const body = document.querySelector("#skyBody");
+  if (!overlay || !body) return;
+  overlay.hidden = false;
+  document.body.style.overflow = "hidden";
+  renderSkyDesk(body);
+}
+
+function closeSkyDesk() {
+  const overlay = document.querySelector("#skyOverlay");
+  if (overlay) overlay.hidden = true;
+  document.body.style.overflow = "";
+  window.clearInterval(domeState.timer);
+}
+
+function renderSkyDesk(body) {
+  const payload = lastWeatherPayload;
+  const astro = window.DaymarkAstro
+    ? window.DaymarkAstro.snapshot(35.994, -78.8986)
+    : null;
+  const timeText = (date) =>
+    date ? date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+
+  let html = `
+    <h3 class="sky-section">THE DOME · LIVE</h3>
+    <p class="sky-dome-note">The sky over Durham right now. Pinch or scroll to zoom, drag to pan, tap a star.</p>
+    <canvas id="skyDome" class="sky-dome"></canvas>
+  `;
+
+  if (payload) {
+    const current = payload.current || {};
+    const daily = payload.daily || {};
+    html += `
+      <div class="sky-stats">
+        <div><small>NOW</small><strong>${Math.round(current.temperature_2m ?? 0)}°</strong></div>
+        <div><small>WIND</small><strong>${Math.round(current.wind_speed_10m ?? 0)} mph</strong></div>
+        <div><small>HUMIDITY</small><strong>${current.relative_humidity_2m ?? "—"}%</strong></div>
+        <div><small>UV MAX</small><strong>${daily.uv_index_max?.[0] != null ? Math.round(daily.uv_index_max[0]) : "—"}</strong></div>
+      </div>
+      <p class="sky-rainline">${escapeHtml(rainWindowSentence(payload))}</p>
+    `;
+
+    // 7-day outlook
+    const week = [];
+    for (let i = 1; i < Math.min(8, (daily.time || []).length); i += 1) {
+      week.push(`
+        <div class="sky-day">
+          <span>${new Date(`${daily.time[i]}T12:00`).toLocaleDateString("en-US", { weekday: "short" })}</span>
+          <i class="wx">${weatherIcon(daily.weather_code?.[i] ?? 0)}</i>
+          <em>${(daily.precipitation_probability_max?.[i] ?? 0) > 20 ? `${daily.precipitation_probability_max[i]}%` : ""}</em>
+          <b>${Math.round(daily.temperature_2m_min?.[i] ?? 0)}°–${Math.round(daily.temperature_2m_max?.[i] ?? 0)}°</b>
+        </div>
+      `);
+    }
+    html += `<h3 class="sky-section">THE WEEK AHEAD</h3><div class="sky-week">${week.join("")}</div>`;
+  }
+
+  html += `
+    <h3 class="sky-section">RADAR</h3>
+    <iframe class="sky-radar" title="Durham radar (RainViewer)" src="https://www.rainviewer.com/map.html?loc=35.994,-78.8986,8&oCS=1&c=3&o=83&lm=1&layer=radar&sm=1&sn=1" loading="lazy" allow="fullscreen"></iframe>
+  `;
+
+  if (lastAirQuality) {
+    html += `
+      <h3 class="sky-section">THE AIR</h3>
+      <div class="sky-stats">
+        <div><small>AQI</small><strong>${lastAirQuality.aqi ?? "—"}</strong></div>
+        <div><small>PM2.5</small><strong>${lastAirQuality.pm25 ?? "—"}</strong></div>
+        <div><small>POLLEN</small><strong>${escapeHtml(lastAirQuality.pollenName || "Low")}</strong></div>
+      </div>
+    `;
+  }
+
+  if (astro) {
+    html += `
+      <h3 class="sky-section">SUN &amp; MOON</h3>
+      <div class="sky-moon">
+        <strong>${escapeHtml(astro.moon.phase)}</strong>
+        <span>${Math.round(astro.moon.illumination * 100)}% lit · day ${Math.round(astro.moon.ageDays)} · Moon in ${escapeHtml(astro.moon.sign)}</span>
+      </div>
+      <div class="sky-almanac">
+        <div><span>Sunrise</span><b>${timeText(astro.sun.sunrise)}</b></div>
+        <div><span>Sunset</span><b>${timeText(astro.sun.sunset)}</b></div>
+        <div><span>Moonrise</span><b>${timeText(astro.moon.moonrise)}</b></div>
+        <div><span>Moonset</span><b>${timeText(astro.moon.moonset)}</b></div>
+      </div>
+      <h3 class="sky-section">TONIGHT'S SKY</h3>
+      <div class="sky-planets">
+        ${astro.planets
+          .map(
+            (planet) => `
+          <div class="${planet.visible ? "is-up" : ""}">
+            <i></i><span>${escapeHtml(planet.name)}</span>
+            <b>${planet.visible ? (planet.rise && planet.rise > new Date() ? `Rises ${timeText(planet.rise)}` : "Up tonight") : "Not visible"}</b>
+          </div>
+        `,
+          )
+          .join("")}
+      </div>
+      <h3 class="sky-section">COMING ATTRACTIONS</h3>
+      <div class="sky-events">
+        ${window.DaymarkAstro.upcomingEvents().map((event) => {
+          const days = Math.round((event.date - Date.now()) / 86400000);
+          const when = event.date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const glyph = event.kind === "shower" ? "✦" : event.kind === "eclipse" ? "◐" : "●";
+          return `
+            <div>
+              <i>${glyph}</i>
+              <div class="sky-event-copy"><span>${escapeHtml(event.title)}</span><small>${escapeHtml(event.detail)}</small></div>
+              <div class="sky-event-when"><b>${when}</b><em class="${days <= 3 ? "is-soon" : ""}">${days <= 0 ? "TONIGHT" : `IN ${days} DAY${days === 1 ? "" : "S"}`}</em></div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+      <h3 class="sky-section">THE ASTROLOGY DESK</h3>
+      <div class="sky-astrology">
+        <div class="sky-astrology-head">
+          <span>TAURUS · APRIL 21</span>
+          ${astro.mercuryRetrograde ? '<em class="sky-rx">MERCURY RX</em>' : ""}
+        </div>
+        <p>Sun in ${escapeHtml(astro.sunSign)} · Moon in ${escapeHtml(astro.moon.sign)}${astro.mercuryRetrograde ? " · Mercury retrograde" : ""}</p>
+        <p class="sky-horoscope" id="skyHoroscope">${
+          aiConfigured()
+            ? "The desk can write today's horoscope from these transits."
+            : "Add an AI key in Desk settings and the desk writes today's horoscope from these transits."
+        }</p>
+        ${aiConfigured() ? '<button class="ai-desk-run" id="skyHoroscopeRun" type="button">WRITE TODAY\'S HOROSCOPE</button>' : ""}
+      </div>
+    `;
+  }
+
+  body.innerHTML = html;
+  mountDome();
+
+  const run = body.querySelector("#skyHoroscopeRun");
+  if (run && astro) {
+    run.addEventListener("click", async () => {
+      run.disabled = true;
+      run.textContent = "WRITING…";
+      try {
+        const transits =
+          `Sun in ${astro.sunSign}. Moon in ${astro.moon.sign}, ${astro.moon.phase} ` +
+          `(${Math.round(astro.moon.illumination * 100)}% lit, day ${Math.round(astro.moon.ageDays)}). ` +
+          `Mercury retrograde: ${astro.mercuryRetrograde ? "yes" : "no"}. ` +
+          `Planets visible tonight: ${astro.planets.filter((p) => p.visible).map((p) => p.name).join(", ") || "none"}.`;
+        const text = await aiComplete(
+          AI_VOICE,
+          `Ty is a Taurus (born April 21, 1986). Today's real computed sky:\n\n${transits}\n\n` +
+            "Write today's horoscope for him: 3-4 sentences, editorial and a little playful, " +
+            "grounded in these actual transits. No generic filler.",
+          300,
+        );
+        const target = body.querySelector("#skyHoroscope");
+        if (target) {
+          target.textContent = text;
+          target.classList.add("is-written");
+        }
+        run.textContent = "REWRITE";
+      } catch {
+        showToast("The AI desk didn't answer — check the key in Desk settings.");
+        run.textContent = "WRITE TODAY'S HOROSCOPE";
+      } finally {
+        run.disabled = false;
+      }
+    });
   }
 }
 
@@ -2299,7 +3472,10 @@ async function refreshSpotify(force = false) {
     if (profileResult.status === "fulfilled" && profileResult.value) {
       lastSpotifyData.profile = profileResult.value;
     }
-    if (refreshLibrary) lastSpotifyLibraryRefreshAt = Date.now();
+    if (refreshLibrary) {
+      lastSpotifyLibraryRefreshAt = Date.now();
+      refreshDiscovery();
+    }
     renderSpotifyPanel(lastSpotifyData);
   } catch (error) {
     if (!spotifyRefreshToken && Date.now() >= spotifyTokenExpiresAt) {
@@ -2709,9 +3885,10 @@ function updateSyncState() {
 function getWeatherUrl() {
   return (
     "https://api.open-meteo.com/v1/forecast?latitude=35.9940&longitude=-78.8986" +
-    "&current=temperature_2m,apparent_temperature,weather_code" +
-    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset,sunrise" +
-    "&temperature_unit=fahrenheit&timezone=America%2FNew_York&forecast_days=2"
+    "&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m" +
+    "&hourly=precipitation_probability,precipitation" +
+    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset,sunrise,weather_code,uv_index_max" +
+    "&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FNew_York&forecast_days=8"
   );
 }
 
@@ -2850,12 +4027,15 @@ async function refreshWeather(force = false) {
   try {
     const data = await fetchJson(getWeatherUrl());
     const updatedAt = new Date();
+    lastWeatherPayload = data;
     renderWeather(data, "live", updatedAt);
     writeLiveCache(WEATHER_CACHE_KEY, data);
     publicFeedStatus.weather = "live";
+    fetchAirQuality();
   } catch {
     const cached = readLiveCache(WEATHER_CACHE_KEY);
     if (cached?.data) {
+      lastWeatherPayload = cached.data;
       renderWeather(cached.data, "cached", cached.savedAt);
       publicFeedStatus.weather = "cached";
     } else {
@@ -3058,6 +4238,39 @@ function renderWeeklyScorecard() {
       dots.append(button);
     }
   });
+
+  renderScoreTrends();
+}
+
+const SCORE_TARGETS = { jobs: 5, veraya: 4, writing: 3, fitness: 4, household: 5 };
+
+function renderScoreTrends() {
+  const host = document.querySelector("#scoreTrends");
+  const history = state.scoreHistory || {};
+  const weeks = Object.keys(history).sort().slice(-7);
+  if (!host) return;
+  if (!weeks.length) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  host.innerHTML =
+    '<p class="trend-title">EIGHT-WEEK TREND</p>' +
+    Object.keys(SCORE_TARGETS)
+      .map((key) => {
+        const values = weeks.map((week) => history[week]?.[key] || 0);
+        values.push(Number(state.weeklyScores[key]) || 0);
+        const target = SCORE_TARGETS[key];
+        const bars = values
+          .map((value, index) => {
+            const ratio = Math.min(1, value / target);
+            const isCurrent = index === values.length - 1;
+            return `<i class="${isCurrent ? "is-current" : ratio >= 1 ? "is-hit" : ""}" style="height:${Math.max(3, Math.round(22 * ratio))}px"></i>`;
+          })
+          .join("");
+        return `<div class="trend-row"><span>${key}</span><div class="trend-bars">${bars}</div></div>`;
+      })
+      .join("");
 }
 
 function hydrateDecisions() {
@@ -3482,6 +4695,14 @@ renderFocusRail();
 updateFocusTimer();
 restoreGoogleSession();
 initializeSpotify();
+initializeDeskSettings();
+document.querySelector("#openSkyDesk")?.addEventListener("click", openSkyDesk);
+document.querySelector("#skyClose")?.addEventListener("click", closeSkyDesk);
+document.querySelector("#skyOverlay")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) closeSkyDesk();
+});
+refreshAIDesk();
+renderSoundCloudShelf();
 refreshAllData(true);
 window.setInterval(() => {
   updateClock();

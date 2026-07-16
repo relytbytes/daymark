@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=19" />
+    <link rel="manifest" href="./manifest.webmanifest?v=27" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,8 +18,9 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=19" />
-    <script src="./config.js?v=19"></script>
+    <link rel="stylesheet" href="./styles.css?v=27" />
+    <script src="./config.js?v=27"></script>
+    <script src="./astro.js?v=27" defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -34,7 +35,6 @@
         </a>
 
         <div class="topbar-actions">
-          <span class="masthead-tag" id="viewKicker">Morning Brief</span>
           <span class="sync-state" id="syncState">
             <span class="sync-dot"></span>
             <span class="sync-label">waiting</span>
@@ -58,7 +58,7 @@
             <p class="masthead-date" id="dateLabel">THURSDAY · JULY 2</p>
             <span class="masthead-phase">
               <span class="live-pulse" aria-hidden="true"></span>
-              <strong id="phaseLabel">Plan the day</strong>
+              <strong id="phaseLabel">Morning edition</strong>
             </span>
           </div>
           <h1 class="masthead-title" id="viewTitle">Good morning, <i>Ty.</i></h1>
@@ -78,8 +78,8 @@
         <section class="hero" id="today" data-view-section="today">
           <div class="hero-copy">
             <p class="eyebrow">Lead · Your day</p>
-            <h1 id="heroTitle">Make the day smaller, Ty.</h1>
-            <p class="hero-note" id="heroNote">Three priorities. One focused block. Everything else can wait its turn.</p>
+            <h1 id="heroTitle">The morning brief.</h1>
+            <p class="hero-note" id="heroNote">Today’s priorities, the calendar, and what came in overnight.</p>
           </div>
 
           <div class="hero-orbit" aria-label="Brief completion">
@@ -223,7 +223,7 @@
                   <span class="action-content">
                     <span class="action-topline"><span>TOMORROW</span><time>2 min</time></span>
                     <strong>Choose the first move</strong>
-                    <small>Put one specific task at 9:00 AM before the day fills up.</small>
+                    <small>Put one specific task on the 9:00 AM line.</small>
                   </span>
                   <span class="action-arrow" aria-hidden="true"></span>
                 </label>
@@ -240,6 +240,10 @@
                 <div class="capture-items" id="captureItems"></div>
               </article>
             </section>
+
+            <section class="section-block" id="aiPlanMount" data-view-section="today" hidden></section>
+            <section class="section-block" id="aiTriageMount" data-view-section="today" hidden></section>
+            <section class="section-block" id="aiEveningMount" data-view-section="today" hidden></section>
 
             <section class="section-block" id="signals" data-view-section="today">
               <div class="section-heading">
@@ -291,6 +295,22 @@
               </div>
               <p class="connection-note">Spotify can renew its session on this device. Google requires a quick reconnect when its short-lived browser access expires.</p>
             </section>
+
+            <section class="section-block" id="landed" data-view-section="work" hidden>
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">LIVE FROM LANDED</p>
+                  <h2>The pipeline</h2>
+                </div>
+                <a class="text-button" href="https://job-search-command-center-brown.vercel.app" target="_blank" rel="noreferrer">Open Landed</a>
+              </div>
+              <article class="panel">
+                <p class="landed-summary" id="landedSummary"></p>
+                <div class="application-list" id="landedList"></div>
+              </article>
+            </section>
+
+            <section class="section-block" id="aiCoachMount" data-view-section="work" hidden></section>
 
             <section class="section-block" id="jobs" data-view-section="work">
               <div class="section-heading">
@@ -451,6 +471,7 @@
                   <div><strong>Household</strong><small>0 of 5 tasks</small></div>
                   <div class="score-dots score-dots--gold" data-target="5" aria-label="0 of 5"></div>
                 </div>
+                <div id="scoreTrends" hidden></div>
               </article>
             </section>
 
@@ -476,7 +497,10 @@
                   <span><small>RAIN</small><b id="weatherRain">—%</b></span>
                   <span><small>SUNSET</small><b id="weatherSunset">—</b></span>
                 </div>
-                <a class="source-link weather-source-link" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather by Open-Meteo</a>
+                <div class="weather-links">
+                  <button class="text-button" id="openSkyDesk" type="button">Full Sky Desk ↗</button>
+                  <a class="source-link weather-source-link" href="https://open-meteo.com/" target="_blank" rel="noreferrer">Weather by Open-Meteo</a>
+                </div>
               </article>
 
               <div class="local-list">
@@ -494,7 +518,7 @@
                 </a>
                 <button class="local-reminder" id="practicalReminder" type="button" data-open-reminder>
                   <span class="local-icon local-icon--bell" aria-hidden="true">!</span>
-                  <div><small>PRACTICAL · YOURS</small><strong id="practicalReminderTitle">Add a practical reminder</strong><p id="practicalReminderNote">Tap to capture the thing that cannot slip.</p></div>
+                  <div><small>PRACTICAL · YOURS</small><strong id="practicalReminderTitle">Add a practical reminder</strong><p id="practicalReminderNote">Tap to add a reminder.</p></div>
                 </button>
               </div>
 
@@ -684,6 +708,67 @@
               </article>
             </section>
 
+            <section class="section-block" id="discovery" data-view-section="more" hidden>
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">NEW MUSIC · SEEDED BY YOUR LISTENING</p>
+                  <h2>The Discovery Wire</h2>
+                </div>
+                <span class="section-note" id="discoveryStatus"></span>
+              </div>
+              <article class="panel">
+                <div id="discoveryList"></div>
+              </article>
+            </section>
+
+            <section class="section-block" id="soundcloudShelf" data-view-section="more" hidden>
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">SOUNDCLOUD · OFFICIAL EMBED</p>
+                  <h2>The SoundCloud shelf</h2>
+                </div>
+              </div>
+              <div id="soundcloudWidgets"></div>
+            </section>
+
+            <section class="section-block" id="deskSettings" data-view-section="more">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">DEVICE-LOCAL · NEVER COMMITTED</p>
+                  <h2>Desk settings</h2>
+                </div>
+              </div>
+              <article class="panel desk-settings">
+                <label>Landed sheet ID
+                  <input type="text" id="deskLandedSheet" autocomplete="off" spellcheck="false" placeholder="from docs.google.com/spreadsheets/d/THIS_PART/edit" />
+                </label>
+                <label>AI provider
+                  <select id="deskAIProvider">
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                  </select>
+                </label>
+                <label>AI API key
+                  <input type="password" id="deskAIKey" autocomplete="off" placeholder="sk-…" />
+                </label>
+                <label>SoundCloud username
+                  <input type="text" id="deskSCUser" autocomplete="off" spellcheck="false" placeholder="your-profile-slug" />
+                </label>
+                <label>SoundCloud artists (comma-separated slugs)
+                  <input type="text" id="deskSCArtists" autocomplete="off" spellcheck="false" placeholder="fourtet, floatingpoints" />
+                </label>
+                <label>Focus soundtrack (Spotify playlist link)
+                  <input type="text" id="deskFocusPlaylist" autocomplete="off" spellcheck="false" placeholder="https://open.spotify.com/playlist/…" />
+                </label>
+                <button class="dialog-submit" id="deskSettingsSave" type="button">Save desk settings</button>
+                <div class="desk-backup">
+                  <button class="text-button" id="deskExport" type="button">Export backup</button>
+                  <label class="text-button desk-import">Import backup<input type="file" id="deskImportFile" accept="application/json" hidden /></label>
+                </div>
+                <p class="desk-settings-note">Stored in this browser only. The AI key powers the daily plan, job coach, evening column, and horoscope.</p>
+              </article>
+            </section>
+
             <section class="section-block reading-section" id="reading" data-view-section="more">
               <div class="section-heading">
                 <div>
@@ -740,8 +825,8 @@
 
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
-          <p>Enough for today.</p>
-          <small>Daymark keeps the signal. You keep the day. · BUILD 19</small>
+          <p>That’s the brief.</p>
+          <small>Daymark · Build 27</small>
         </footer>
       </main>
 
@@ -856,6 +941,19 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="./app.js?v=19" defer></script>
+    <div class="sky-overlay" id="skyOverlay" hidden>
+      <div class="sky-sheet" role="dialog" aria-modal="true" aria-label="The Sky Desk">
+        <div class="sky-head">
+          <div>
+            <p class="section-kicker">THE SKY DESK · DURHAM</p>
+            <h2>Above the Bull City.</h2>
+          </div>
+          <button class="dialog-close" id="skyClose" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="sky-body" id="skyBody"></div>
+      </div>
+    </div>
+
+    <script src="./app.js?v=27" defer></script>
   </body>
 </html>

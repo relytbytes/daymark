@@ -1,19 +1,23 @@
 :root {
   color-scheme: light;
-  --paper: #f1eee6;
-  --paper-deep: #e7e2d7;
-  --card: #fbfaf6;
-  --ink: #181a1c;
-  --muted: #73736d;
-  --line: #d8d3c9;
-  --coral: #ff603d;
-  --coral-soft: #ffd8cd;
-  --blue: #3155e7;
-  --blue-soft: #dce3ff;
-  --acid: #dffd61;
-  --green: #3d8b68;
-  --violet: #8c66d9;
-  --gold: #d8a52b;
+  /* The Daily × Scoreboard: white ground, ink, one disciplined red — red means "now". */
+  --paper: #fdfdfc;
+  --paper-deep: #f0efec;
+  --card: #ffffff;
+  --wash: #f8f7f5;
+  --ink: #141412;
+  --muted: #75726c;
+  --line: #e8e6e1;
+  --coral: #c8102e;
+  --coral-soft: #fbedef;
+  --blue: #1d6fe0;
+  --blue-soft: #eff4ff;
+  --acid: #f8f7f5;
+  --green: #0e9f6e;
+  --green-soft: #e9f7f1;
+  --down: #dc2626;
+  --violet: #6b4fa3;
+  --gold: #b98a1f;
   --radius-sm: 12px;
   --radius-md: 18px;
   --radius-lg: 26px;
@@ -500,9 +504,10 @@ body:not([data-view="today"]) footer {
   padding: 28px 24px 20px;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  background: var(--ink);
-  color: white;
-  box-shadow: 0 18px 50px rgba(24, 26, 28, 0.18);
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 34px rgba(20, 20, 18, 0.07), 0 1px 3px rgba(20, 20, 18, 0.04);
 }
 
 .hero::before,
@@ -517,11 +522,11 @@ body:not([data-view="today"]) footer {
   right: -106px;
   width: 292px;
   height: 292px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  border: 1px solid rgba(20, 20, 18, 0.06);
   border-radius: 50%;
   box-shadow:
-    0 0 0 38px rgba(255, 255, 255, 0.025),
-    0 0 0 78px rgba(255, 255, 255, 0.018);
+    0 0 0 38px rgba(20, 20, 18, 0.018),
+    0 0 0 78px rgba(20, 20, 18, 0.012);
 }
 
 .hero::after {
@@ -534,23 +539,14 @@ body:not([data-view="today"]) footer {
 
 body[data-phase="afternoon"] .hero::after,
 body[data-phase="evening"] .hero::after,
-body[data-phase="night"] .hero::after {
-  background: var(--blue);
-}
-
+body[data-phase="night"] .hero::after,
 body[data-phase="afternoon"] .live-pulse,
-body[data-phase="afternoon"] .day-progress i {
-  background: var(--blue);
-}
-
+body[data-phase="afternoon"] .day-progress i,
 body[data-phase="evening"] .live-pulse,
-body[data-phase="evening"] .day-progress i {
-  background: var(--violet);
-}
-
+body[data-phase="evening"] .day-progress i,
 body[data-phase="night"] .live-pulse,
 body[data-phase="night"] .day-progress i {
-  background: var(--acid);
+  background: var(--coral);
 }
 
 .hero-copy {
@@ -570,7 +566,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .eyebrow {
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--muted);
 }
 
 .hero h1 {
@@ -589,7 +585,7 @@ body[data-phase="night"] .day-progress i {
   font-family: var(--serif-note);
   font-size: 16px;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
   line-height: 1.4;
 }
 
@@ -602,7 +598,7 @@ body[data-phase="night"] .day-progress i {
   width: 92px;
   height: 92px;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.19);
+  border: 1px solid rgba(20, 20, 18, 0.14);
   border-radius: 50%;
 }
 
@@ -610,8 +606,8 @@ body[data-phase="night"] .day-progress i {
   position: absolute;
   width: 72px;
   height: 72px;
-  border: 7px solid rgba(255, 255, 255, 0.08);
-  border-top-color: var(--acid);
+  border: 7px solid rgba(20, 20, 18, 0.07);
+  border-top-color: var(--coral);
   border-radius: 50%;
   content: "";
   transform: rotate(30deg);
@@ -622,7 +618,7 @@ body[data-phase="night"] .day-progress i {
   display: flex;
   flex-direction: column;
   align-items: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -630,7 +626,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .orbit-label strong {
-  color: white;
+  color: var(--ink);
   font-size: 18px;
   letter-spacing: -0.04em;
 }
@@ -644,8 +640,8 @@ body[data-phase="night"] .day-progress i {
   align-items: center;
   justify-content: space-between;
   padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.62);
+  border-top: 2px solid var(--ink);
+  color: var(--muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -659,12 +655,12 @@ body[data-phase="night"] .day-progress i {
 }
 
 .hero-meta b {
-  color: white;
+  color: var(--ink);
   font-weight: 800;
 }
 
 .weather-glyph {
-  color: var(--acid);
+  color: var(--gold);
   font-size: 16px;
   font-style: normal;
 }
@@ -685,10 +681,11 @@ body[data-phase="night"] .day-progress i {
   margin-top: 14px;
   padding: 16px 16px 19px;
   overflow: hidden;
-  border: 1px solid rgba(24, 26, 28, 0.14);
-  border-radius: 20px;
-  background: var(--acid);
-  box-shadow: 0 9px 28px rgba(32, 30, 25, 0.07);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--coral);
+  border-radius: 0 20px 20px 0;
+  background: var(--wash);
+  box-shadow: 0 9px 28px rgba(32, 30, 25, 0.05);
 }
 
 .focus-marker {
@@ -782,7 +779,7 @@ body[data-phase="night"] .day-progress i {
   height: 0;
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
-  border-left: 8px solid var(--acid);
+  border-left: 8px solid white;
 }
 
 .focus-start.is-running .focus-play {
@@ -912,7 +909,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .glance-icon--weather {
-  background: var(--acid);
+  background: #f6ead0;
 }
 
 .glance-icon--weather::before {
@@ -1158,9 +1155,11 @@ body[data-phase="night"] .day-progress i {
 }
 
 .action-card--dark {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: white;
+  border-color: var(--line);
+  border-left: 3px solid var(--coral);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--wash);
+  color: var(--ink);
 }
 
 .action-card input,
@@ -1194,7 +1193,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .action-card--dark .custom-check {
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: #b8b5ad;
 }
 
 .action-card input:checked + .custom-check,
@@ -1236,7 +1235,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .action-card--dark .action-topline {
-  color: var(--acid);
+  color: var(--coral);
 }
 
 .action-topline time {
@@ -1247,7 +1246,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .action-card--dark .action-topline time {
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--muted);
 }
 
 .action-content strong {
@@ -1266,7 +1265,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .action-card--dark .action-content small {
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--muted);
 }
 
 .action-arrow {
@@ -1274,7 +1273,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .action-card--dark .action-arrow {
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--muted);
 }
 
 .text-button,
@@ -1868,8 +1867,8 @@ body[data-phase="night"] .day-progress i {
   margin-left: 7px;
   padding: 3px 5px;
   border-radius: 5px;
-  background: var(--acid);
-  color: #273208;
+  background: var(--coral-soft);
+  color: var(--coral);
   font-size: 9px;
 }
 
@@ -2263,8 +2262,8 @@ body[data-phase="night"] .day-progress i {
 
 .sun-art::before {
   inset: 23px;
-  background: var(--acid);
-  box-shadow: 0 6px 18px rgba(93, 116, 20, 0.16);
+  background: #f2c94c;
+  box-shadow: 0 6px 18px rgba(185, 138, 31, 0.24);
 }
 
 .sun-art::after {
@@ -2643,12 +2642,12 @@ body[data-phase="night"] .day-progress i {
 
 .bulls-game-card.is-live {
   background:
-    radial-gradient(circle at 100% 0, rgba(196, 240, 77, 0.2), transparent 42%),
+    radial-gradient(circle at 100% 0, rgba(229, 96, 32, 0.3), transparent 42%),
     #082d44;
 }
 
 .bulls-game-card.is-live > b {
-  color: var(--acid);
+  color: #f99b70;
 }
 
 .bulls-game-card.is-live > b::before {
@@ -4052,7 +4051,7 @@ body[data-phase="night"] .day-progress i {
 }
 
 .reading-copy small {
-  color: var(--acid);
+  color: var(--coral);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -4774,3 +4773,278 @@ body[data-phase="night"] #eveningActions {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* ---- The Landed wire ---- */
+.landed-summary {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.landed-chip {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--coral-soft);
+  color: var(--coral);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.landed-chip.is-hot {
+  background: var(--green-soft);
+  color: #0e7a54;
+}
+
+
+/* ---- The AI desk ---- */
+.ai-desk-card { padding: 16px; }
+.ai-desk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--coral);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+.ai-desk-run {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.ai-desk-run:disabled { opacity: 0.5; }
+.ai-desk-body {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--serif-note);
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.5;
+}
+.ai-desk-body.is-written {
+  color: var(--ink);
+  font-style: normal;
+  white-space: pre-wrap;
+}
+
+/* ---- The Discovery Wire ---- */
+.discovery-row {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.discovery-row:first-child { border-top: 0; }
+.discovery-art {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--paper-deep);
+}
+.discovery-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.discovery-playmark {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(20, 20, 18, 0.85);
+  color: white;
+  font-size: 7px;
+}
+.discovery-row.is-previewing .discovery-playmark { background: var(--coral); }
+.discovery-copy { min-width: 0; flex: 1; }
+.discovery-copy strong { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.discovery-copy small { display: block; color: var(--muted); font-size: 11px; }
+.discovery-copy em {
+  display: block;
+  color: var(--muted);
+  font-size: 7.5px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.discovery-copy em.is-wildcard { color: var(--violet); }
+.discovery-actions { display: flex; gap: 9px; align-items: center; flex: none; }
+.discovery-actions button {
+  border: 0;
+  background: none;
+  font-size: 13px;
+  padding: 2px;
+  filter: grayscale(1);
+}
+.discovery-actions button.is-on,
+.discovery-actions button:active { filter: none; }
+.discovery-actions a {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+/* ---- SoundCloud shelf ---- */
+.sc-label {
+  margin: 12px 0 6px;
+  color: var(--muted);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+.sc-widget { border-radius: 12px; display: block; }
+
+/* ---- Desk settings ---- */
+.desk-settings { display: grid; gap: 12px; padding: 16px; }
+.desk-settings label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.desk-settings input,
+.desk-settings select {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: inherit;
+}
+.desk-settings-note { margin: 0; color: var(--muted); font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+
+/* ---- The Sky Desk ---- */
+.weather-links { display: flex; align-items: center; justify-content: space-between; }
+.sky-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: end center;
+  background: rgba(20, 20, 18, 0.42);
+}
+.sky-sheet {
+  width: min(560px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--paper);
+  border-radius: 22px 22px 0 0;
+  padding: 22px 20px 34px;
+}
+.sky-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
+.sky-head h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 27px; font-weight: 400; letter-spacing: -0.04em; }
+.sky-section {
+  margin: 22px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+.sky-section::after { content: ""; flex: 1; height: 1px; background: var(--ink); }
+.sky-stats { display: flex; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.sky-stats > div { flex: 1; text-align: center; padding: 10px 4px; }
+.sky-stats > div + div { border-left: 1px solid var(--line); }
+.sky-stats small { display: block; color: var(--muted); font-size: 7.5px; font-weight: 800; letter-spacing: 0.1em; margin-bottom: 3px; }
+.sky-stats strong { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.sky-rainline { margin: 12px 0 0; font-family: var(--serif-note); font-size: 15px; font-style: italic; color: var(--ink); }
+.sky-week { display: grid; gap: 0; }
+.sky-day {
+  display: grid;
+  grid-template-columns: 44px 26px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.sky-day:last-child { border-bottom: 1px solid var(--line); }
+.sky-day span { font-weight: 700; }
+.sky-day em { color: var(--blue); font-size: 10px; font-style: normal; font-weight: 800; }
+.sky-day b { font-variant-numeric: tabular-nums; }
+.sky-moon { padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
+.sky-moon strong { display: block; font-family: var(--serif); font-size: 18px; font-weight: 500; }
+.sky-moon span { color: var(--muted); font-size: 11px; font-weight: 600; }
+.sky-almanac { display: grid; }
+.sky-almanac > div { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.sky-almanac span { color: var(--ink); font-weight: 600; }
+.sky-almanac b { font-variant-numeric: tabular-nums; }
+.sky-planets > div { display: flex; gap: 9px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.sky-planets i { width: 7px; height: 7px; border-radius: 50%; background: var(--paper-deep); }
+.sky-planets .is-up { color: var(--ink); font-weight: 600; }
+.sky-planets .is-up i { background: var(--coral); }
+.sky-planets b { margin-left: auto; font-size: 11px; font-weight: 700; }
+.sky-astrology { padding: 14px; background: var(--wash); border-left: 3px solid var(--coral); border-radius: 0 12px 12px 0; }
+.sky-astrology-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: var(--coral); font-size: 9px; font-weight: 900; letter-spacing: 0.14em; }
+.sky-rx { padding: 3px 8px; border-radius: 999px; background: var(--coral-soft); font-style: normal; }
+.sky-astrology p { margin: 0 0 8px; font-size: 12px; font-weight: 600; }
+.sky-horoscope { font-family: var(--serif-note); font-size: 14px; font-style: italic; color: var(--muted); line-height: 1.5; }
+.sky-horoscope.is-written { color: var(--ink); font-style: normal; }
+
+
+/* ---- Score trends ---- */
+.trend-title { margin: 14px 0 8px; color: var(--muted); font-size: 8.5px; font-weight: 800; letter-spacing: 0.12em; }
+.trend-row { display: flex; align-items: flex-end; gap: 10px; padding: 4px 0; }
+.trend-row span { width: 76px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.trend-bars { display: flex; align-items: flex-end; gap: 3px; height: 24px; }
+.trend-bars i { width: 14px; border-radius: 2px 2px 0 0; background: var(--paper-deep); }
+.trend-bars i.is-hit { background: rgba(200, 16, 46, 0.35); }
+.trend-bars i.is-current { background: var(--coral); }
+
+/* ---- Backup ---- */
+.desk-backup { display: flex; gap: 16px; }
+.desk-import { cursor: pointer; }
+
+.sky-radar { width: 100%; height: 300px; border: 1px solid var(--line); border-radius: 14px; display: block; }
+
+/* ---- The Dome ---- */
+.sky-dome {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  border-radius: 16px;
+  touch-action: none;
+  background: #0b1020;
+}
+.sky-dome-note { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+
+/* ---- Coming attractions ---- */
+.sky-events > div { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+.sky-events > div:last-child { border-bottom: 1px solid var(--line); }
+.sky-events i { font-style: normal; color: var(--gold); width: 20px; text-align: center; }
+.sky-event-copy { flex: 1; min-width: 0; }
+.sky-event-copy span { display: block; font-size: 13px; font-weight: 600; }
+.sky-event-copy small { color: var(--muted); font-size: 10.5px; }
+.sky-event-when { text-align: right; }
+.sky-event-when b { display: block; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.sky-event-when em { font-size: 7.5px; font-style: normal; font-weight: 800; letter-spacing: 0.08em; color: var(--muted); }
+.sky-event-when em.is-soon { color: var(--coral); }

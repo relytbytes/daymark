@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Daymark</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.relytbytes.daymark.morningbrief</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Daymark reads your calendar to build the day timeline, meeting prep, and tomorrow&#8217;s brief. Events never leave your device.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Daymark uses your location only to estimate travel time to your next meeting.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fraunces.ttf</string>
+		<string>Fraunces-Italic.ttf</string>
+		<string>Newsreader.ttf</string>
+		<string>Newsreader-Italic.ttf</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>Paper</string>
+	</dict>
+</dict>
+</plist>

@@ -1,0 +1,187 @@
+//
+//  RootView.swift
+//  Daymark
+//
+//  The app shell: section pages, editorial tab bar, capture, settings, toast.
+//
+
+import SwiftUI
+
+enum AppSection: String, CaseIterable, Identifiable {
+    case today, work, life, more
+    var id: String { rawValue }
+
+    var label: String { rawValue.capitalized }
+
+    var icon: String {
+        switch self {
+        case .today: return "house"
+        case .work: return "briefcase"
+        case .life: return "mappin.and.ellipse"
+        case .more: return "square.grid.2x2"
+        }
+    }
+}
+
+struct RootView: View {
+    @Environment(AppState.self) private var app
+    @State private var section: AppSection = .today
+    @State private var showCapture = false
+    @State private var showSettings = false
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Palette.paper.ignoresSafeArea()
+
+            Group {
+                switch section {
+                case .today: TodayView(showSettings: $showSettings)
+                case .work: WorkView(showSettings: $showSettings)
+                case .life: LifeView(showSettings: $showSettings)
+                case .more: MoreView(showSettings: $showSettings)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            tabBar
+        }
+        .sheet(isPresented: $showCapture) { CaptureSheet() }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .overlay(alignment: .bottom) { toast }
+        .task {
+            await app.refreshAll(force: false)
+            await app.syncNotifications()
+        }
+    }
+
+    // MARK: Tab bar
+
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            tabButton(.today)
+            tabButton(.work)
+            captureButton
+            tabButton(.life)
+            tabButton(.more)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .background(
+            Palette.paper.opacity(0.92)
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Palette.ink.opacity(0.8)).frame(height: 1)
+                }
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+
+    private func tabButton(_ target: AppSection) -> some View {
+        let selected = section == target
+        return Button {
+            if section == target { return }
+            section = target
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: target.icon)
+                    .font(.system(size: 19, weight: .regular))
+                    .symbolVariant(selected ? .fill : .none)
+                Text(target.label.uppercased())
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(0.6)
+            }
+            .foregroundStyle(selected ? Palette.ink : Color(hex: 0xA3A299))
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(target.label)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var captureButton: some View {
+        Button {
+            showCapture = true
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle().fill(Palette.coral).frame(width: 34, height: 34)
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                Text("CAPTURE")
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(0.6)
+                    .foregroundStyle(Palette.ink)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Quick capture")
+    }
+
+    // MARK: Toast
+
+    @ViewBuilder
+    private var toast: some View {
+        if let message = app.toastMessage {
+            Text(message)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .background(Palette.ink)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.bottom, 84)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(duration: 0.3), value: app.toastMessage)
+        }
+    }
+}
+
+/// Shared scroll scaffold every section page uses.
+struct SectionPage<Content: View>: View {
+    @Environment(AppState.self) private var app
+    let tag: String
+    @Binding var showSettings: Bool
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                MastheadTopline(
+                    tag: tag,
+                    refreshing: app.isRefreshing,
+                    onRefresh: { Task { await app.refreshAll(force: true) } },
+                    onSettings: { showSettings = true }
+                )
+                .padding(.bottom, 14)
+
+                content
+
+                footer
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 8)
+            .padding(.bottom, 108)
+        }
+        .scrollIndicators(.hidden)
+        .refreshable { await app.refreshAll(force: true) }
+        .background(Palette.paper)
+    }
+
+    private var footer: some View {
+        VStack(spacing: 8) {
+            BrandMark().padding(.top, 44)
+            Text("That\u{2019}s the brief.")
+                .font(DS.deck(15))
+                .foregroundStyle(Palette.muted)
+            Text("DAYMARK KEEPS THE SIGNAL. YOU KEEP THE DAY.")
+                .kickerStyle(Palette.subtle, size: 7.5, tracking: 1.4)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
