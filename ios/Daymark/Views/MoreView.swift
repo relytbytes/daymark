@@ -14,7 +14,6 @@ struct MoreView: View {
     @Binding var showSettings: Bool
     @State private var openURLItem: SheetLink?
     @State private var standingsView = "division"
-    @State private var showSpirit = false
 
     var body: some View {
         let phase = DayPhase.current()
@@ -32,7 +31,6 @@ struct MoreView: View {
                 }
             }
 
-            spiritOpener
             newsSection
             marketsSection
             sportsSection
@@ -45,38 +43,6 @@ struct MoreView: View {
         .sheet(item: $openURLItem) { item in
             SafariView(url: item.url).ignoresSafeArea()
         }
-        .sheet(isPresented: $showSpirit) {
-            SpiritView()
-        }
-    }
-
-    // MARK: Spirit Desk opener
-
-    private var spiritOpener: some View {
-        Button {
-            showSpirit = true
-        } label: {
-            HStack(spacing: 12) {
-                Text("☾")
-                    .font(.system(size: 22))
-                    .foregroundStyle(Palette.violet)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("THE SPIRIT DESK").kickerStyle(Palette.coral, size: 8.5, tracking: 1.3)
-                    Text("Horoscope, tarot, the oracle, crystals, chakras, and the sit.")
-                        .font(DS.label(12, weight: .medium))
-                        .foregroundStyle(Palette.muted)
-                        .multilineTextAlignment(.leading)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Palette.subtle)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .editorialPanel(padding: 14)
-        .padding(.top, 20)
     }
 
     // MARK: News brief

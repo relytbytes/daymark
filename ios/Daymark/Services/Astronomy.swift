@@ -229,7 +229,7 @@ enum Astronomy {
 
     static func planetSightings(latitude: Double, longitude: Double, date: Date, sun: SunTimes) -> [PlanetSighting] {
         let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
+        formatter.dateFormat = "HH:mm"
 
         return planetElements.keys.sorted(by: planetOrder).compactMap { name in
             let altitudeFn: (Double, Double, Double) -> Double = { jd, lat, lon in

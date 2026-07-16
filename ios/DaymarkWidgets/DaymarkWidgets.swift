@@ -180,7 +180,7 @@ struct GlanceProvider: TimelineProvider {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
         formatter.timeZone = TimeZone(identifier: "America/New_York")
         let out = DateFormatter()
-        out.dateFormat = "h:mm a"
+        out.dateFormat = "HH:mm"
         if let sunsetRaw = response.daily.sunset.first,
            let date = formatter.date(from: sunsetRaw) {
             bits.sunsetDate = date
@@ -320,7 +320,7 @@ struct GlanceProvider: TimelineProvider {
             let formatter = ISO8601DateFormatter()
             if let raw = game.gameDate, let date = formatter.date(from: raw) {
                 let out = DateFormatter()
-                out.dateFormat = "h:mm a"
+                out.dateFormat = "HH:mm"
                 return GameLine(label: label, text: "\(away) at \(home) · \(out.string(from: date))")
             }
             return GameLine(label: label, text: "\(away) at \(home)")
@@ -474,7 +474,7 @@ struct GlanceWidgetView: View {
                     if let title = desk.nextEventTitle, let time = desk.nextEventTime, time > entry.date {
                         HStack(spacing: 5) {
                             Circle().fill(WPalette.blue).frame(width: 5, height: 5)
-                            Text("\(time.formatted(date: .omitted, time: .shortened)) \(title)")
+                            Text("\(Self.hm(time)) \(title)")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(WPalette.ink)
                                 .lineLimit(1)
@@ -575,7 +575,7 @@ struct GlanceWidgetView: View {
                                 .fill(event.start <= entry.date && entry.date < event.end ? WPalette.red : WPalette.blue)
                                 .frame(width: 2.5, height: 18)
                             VStack(alignment: .leading, spacing: 0) {
-                                Text("\(event.isTomorrow ? "TOMORROW " : "")\(event.start.formatted(date: .omitted, time: .shortened))")
+                                Text("\(event.isTomorrow ? "TOMORROW " : "")\(Self.hm(event.start))")
                                     .font(.system(size: 7.5, weight: .heavy)).tracking(0.6)
                                     .foregroundStyle(event.isTomorrow ? WPalette.subtle : WPalette.red)
                                 Text(event.title)
@@ -671,6 +671,14 @@ struct GlanceWidgetView: View {
     private var rule: some View {
         Rectangle().fill(WPalette.line).frame(height: 1)
     }
+
+    private static let hmFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    private static func hm(_ date: Date) -> String { hmFormatter.string(from: date) }
 
     /// Feels-like beside the numeral — a thermometer glyph and the bare
     /// number, no punctuation — shown only when it meaningfully differs

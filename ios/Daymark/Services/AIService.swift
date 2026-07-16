@@ -304,6 +304,28 @@ enum AIDesk {
         )
     }
 
+    /// The Veraya sprint ledger: a running record of what the checkmarks
+    /// and notes actually mean, rewritten as the sprint moves.
+    static func sprintLedger(state: String, percent: Int, previous: String) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            The Veraya sprint board right now (\(percent)% complete):
+
+            \(state)
+
+            \(previous.isEmpty ? "" : "The previous ledger entry, for continuity:\n\(previous)\n")
+            Rewrite the sprint ledger: one short paragraph recording what has
+            actually been decided or proven so far (drawn from the done items
+            and the notes — quote the substance of the notes, don't just say
+            notes exist), then one line starting "Next proof:" naming the most
+            specific next move. This is the record to look back at, so keep
+            every concrete detail from the notes.
+            """,
+            maxTokens: 350
+        )
+    }
+
     /// A deeper unfolding of the daily oracle card.
     static func oracleReading(card: String, message: String) async throws -> String {
         try await AIService.complete(

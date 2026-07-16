@@ -93,6 +93,7 @@ final class AppState {
 
     var autoFitnessDays: Int = 0        // HealthKit: fitness days since Monday
     var autoJobTouches: Int = 0         // Landed: rows changed since Monday
+    var landedError: String?            // why the Landed wire is down, if it is
 
     // MARK: Init
 
@@ -157,6 +158,7 @@ final class AppState {
         if persisted.dayKey != now.dayKey {
             persisted.dayKey = now.dayKey
             persisted.tasks = [:]
+            persisted.taskNotes = [:]
             persisted.captures.removeAll { $0.done }
             persisted.focusEndsAt = nil
             persisted.focusTaskID = nil
@@ -176,6 +178,9 @@ final class AppState {
             persisted.weekKey = now.weekKey
             persisted.weeklyScores = [:]
             persisted.sprint = [:]
+            persisted.sprintNotes = [:]
+            persisted.sprintLedger = ""
+            persisted.sprintLedgerAt = nil
         }
         if let ends = persisted.focusEndsAt, ends <= now {
             persisted.focusEndsAt = nil
@@ -563,13 +568,47 @@ final class AppState {
     // MARK: Sprint
 
     func sprintDone(_ id: String) -> Bool { persisted.sprint[id] ?? false }
-    func toggleSprint(_ id: String) { persisted.sprint[id] = !(persisted.sprint[id] ?? false) }
+
+    func toggleSprint(_ id: String) {
+        persisted.sprint[id] = !(persisted.sprint[id] ?? false)
+        updateSprintLedger()
+    }
+
+    func sprintNote(_ id: String) -> String { persisted.sprintNotes[id] ?? "" }
+
+    func setSprintNote(_ id: String, _ note: String) {
+        persisted.sprintNotes[id] = note.nilIfEmpty
+        if persisted.sprintNotes[id] == nil { persisted.sprintNotes.removeValue(forKey: id) }
+    }
 
     var sprintPercent: Int {
         let total = SprintMilestone.defaults.count
         guard total > 0 else { return 0 }
         let done = SprintMilestone.defaults.filter { sprintDone($0.id) }.count
         return Int((Double(done) / Double(total) * 100).rounded())
+    }
+
+    var sprintLedgerBusy = false
+
+    /// The desk rewrites the sprint ledger from the current checks and
+    /// notes — called after every toggle and note commit, so there's
+    /// always a record of what the checkmarks meant.
+    func updateSprintLedger() {
+        guard AIService.isConfigured else { return }
+        sprintLedgerBusy = true
+        let lines = SprintMilestone.defaults.map { milestone in
+            let mark = sprintDone(milestone.id) ? "[done]" : "[open]"
+            let note = sprintNote(milestone.id)
+            return "\(mark) \(milestone.title)\(note.isEmpty ? "" : " — notes: \(note)")"
+        }.joined(separator: "\n")
+        Task {
+            defer { sprintLedgerBusy = false }
+            if let text = try? await AIDesk.sprintLedger(
+                state: lines, percent: sprintPercent, previous: persisted.sprintLedger) {
+                persisted.sprintLedger = text
+                persisted.sprintLedgerAt = Date()
+            }
+        }
     }
 
     // MARK: Decisions
@@ -616,11 +655,17 @@ final class AppState {
 
     // MARK: Scorecard
 
+    /// Sprint milestones checked this week double as the Veraya score.
+    private var autoVerayaProofs: Int {
+        SprintMilestone.defaults.filter { sprintDone($0.id) }.count
+    }
+
     func score(_ key: String) -> Int {
         let manual = persisted.weeklyScores[key] ?? 0
         switch key {
         case "fitness": return max(manual, autoFitnessDays)
         case "jobs": return max(manual, autoJobTouches)
+        case "veraya": return max(manual, autoVerayaProofs)
         default: return manual
         }
     }
@@ -630,6 +675,7 @@ final class AppState {
         switch key {
         case "fitness": return autoFitnessDays > (persisted.weeklyScores[key] ?? 0)
         case "jobs": return autoJobTouches > (persisted.weeklyScores[key] ?? 0)
+        case "veraya": return autoVerayaProofs > (persisted.weeklyScores[key] ?? 0)
         default: return false
         }
     }
@@ -749,9 +795,14 @@ final class AppState {
             landedRoles = try await google.fetchLandedRoles(sheetID: AppConfig.landedSheetID)
                 .sorted { ($0.stageRank, $0.company) < ($1.stageRank, $1.company) }
             landedStatus = .live(Date())
+            landedError = nil
             updateJobTouches()
+        } catch let error as LandedFetchError {
+            landedStatus = degrade(landedStatus)
+            landedError = error.readable
         } catch {
             landedStatus = degrade(landedStatus)
+            landedError = error.localizedDescription
         }
     }
 
@@ -856,7 +907,8 @@ final class AppState {
         let wire = await DiscoveryService.dailyWire(
             seeds: seeds.isEmpty ? recentArtists : seeds,
             liked: persisted.musicLikes,
-            exclude: exclude
+            exclude: exclude,
+            count: 20
         )
         guard !wire.isEmpty else {
             discoveryStatus = degrade(discoveryStatus)
@@ -867,6 +919,15 @@ final class AppState {
         defaults.set(Date().dayKey, forKey: Self.discoveryDayKey)
         defaults.set(try? JSONEncoder().encode(wire), forKey: Self.discoveryCacheKey)
         defaults.set(surfaced + wire.map { $0.artist.lowercased() }, forKey: Self.discoverySurfacedKey)
+
+        // Mirror the fresh wire into its Spotify playlist so the whole
+        // batch is listenable in one place. Fire and forget — a miss
+        // never degrades the wire itself.
+        Task {
+            let count = (try? await spotify.syncDiscoveryWirePlaylist(
+                tracks: wire.map { (title: $0.title, artist: $0.artist) })) ?? 0
+            if count > 0 { toast("Discovery Wire playlist updated — \(count) tracks.") }
+        }
     }
 
     func discoveryLike(_ track: DiscoveryTrack) {

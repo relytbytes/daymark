@@ -312,6 +312,10 @@ struct PersistedState: Codable {
     var musicLikes: [String] = []              // discovery feedback: artist names, lowercased
     var musicPasses: [String] = []
     var scoreHistory: [String: [String: Int]] = [:]   // weekKey -> category -> done
+    var taskNotes: [String: String] = [:]      // EssentialTask.id -> today's note
+    var sprintNotes: [String: String] = [:]    // SprintMilestone.id -> working note
+    var sprintLedger: String = ""              // the desk's running sprint summary
+    var sprintLedgerAt: Date?
 
     init() {}
 
@@ -338,6 +342,10 @@ struct PersistedState: Codable {
         musicLikes = (try? c.decodeIfPresent([String].self, forKey: .musicLikes)) ?? nil ?? []
         musicPasses = (try? c.decodeIfPresent([String].self, forKey: .musicPasses)) ?? nil ?? []
         scoreHistory = (try? c.decodeIfPresent([String: [String: Int]].self, forKey: .scoreHistory)) ?? nil ?? [:]
+        taskNotes = (try? c.decodeIfPresent([String: String].self, forKey: .taskNotes)) ?? nil ?? [:]
+        sprintNotes = (try? c.decodeIfPresent([String: String].self, forKey: .sprintNotes)) ?? nil ?? [:]
+        sprintLedger = (try? c.decodeIfPresent(String.self, forKey: .sprintLedger)) ?? nil ?? ""
+        sprintLedgerAt = try? c.decodeIfPresent(Date.self, forKey: .sprintLedgerAt) ?? nil
     }
 }
 

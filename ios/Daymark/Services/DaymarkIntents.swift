@@ -81,7 +81,7 @@ struct DayBriefIntent: AppIntent {
         if waiting > 0 { parts.append("\(waiting) repl\(waiting == 1 ? "y" : "ies") awaited") }
         if let snapshot = WidgetSnapshot.read(), let title = snapshot.nextEventTitle, let time = snapshot.nextEventTime, time > Date() {
             let formatter = DateFormatter()
-            formatter.dateFormat = "h:mm a"
+            formatter.dateFormat = "HH:mm"
             parts.append("next: \(title) at \(formatter.string(from: time))")
         }
         return .result(dialog: IntentDialog(stringLiteral: parts.joined(separator: ", ") + "."))

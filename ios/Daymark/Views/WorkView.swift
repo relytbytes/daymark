@@ -2,7 +2,7 @@
 //  WorkView.swift
 //  Daymark
 //
-//  Section B: applications pipeline, the Veraya sprint, decisions,
+//  Section B: applications pipeline, the Veraya sprint,
 //  waiting-on ledger, and the weekly scorecard.
 //
 
@@ -16,6 +16,7 @@ struct WorkView: View {
     @State private var creatingApplication = false
     @State private var addingWaiting = false
     @State private var deskSheet: JobDeskSheet?
+    @State private var openMilestone: String?
 
     var body: some View {
         let phase = DayPhase.current()
@@ -37,7 +38,6 @@ struct WorkView: View {
             applicationsSection
             aiCoachSection
             sprintSection
-            decisionsSection
             waitingSection
             scorecardSection
         }
@@ -68,9 +68,10 @@ struct WorkView: View {
                 .padding(.bottom, 4)
 
                 if app.landedRoles.isEmpty {
-                    EmptyNote(text: app.landedStatus == .unavailable
-                              ? "Could not reach the Landed sheet — check that this Google account can open it."
-                              : "Reading the pipeline from Landed…")
+                    EmptyNote(text: app.landedError
+                              ?? (app.landedStatus == .unavailable
+                                  ? "Could not reach the Landed sheet — check that this Google account can open it."
+                                  : "Reading the pipeline from Landed…"))
                 } else {
                     Text("\(app.landedRoles.count) open roles · \(app.landedFocusQueue.count) worth attention today")
                         .font(DS.label(11, weight: .semibold))
@@ -240,96 +241,135 @@ struct WorkView: View {
             .padding(.bottom, 14)
 
             ForEach(SprintMilestone.defaults) { milestone in
-                HStack(spacing: 11) {
-                    Button {
-                        app.toggleSprint(milestone.id)
-                    } label: {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 5)
-                                .strokeBorder(app.sprintDone(milestone.id) ? Palette.ink : Color(hex: 0x9A978D), lineWidth: 1.5)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .fill(app.sprintDone(milestone.id) ? Palette.ink : .clear)
-                                )
-                                .frame(width: 20, height: 20)
-                            if app.sprintDone(milestone.id) {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.white)
+                let isOpen = openMilestone == milestone.id
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 11) {
+                        Button {
+                            app.toggleSprint(milestone.id)
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 5)
+                                    .strokeBorder(app.sprintDone(milestone.id) ? Palette.ink : Color(hex: 0x9A978D), lineWidth: 1.5)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .fill(app.sprintDone(milestone.id) ? Palette.ink : .clear)
+                                    )
+                                    .frame(width: 20, height: 20)
+                                if app.sprintDone(milestone.id) {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
+                        Button {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                openMilestone = isOpen ? nil : milestone.id
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(milestone.title)
+                                        .font(DS.label(14, weight: .medium))
+                                        .foregroundStyle(app.sprintDone(milestone.id) ? Color(hex: 0xA3A299) : Palette.ink)
+                                        .strikethrough(app.sprintDone(milestone.id), color: Color(hex: 0xA3A299))
+                                        .multilineTextAlignment(.leading)
+                                    Text(milestone.detail)
+                                        .font(DS.label(11, weight: .regular))
+                                        .foregroundStyle(Palette.subtle)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer()
+                                if !app.sprintNote(milestone.id).isEmpty {
+                                    Image(systemName: "note.text")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(Palette.gold)
+                                }
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(Palette.subtle)
+                                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(milestone.title)
-                            .font(DS.label(14, weight: .medium))
-                            .foregroundStyle(app.sprintDone(milestone.id) ? Color(hex: 0xA3A299) : Palette.ink)
-                            .strikethrough(app.sprintDone(milestone.id), color: Color(hex: 0xA3A299))
-                        Text(milestone.detail)
-                            .font(DS.label(11, weight: .regular))
-                            .foregroundStyle(Palette.subtle)
+                    .padding(.vertical, 6)
+
+                    if isOpen {
+                        TextField("What was decided, tried, or proven…",
+                                  text: milestoneNoteBinding(milestone.id), axis: .vertical)
+                            .font(DS.label(12, weight: .regular))
+                            .lineLimit(2...5)
+                            .padding(9)
+                            .background(Palette.wash)
+                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                            .padding(.leading, 31)
+                            .padding(.bottom, 8)
+                            .onSubmit { app.updateSprintLedger() }
                     }
-                    Spacer()
                 }
-                .padding(.vertical, 6)
             }
+
+            ledgerPanel
         }
         .padding(.top, 26)
     }
 
-    // MARK: Decisions
+    private func milestoneNoteBinding(_ id: String) -> Binding<String> {
+        Binding(
+            get: { app.sprintNote(id) },
+            set: { app.setSprintNote(id, $0) }
+        )
+    }
 
-    private var decisionsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionRuleHeader(title: "Open Decisions")
-                .padding(.bottom, 12)
-
-            ForEach(Array(DecisionDefinition.defaults.enumerated()), id: \.element.id) { index, decision in
-                let choice = app.persisted.decisions[decision.id]
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(String(format: "%02d", index + 1))
-                            .font(DS.display(18))
-                            .foregroundStyle(Palette.coral)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(decision.title)
-                                .font(DS.label(14.5, weight: .semibold))
-                                .foregroundStyle(Palette.ink)
-                            Text(decision.detail)
-                                .font(DS.label(11.5, weight: .regular))
-                                .foregroundStyle(Palette.muted)
-                        }
-                        Spacer()
-                    }
-                    if let choice {
-                        HStack(spacing: 8) {
-                            StatusChip(text: "Decided · \(choice)")
-                            Button("Revisit") { app.choose(decision.id, option: "") }
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Palette.subtle)
-                        }
-                        .padding(.leading, 34)
-                    } else {
-                        HStack(spacing: 7) {
-                            ForEach(decision.options, id: \.self) { option in
-                                QuietButton(label: option) {
-                                    app.choose(decision.id, option: option)
-                                    if option == "Open", let url = Self.decisionURL(decision.id) {
-                                        UIApplication.shared.open(url)
-                                    } else {
-                                        app.toast("Noted: \(option).")
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.leading, 34)
-                    }
+    /// The desk's running record of the sprint — what the checkmarks and
+    /// notes mean, kept current as they change.
+    @ViewBuilder
+    private var ledgerPanel: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("THE LEDGER").kickerStyle(Palette.coral, size: 8, tracking: 1.3)
+                Spacer()
+                if app.sprintLedgerBusy {
+                    ProgressView().controlSize(.mini)
+                } else if let at = app.persisted.sprintLedgerAt {
+                    Text(at.formatted(.dateTime.day().month(.abbreviated))
+                            .uppercased() + " " + at.timeText())
+                        .font(.system(size: 8, weight: .heavy)).tracking(0.6)
+                        .foregroundStyle(Palette.subtle)
                 }
-                .padding(.vertical, 12)
-                if index < DecisionDefinition.defaults.count - 1 { Hairline() }
+            }
+            if app.persisted.sprintLedger.isEmpty {
+                Text(AIService.isConfigured
+                     ? "Check a proof or add a note and the desk starts the record here — what was decided, what it means, and the next move."
+                     : "Add an AI key in Settings and the desk keeps a running record of this sprint.")
+                    .font(DS.label(11.5, weight: .regular))
+                    .foregroundStyle(Palette.subtle)
+            } else {
+                Text(app.persisted.sprintLedger)
+                    .font(DS.deck(13.5))
+                    .foregroundStyle(Palette.ink)
+                    .lineSpacing(4)
+                    .textSelection(.enabled)
+            }
+            if !app.persisted.sprintLedger.isEmpty || AIService.isConfigured {
+                Button {
+                    app.updateSprintLedger()
+                } label: {
+                    Text("UPDATE THE LEDGER")
+                        .font(.system(size: 9, weight: .heavy)).tracking(0.8)
+                        .foregroundStyle(Palette.ink)
+                }
+                .buttonStyle(.plain)
+                .disabled(app.sprintLedgerBusy)
+                .padding(.top, 2)
             }
         }
-        .padding(.top, 26)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .editorialPanel(padding: 13)
+        .padding(.top, 10)
     }
 
     // MARK: Waiting-on ledger
@@ -457,14 +497,6 @@ struct WorkView: View {
             Spacer(minLength: 0)
         }
         .frame(height: 24, alignment: .bottom)
-    }
-
-    private static func decisionURL(_ id: String) -> URL? {
-        switch id {
-        case "duke": return URL(string: "https://careers.duke.edu/")
-        case "housing": return URL(string: "https://www.redfin.com/city/4909/NC/Durham/filter/max-price=450k")
-        default: return nil
-        }
     }
 
     private func stepButton(_ symbol: String, action: @escaping () -> Void) -> some View {

@@ -14,6 +14,7 @@ struct TodayView: View {
     @Environment(AppState.self) private var app
     @Binding var showSettings: Bool
     @State private var openURLItem: SheetLink?
+    @State private var openEssential: String?
 
     var body: some View {
         let phase = DayPhase.current()
@@ -136,6 +137,7 @@ struct TodayView: View {
             SectionRuleHeader(title: "The Essential Three")
                 .padding(.bottom, 4)
             ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                let isOpen = openEssential == task.id
                 VStack(spacing: 0) {
                     Hairline()
                     HStack(alignment: .center, spacing: 14) {
@@ -143,26 +145,71 @@ struct TodayView: View {
                             .font(DS.display(22))
                             .foregroundStyle(Palette.coral)
                             .frame(width: 34, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(task.kicker.uppercased())
-                                .kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
-                            Text(task.title)
-                                .font(DS.label(15, weight: .semibold))
-                                .foregroundStyle(Palette.ink)
-                                .strikethrough(app.essentialDone(task.id), color: Palette.subtle)
-                                .opacity(app.essentialDone(task.id) ? 0.45 : 1)
+                        Button {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                openEssential = isOpen ? nil : task.id
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(task.kicker.uppercased())
+                                        .kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                                    Text(task.title)
+                                        .font(DS.label(15, weight: .semibold))
+                                        .foregroundStyle(Palette.ink)
+                                        .strikethrough(app.essentialDone(task.id), color: Palette.subtle)
+                                        .opacity(app.essentialDone(task.id) ? 0.45 : 1)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer()
+                                if !(app.persisted.taskNotes[task.id] ?? "").isEmpty {
+                                    Image(systemName: "note.text")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(Palette.gold)
+                                }
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(Palette.subtle)
+                                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+                            }
+                            .contentShape(Rectangle())
                         }
-                        Spacer()
+                        .buttonStyle(.plain)
                         CircleCheck(checked: app.essentialDone(task.id)) {
                             app.toggleEssential(task.id)
                         }
                     }
                     .padding(.vertical, 14)
+
+                    if isOpen {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(task.detail)
+                                .font(DS.deck(13))
+                                .foregroundStyle(Palette.muted)
+                                .lineSpacing(3)
+                            TextField("Note what this means today…",
+                                      text: taskNoteBinding(task.id), axis: .vertical)
+                                .font(DS.label(12, weight: .regular))
+                                .lineLimit(1...4)
+                                .padding(9)
+                                .background(Palette.wash)
+                                .clipShape(RoundedRectangle(cornerRadius: 9))
+                        }
+                        .padding(.leading, 48)
+                        .padding(.bottom, 12)
+                    }
                 }
             }
             Hairline()
         }
         .padding(.top, 26)
+    }
+
+    private func taskNoteBinding(_ id: String) -> Binding<String> {
+        Binding(
+            get: { app.persisted.taskNotes[id] ?? "" },
+            set: { app.persisted.taskNotes[id] = $0.nilIfEmpty ?? nil }
+        )
     }
 
     // MARK: Day timeline

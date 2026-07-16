@@ -79,14 +79,13 @@ extension Date {
     /// "7p" — compact hour for dense strips.
     func clockHourText() -> String {
         let hour = Calendar.current.component(.hour, from: self)
-        let display = hour % 12 == 0 ? 12 : hour % 12
-        return "\(display)\(hour < 12 ? "a" : "p")"
+        return String(format: "%02d", hour)
     }
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US")
-        f.dateFormat = "h:mm a"
+        f.dateFormat = "HH:mm"
         return f
     }()
 

@@ -2121,7 +2121,7 @@ function rainWindowSentence(payload) {
   }
   if (!upcoming.length) return "";
   const hourText = (ms) =>
-    new Date(ms).toLocaleTimeString("en-US", { hour: "numeric" }).toLowerCase().replace(" ", "");
+    String(new Date(ms).getHours()).padStart(2, "0");
   const first = upcoming.findIndex((h) => h.rainy);
   if (first === -1) return "Dry for the next 12 hours.";
   if (first === 0) {
@@ -2409,7 +2409,7 @@ function renderSkyDesk(body) {
     ? window.DaymarkAstro.snapshot(35.994, -78.8986)
     : null;
   const timeText = (date) =>
-    date ? date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "—";
+    date ? date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
 
   let html = `
     <h3 class="sky-section">THE DOME · LIVE</h3>

@@ -138,8 +138,18 @@ final class GoogleService {
         var components = URLComponents(
             string: "https://sheets.googleapis.com/v4/spreadsheets/\(sheetID)/values/Tracker!A2:L")!
         components.queryItems = [URLQueryItem(name: "majorDimension", value: "ROWS")]
-        let response = try await HTTP.json(SheetValues.self, components.url!,
-                                           headers: ["Authorization": "Bearer \(token)"])
+        var request = URLRequest(url: components.url!, timeoutInterval: 20)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, urlResponse) = try await URLSession.shared.data(for: request)
+        if let http = urlResponse as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            struct GoogleError: Decodable {
+                struct Inner: Decodable { let message: String? }
+                let error: Inner?
+            }
+            let message = (try? JSONDecoder().decode(GoogleError.self, from: data))?.error?.message ?? ""
+            throw LandedFetchError(status: http.statusCode, message: message)
+        }
+        let response = try JSONDecoder().decode(SheetValues.self, from: data)
         return (response.values ?? []).enumerated().compactMap { index, row in
             func col(_ i: Int) -> String { i < row.count ? row[i].trimmingCharacters(in: .whitespaces) : "" }
             let company = col(0)
@@ -163,6 +173,28 @@ final class GoogleService {
     private struct SheetValues: Decodable {
         let values: [[String]]?
     }
+}
+
+/// A Landed sheet failure the UI can explain instead of shrugging.
+struct LandedFetchError: Error {
+    let status: Int
+    let message: String
+
+    var readable: String {
+        switch status {
+        case 403:
+            return "Google denied Sheets access — disconnect and reconnect Google in Settings to grant the spreadsheet permission."
+        case 404:
+            return "Sheet not found — the Landed sheet ID looks wrong, or this Google account can't open it."
+        case 400:
+            return "The sheet has no 'Tracker' tab — check the tab name in the Landed spreadsheet."
+        default:
+            return "Landed sheet error \(status)\(message.isEmpty ? "" : ": \(message)")"
+        }
+    }
+}
+
+extension GoogleService {
 
     // MARK: Gmail
 

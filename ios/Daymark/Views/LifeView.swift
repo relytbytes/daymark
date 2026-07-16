@@ -14,6 +14,7 @@ struct LifeView: View {
     @Binding var showSettings: Bool
     @State private var openURLItem: SheetLink?
     @State private var showSky = false
+    @State private var mapQuery = ""
 
     var body: some View {
         let phase = DayPhase.current()
@@ -37,7 +38,15 @@ struct LifeView: View {
             aroundTown
             bullsSection
             remindersSection
+            SpiritSectionsView()
         }
+        .scrollDismissesKeyboard(.immediately)
+        // Tapping anywhere outside a field drops the keyboard;
+        // simultaneous so buttons and links keep working.
+        .simultaneousGesture(TapGesture().onEnded {
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        })
         .sheet(item: $openURLItem) { item in
             SafariView(url: item.url).ignoresSafeArea()
         }
@@ -242,13 +251,47 @@ struct LifeView: View {
             // Maps quick searches
             HStack(spacing: 7) {
                 mapChip("Coffee", query: "coffee shops")
-                mapChip("Open houses", query: "open houses")
+                mapChip("Breweries", query: "breweries")
                 mapChip("Trails", query: "hiking trails")
                 mapChip("Dinner", query: "dinner restaurants")
             }
             .padding(.top, 12)
+
+            // Free-text search, same destination: Maps near Durham.
+            HStack(spacing: 8) {
+                TextField("Search the map near Durham…", text: $mapQuery)
+                    .font(DS.label(13, weight: .medium))
+                    .padding(10)
+                    .background(Palette.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.line, lineWidth: 1))
+                    .submitLabel(.search)
+                    .onSubmit { openMapSearch() }
+                Button {
+                    openMapSearch()
+                } label: {
+                    Text("GO")
+                        .font(.system(size: 10, weight: .heavy)).tracking(0.8)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 12)
+                        .background(Palette.ink)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(mapQuery.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.top, 10)
         }
         .padding(.top, 26)
+    }
+
+    private func openMapSearch() {
+        let trimmed = mapQuery.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        let q = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
+        if let url = URL(string: "maps://?q=\(q)&near=Durham,NC") {
+            UIApplication.shared.open(url)
+        }
     }
 
     private func linkRow(index: String, kicker: String, title: String, url: String) -> some View {

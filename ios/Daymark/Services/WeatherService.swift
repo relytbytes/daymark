@@ -115,7 +115,7 @@ enum WeatherService {
     /// The one useful sentence: when does rain start/stop in the next 12 hours?
     static func rainWindowSentence(hourly: [HourForecast]) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "h a"
+        formatter.dateFormat = "HH"
         formatter.timeZone = TimeZone(identifier: "America/New_York")
 
         let rainy = hourly.map { $0.precip >= 40 || $0.precipAmount >= 0.02 }

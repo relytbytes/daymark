@@ -10,9 +10,8 @@
 
 import SwiftUI
 
-struct SpiritView: View {
+struct SpiritSectionsView: View {
     @Environment(AppState.self) private var app
-    @Environment(\.dismiss) private var dismiss
 
     @State private var question = ""
     @State private var spread: [TarotCard] = []
@@ -28,38 +27,17 @@ struct SpiritView: View {
     @State private var showChakraGuide = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    header
-                    horoscopeSection
-                    tarotSection
-                    oracleSection
-                    crystalSection
-                    chakraSection
-                    meditationSection
-                }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 40)
-            }
-            .background(Palette.paper)
-            .scrollDismissesKeyboard(.immediately)
-            // Tapping anywhere outside a field drops the keyboard;
-            // simultaneous so buttons and links keep working.
-            .simultaneousGesture(TapGesture().onEnded {
-                UIApplication.shared.sendAction(
-                    #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            })
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Palette.ink)
-                }
-            }
-            .sheet(isPresented: $showCabinet) { CrystalCabinetView() }
-            .sheet(isPresented: $showChakraGuide) { ChakraGuideView() }
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            horoscopeSection
+            tarotSection
+            oracleSection
+            crystalSection
+            chakraSection
+            meditationSection
         }
+        .sheet(isPresented: $showCabinet) { CrystalCabinetView() }
+        .sheet(isPresented: $showChakraGuide) { ChakraGuideView() }
     }
 
     // MARK: Header
@@ -70,11 +48,11 @@ struct SpiritView: View {
                 .kickerStyle(Palette.coral, size: 10, tracking: 1.5)
                 .padding(.bottom, 8)
             Text("The inner edition.")
-                .font(DS.display(34))
+                .font(DS.display(28))
                 .foregroundStyle(Palette.ink)
             InkRule().padding(.top, 12)
         }
-        .padding(.top, 10)
+        .padding(.top, 34)
     }
 
     // MARK: Horoscope (shares the Sky Desk's engine + output)
