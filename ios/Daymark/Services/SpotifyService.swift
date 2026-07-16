@@ -9,6 +9,18 @@
 import Foundation
 
 @MainActor
+/// A Spotify Web API refusal, kept verbatim so the UI can say which
+/// step failed and why in Spotify's own words.
+struct SpotifyAPIError: Error {
+    let step: String
+    let status: Int
+    let message: String
+
+    var readable: String {
+        "Spotify \(status) while \(step)\(message.isEmpty ? "" : " — \(message)")"
+    }
+}
+
 final class SpotifyService {
     private static let refreshKey = "spotify.refresh"
     private var accessToken: String?
@@ -41,6 +53,9 @@ final class SpotifyService {
             URLQueryItem(name: "scope", value: Self.scopes),
             URLQueryItem(name: "code_challenge", value: PKCE.challenge(for: verifier)),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
+            // Always show the consent screen so a re-grant visibly lists
+            // every permission instead of silently reusing an old one.
+            URLQueryItem(name: "show_dialog", value: "true"),
         ]
         let callback = try await WebAuthenticator.shared.authenticate(
             url: components.url!,
@@ -225,6 +240,30 @@ final class SpotifyService {
 
     private static let wireName = "Daymark Discovery Wire"
 
+    /// One Spotify Web API call with the error body preserved, so a
+    /// failure names the step and Spotify's own explanation.
+    private func api(_ method: String, _ url: URL, token: String,
+                     body: [String: Any]? = nil, step: String) async throws -> Data {
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.httpMethod = method
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            struct ErrorBody: Decodable {
+                struct Inner: Decodable { let message: String? }
+                let error: Inner?
+            }
+            let message = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error?.message
+                ?? String(data: data.prefix(120), encoding: .utf8) ?? ""
+            throw SpotifyAPIError(step: step, status: http.statusCode, message: message)
+        }
+        return data
+    }
+
     /// Find or create the Discovery Wire playlist; returns its id.
     private func wirePlaylistID() async throws -> String {
         if let cached = UserDefaults.standard.string(forKey: "daymark-wire-playlist") {
@@ -238,33 +277,31 @@ final class SpotifyService {
             }
             let items: [Item]?
         }
-        let list = try await HTTP.json(Playlists.self,
+        let listData = try await api("GET",
             URL(string: "https://api.spotify.com/v1/me/playlists?limit=50")!,
-            headers: ["Authorization": "Bearer \(token)"])
+            token: token, step: "listing playlists")
+        let list = try JSONDecoder().decode(Playlists.self, from: listData)
         if let existing = list.items?.first(where: { $0.name == Self.wireName }) {
             UserDefaults.standard.set(existing.id, forKey: "daymark-wire-playlist")
             return existing.id
         }
         struct Me: Decodable { let id: String }
-        let me = try await HTTP.json(Me.self, URL(string: "https://api.spotify.com/v1/me")!,
-                                     headers: ["Authorization": "Bearer \(token)"])
-        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/users/\(me.id)/playlists")!, timeoutInterval: 20)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "name": Self.wireName,
-            "public": false,
-            "description": "Today's Discovery Wire — regenerated daily by Daymark.",
-        ])
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw HTTPError.status((response as? HTTPURLResponse)?.statusCode ?? 0)
-        }
+        let meData = try await api("GET", URL(string: "https://api.spotify.com/v1/me")!,
+                                   token: token, step: "reading profile")
+        let me = try JSONDecoder().decode(Me.self, from: meData)
+        let created = try await api("POST",
+            URL(string: "https://api.spotify.com/v1/users/\(me.id)/playlists")!,
+            token: token,
+            body: [
+                "name": Self.wireName,
+                "public": false,
+                "description": "Today's Discovery Wire — regenerated daily by Daymark.",
+            ],
+            step: "creating the playlist")
         struct Created: Decodable { let id: String }
-        let created = try JSONDecoder().decode(Created.self, from: data)
-        UserDefaults.standard.set(created.id, forKey: "daymark-wire-playlist")
-        return created.id
+        let playlist = try JSONDecoder().decode(Created.self, from: created)
+        UserDefaults.standard.set(playlist.id, forKey: "daymark-wire-playlist")
+        return playlist.id
     }
 
     /// Match one discovery track to a Spotify URI. URLComponents handles
@@ -308,15 +345,11 @@ final class SpotifyService {
         guard !matched.isEmpty else { return 0 }
 
         let playlist = try await wirePlaylistID()
-        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!, timeoutInterval: 20)
-        request.httpMethod = "PUT"      // replaces the playlist contents
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["uris": matched])
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw HTTPError.status((response as? HTTPURLResponse)?.statusCode ?? 0)
-        }
+        _ = try await api("PUT",
+            URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!,
+            token: token,
+            body: ["uris": matched],
+            step: "filling the playlist")
         return matched.count
     }
 
