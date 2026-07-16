@@ -245,7 +245,7 @@ actor IMAPClient {
     }
 
     func logout() async {
-        try? await command("LOGOUT")
+        _ = try? await command("LOGOUT")
         close()
     }
 }
