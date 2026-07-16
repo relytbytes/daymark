@@ -349,24 +349,52 @@ final class SpotifyService {
 
         let playlist = try await wirePlaylistID()
         do {
-            _ = try await api("PUT",
-                URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!,
-                token: token,
-                body: ["uris": matched],
-                step: "filling the playlist (\(playlist.suffix(6)))")
+            try await fill(playlist, uris: matched, token: token)
         } catch let error as SpotifyAPIError where error.status == 403 || error.status == 404 {
             // The cached playlist may be deleted or not actually ours —
             // drop the cache, re-resolve by name, and retry once.
             UserDefaults.standard.removeObject(forKey: "daymark-wire-playlist")
             let fresh = try await wirePlaylistID()
             guard fresh != playlist else { throw error }
-            _ = try await api("PUT",
-                URL(string: "https://api.spotify.com/v1/playlists/\(fresh)/tracks")!,
-                token: token,
-                body: ["uris": matched],
-                step: "filling the playlist on retry (\(fresh.suffix(6)))")
+            try await fill(fresh, uris: matched, token: token)
         }
         return matched.count
+    }
+
+    /// Replace the playlist's contents; if Spotify forbids the replace,
+    /// try a plain append — the two are sometimes gated differently for
+    /// development-mode apps.
+    private func fill(_ playlist: String, uris: [String], token: String) async throws {
+        do {
+            _ = try await api("PUT",
+                URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!,
+                token: token,
+                body: ["uris": uris],
+                step: "filling the playlist (\(playlist.suffix(6)))")
+        } catch let error as SpotifyAPIError where error.status == 403 {
+            _ = try await api("POST",
+                URL(string: "https://api.spotify.com/v1/playlists/\(playlist)/tracks")!,
+                token: token,
+                body: ["uris": uris],
+                step: "appending to the playlist (\(playlist.suffix(6)))")
+        }
+    }
+
+    /// Push the day's wire straight into the player queue, in order —
+    /// the playback API works even where the playlist API is gated.
+    func queueWire(tracks: [(title: String, artist: String)]) async throws -> Int {
+        let token = try await validToken()
+        var queued = 0
+        for track in tracks {
+            guard let uri = await searchTrackURI(title: track.title, artist: track.artist, token: token)
+            else { continue }
+            var components = URLComponents(string: "https://api.spotify.com/v1/me/player/queue")!
+            components.queryItems = [URLQueryItem(name: "uri", value: uri)]
+            _ = try await api("POST", components.url!, token: token,
+                              step: "queueing \(track.title)")
+            queued += 1
+        }
+        return queued
     }
 
     /// Top artist names across a medium listening window — discovery seeds.

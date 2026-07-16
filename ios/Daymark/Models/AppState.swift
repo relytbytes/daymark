@@ -967,6 +967,31 @@ final class AppState {
         }
     }
 
+    var wireQueueBusy = false
+
+    /// Send the whole wire to the Spotify queue so it plays straight
+    /// through — the route around the playlist API's dev-mode gate.
+    func playWire() {
+        guard spotifyConnected, !discoveryWire.isEmpty, !wireQueueBusy else { return }
+        wireQueueBusy = true
+        Task {
+            defer { wireQueueBusy = false }
+            do {
+                let queued = try await spotify.queueWire(
+                    tracks: discoveryWire.map { (title: $0.title, artist: $0.artist) })
+                toast(queued > 0
+                      ? "Queued \(queued) wire tracks in Spotify."
+                      : "None of today's wire matched on Spotify.")
+            } catch let error as SpotifyAPIError where error.status == 404 {
+                toast("No active Spotify device — play anything in Spotify first, then tap again.")
+            } catch let error as SpotifyAPIError {
+                toast(error.readable)
+            } catch {
+                toast("Couldn't queue the wire: \(error.localizedDescription)")
+            }
+        }
+    }
+
     func discoveryLike(_ track: DiscoveryTrack) {
         let key = track.artist.lowercased()
         if !persisted.musicLikes.contains(key) { persisted.musicLikes.append(key) }

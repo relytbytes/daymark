@@ -468,10 +468,17 @@ extension MoreView {
                               ? "The wire came back empty — it retries on the next refresh."
                               : "Reading your listening history and walking the artist graph…")
                 } else {
-                    Text("Ten for today, seeded by what you actually play. Thumbs teach tomorrow's wire.")
-                        .font(DS.deck(13))
-                        .foregroundStyle(Palette.muted)
-                        .padding(.bottom, 6)
+                    HStack(alignment: .top, spacing: 10) {
+                        Text("Twenty for today, seeded by what you actually play. Thumbs teach tomorrow's wire.")
+                            .font(DS.deck(13))
+                            .foregroundStyle(Palette.muted)
+                        Spacer()
+                        QuietButton(label: app.wireQueueBusy ? "Queueing…" : "▶ Play the wire") {
+                            app.playWire()
+                        }
+                        .disabled(app.wireQueueBusy)
+                    }
+                    .padding(.bottom, 6)
                     ForEach(app.discoveryWire) { track in
                         discoveryRow(track)
                     }
