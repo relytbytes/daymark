@@ -2088,6 +2088,257 @@ function rainWindowSentence(payload) {
     : `Dry until ~${hourText(upcoming[first].t)} — clears by ${hourText(upcoming[ends].t)}.`;
 }
 
+// =====================================================================
+// The Dome: interactive live sky chart. Opens on the sky overhead now —
+// an equidistant azimuthal projection centered on the zenith, N at top.
+// Drag to pan (when zoomed), wheel/pinch to zoom, tap a star to name it.
+// =====================================================================
+
+let skyData = null;
+let domeState = { zoom: 1, panX: 0, panY: 0, selected: null, timer: null };
+
+async function loadSkyData() {
+  if (skyData) return skyData;
+  try {
+    const response = await fetch("./skydata.json?v=24");
+    skyData = await response.json();
+  } catch {
+    skyData = { stars: [], lines: [] };
+  }
+  return skyData;
+}
+
+function starColor(bv) {
+  if (bv < 0.0) return "#cfd8ff";
+  if (bv < 0.4) return "#eef2ff";
+  if (bv < 0.8) return "#fff7e8";
+  if (bv < 1.2) return "#ffe9c4";
+  return "#ffd9a0";
+}
+
+function renderDome(canvas) {
+  const data = skyData;
+  if (!data || !canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const cssSize = canvas.clientWidth;
+  if (canvas.width !== cssSize * dpr) {
+    canvas.width = cssSize * dpr;
+    canvas.height = cssSize * dpr;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const size = cssSize;
+  const now = new Date();
+  const { zoom, panX, panY } = domeState;
+  const R = (size / 2 - 14) * zoom;
+  const cx = size / 2 + panX;
+  const cy = size / 2 + panY;
+
+  const project = (raDec) => {
+    const h = window.DaymarkAstro.horizontal(raDec[0], raDec[1], now, 35.994, -78.8986);
+    if (h.alt < -1) return null;
+    const r = (R * (90 - h.alt)) / 90;
+    const azRad = (h.az * Math.PI) / 180;
+    return { x: cx + r * Math.sin(azRad), y: cy - r * Math.cos(azRad), alt: h.alt };
+  };
+
+  // Night ground
+  ctx.fillStyle = "#0b1020";
+  ctx.fillRect(0, 0, size, size);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Constellation lines
+  ctx.strokeStyle = "rgba(120, 140, 190, 0.35)";
+  ctx.lineWidth = 1;
+  for (const segment of data.lines) {
+    let prev = null;
+    for (const point of segment) {
+      const q = project(point);
+      if (q && prev) {
+        const jump = Math.hypot(q.x - prev.x, q.y - prev.y);
+        if (jump < R * 0.7) {
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(q.x, q.y);
+          ctx.stroke();
+        }
+      }
+      prev = q;
+    }
+  }
+
+  // Stars
+  const visibleStars = [];
+  for (const star of data.stars) {
+    const q = project(star);
+    if (!q) continue;
+    const mag = star[2];
+    const radius = Math.max(0.5, (5.4 - mag) * 0.62) * Math.sqrt(zoom);
+    ctx.beginPath();
+    ctx.fillStyle = starColor(star[3]);
+    ctx.arc(q.x, q.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    if (star[4]) visibleStars.push({ x: q.x, y: q.y, name: star[4], mag });
+    // Label the brightest when zoomed in
+    if (star[4] && (zoom >= 2 || mag < 0.8)) {
+      ctx.fillStyle = "rgba(200, 212, 245, 0.75)";
+      ctx.font = "9px -apple-system, sans-serif";
+      ctx.fillText(star[4], q.x + radius + 3, q.y + 3);
+    }
+  }
+  domeState.hitTargets = visibleStars;
+
+  // Sun / Moon / planets
+  for (const body of window.DaymarkAstro.chartBodies(now)) {
+    const q = project([body.ra, body.dec]);
+    if (!q) continue;
+    if (body.kind === "sun") {
+      ctx.beginPath();
+      ctx.fillStyle = "#ffd75e";
+      ctx.arc(q.x, q.y, 7 * Math.sqrt(zoom), 0, Math.PI * 2);
+      ctx.fill();
+    } else if (body.kind === "moon") {
+      ctx.beginPath();
+      ctx.fillStyle = "#e8ecf5";
+      ctx.arc(q.x, q.y, 6 * Math.sqrt(zoom), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.fillStyle = "#f0c36d";
+      ctx.arc(q.x, q.y, 2.6 * Math.sqrt(zoom), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = body.kind === "planet" ? "#f0c36d" : "#cfd6e8";
+    ctx.font = "700 9.5px -apple-system, sans-serif";
+    ctx.fillText(body.name.toUpperCase(), q.x + 8, q.y + 3);
+  }
+
+  // Selected star tooltip
+  if (domeState.selected) {
+    const sel = domeState.selected;
+    ctx.strokeStyle = "#c8102e";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(sel.x, sel.y, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 11px -apple-system, sans-serif";
+    ctx.fillText(`${sel.name} · mag ${sel.mag.toFixed(1)}`, Math.min(sel.x + 12, size - 120), sel.y - 10);
+  }
+  ctx.restore();
+
+  // Horizon ring + cardinals
+  ctx.strokeStyle = "rgba(200, 208, 230, 0.5)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(220, 226, 244, 0.85)";
+  ctx.font = "800 10px -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  const cardinals = [["N", 0], ["E", 90], ["S", 180], ["W", 270]];
+  for (const [label, az] of cardinals) {
+    const rad = (az * Math.PI) / 180;
+    ctx.fillText(label, cx + (R + 8) * Math.sin(rad), cy - (R + 8) * Math.cos(rad) + 3);
+  }
+  ctx.textAlign = "left";
+}
+
+function bindDome(canvas) {
+  if (canvas.dataset.bound) return;
+  canvas.dataset.bound = "true";
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  let moved = 0;
+  let pinchDist = 0;
+
+  const clampPan = () => {
+    const limit = (canvas.clientWidth / 2) * (domeState.zoom - 1);
+    domeState.panX = Math.max(-limit, Math.min(limit, domeState.panX));
+    domeState.panY = Math.max(-limit, Math.min(limit, domeState.panY));
+  };
+
+  canvas.addEventListener("pointerdown", (event) => {
+    dragging = true;
+    moved = 0;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - lastX;
+    const dy = event.clientY - lastY;
+    moved += Math.abs(dx) + Math.abs(dy);
+    lastX = event.clientX;
+    lastY = event.clientY;
+    if (domeState.zoom > 1) {
+      domeState.panX += dx;
+      domeState.panY += dy;
+      clampPan();
+      renderDome(canvas);
+    }
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    dragging = false;
+    if (moved < 6) {
+      // Tap: select the nearest named star.
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      let best = null;
+      let bestDist = 14;
+      for (const star of domeState.hitTargets || []) {
+        const dist = Math.hypot(star.x - x, star.y - y);
+        if (dist < bestDist) {
+          best = star;
+          bestDist = dist;
+        }
+      }
+      domeState.selected = best;
+      renderDome(canvas);
+    }
+  });
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    domeState.zoom = Math.max(1, Math.min(4, domeState.zoom * (event.deltaY < 0 ? 1.12 : 0.9)));
+    if (domeState.zoom === 1) { domeState.panX = 0; domeState.panY = 0; }
+    clampPan();
+    renderDome(canvas);
+  }, { passive: false });
+  canvas.addEventListener("touchmove", (event) => {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = Math.hypot(
+        event.touches[0].clientX - event.touches[1].clientX,
+        event.touches[0].clientY - event.touches[1].clientY,
+      );
+      if (pinchDist) {
+        domeState.zoom = Math.max(1, Math.min(4, domeState.zoom * (dist / pinchDist)));
+        if (domeState.zoom === 1) { domeState.panX = 0; domeState.panY = 0; }
+        clampPan();
+        renderDome(canvas);
+      }
+      pinchDist = dist;
+    }
+  }, { passive: false });
+  canvas.addEventListener("touchend", () => { pinchDist = 0; });
+}
+
+async function mountDome() {
+  const canvas = document.querySelector("#skyDome");
+  if (!canvas) return;
+  await loadSkyData();
+  bindDome(canvas);
+  renderDome(canvas);
+  window.clearInterval(domeState.timer);
+  domeState.timer = window.setInterval(() => renderDome(canvas), 60000);
+}
+
 function openSkyDesk() {
   const overlay = document.querySelector("#skyOverlay");
   const body = document.querySelector("#skyBody");
@@ -2101,6 +2352,7 @@ function closeSkyDesk() {
   const overlay = document.querySelector("#skyOverlay");
   if (overlay) overlay.hidden = true;
   document.body.style.overflow = "";
+  window.clearInterval(domeState.timer);
 }
 
 function renderSkyDesk(body) {
@@ -2111,7 +2363,11 @@ function renderSkyDesk(body) {
   const timeText = (date) =>
     date ? date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "—";
 
-  let html = "";
+  let html = `
+    <h3 class="sky-section">THE DOME · LIVE</h3>
+    <p class="sky-dome-note">The sky over Durham right now. Pinch or scroll to zoom, drag to pan, tap a star.</p>
+    <canvas id="skyDome" class="sky-dome"></canvas>
+  `;
 
   if (payload) {
     const current = payload.current || {};
@@ -2201,6 +2457,7 @@ function renderSkyDesk(body) {
   }
 
   body.innerHTML = html;
+  mountDome();
 
   const run = body.querySelector("#skyHoroscopeRun");
   if (run && astro) {

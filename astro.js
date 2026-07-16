@@ -258,5 +258,44 @@ window.DaymarkAstro = (() => {
     };
   }
 
-  return { snapshot };
+  /// Equatorial (RA/Dec, degrees) -> horizontal (alt/az, degrees) for an observer now.
+  function horizontal(raDeg, decDeg, date, latitude, longitude) {
+    const jd = julianDay(date);
+    const d = jd - 2451545.0;
+    const gmst = norm(280.46061837 + 360.98564736629 * d);
+    const lst = norm(gmst + longitude);
+    const ha = norm(lst - raDeg);
+    const sinAlt = sinD(latitude) * sinD(decDeg) + cosD(latitude) * cosD(decDeg) * cosD(ha);
+    const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt))) * RAD2DEG;
+    const y = -sinD(ha) * cosD(decDeg);
+    const x = cosD(latitude) * sinD(decDeg) - sinD(latitude) * cosD(decDeg) * cosD(ha);
+    const az = norm(atan2D(y, x));
+    return { alt, az };
+  }
+
+  function eclipticToEquatorial(lon, lat, jd) {
+    const ob = 23.4393 - 3.563e-7 * (jd - 2451543.5);
+    const x = cosD(lon) * cosD(lat);
+    const y = sinD(lon) * cosD(lat) * cosD(ob) - sinD(lat) * sinD(ob);
+    const z = sinD(lon) * cosD(lat) * sinD(ob) + sinD(lat) * cosD(ob);
+    return { ra: norm(atan2D(y, x)), dec: atan2D(z, Math.sqrt(x * x + y * y)) };
+  }
+
+  /// Sun, moon, and planets as chart-ready equatorial coordinates.
+  function chartBodies(date = new Date()) {
+    const jd = julianDay(date);
+    const bodies = [];
+    const sunEq = eclipticToEquatorial(solarEclipticLongitude(jd), 0, jd);
+    bodies.push({ name: "Sun", kind: "sun", ...sunEq });
+    const moon = moonPosition(jd);
+    const moonEq = eclipticToEquatorial(moon.lon, moon.lat, jd);
+    bodies.push({ name: "Moon", kind: "moon", ...moonEq });
+    for (const name of Object.keys(PLANETS)) {
+      const p = planetPosition(name, jd);
+      if (p) bodies.push({ name, kind: "planet", ...eclipticToEquatorial(p.lon, p.lat, jd) });
+    }
+    return bodies;
+  }
+
+  return { snapshot, horizontal, chartBodies };
 })();

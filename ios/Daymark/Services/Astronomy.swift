@@ -389,6 +389,57 @@ enum Astronomy {
         return nil
     }
 
+    // MARK: Chart support
+
+    struct ChartBody {
+        let name: String
+        let kind: Kind
+        let ra: Double
+        let dec: Double
+        enum Kind { case sun, moon, planet }
+    }
+
+    /// Equatorial (RA/Dec, degrees) → horizontal (alt/az, degrees).
+    static func horizontal(ra: Double, dec: Double, date: Date, latitude: Double, longitude: Double) -> (alt: Double, az: Double) {
+        let jd = julianDay(date)
+        let d = jd - 2451545.0
+        let gmst = normalized(280.46061837 + 360.98564736629 * d)
+        let lst = normalized(gmst + longitude)
+        let ha = normalized(lst - ra)
+        let sinAlt = sinDeg(latitude) * sinDeg(dec) + cosDeg(latitude) * cosDeg(dec) * cosDeg(ha)
+        let alt = asin(max(-1, min(1, sinAlt))) * rad2deg
+        let y = -sinDeg(ha) * cosDeg(dec)
+        let x = cosDeg(latitude) * sinDeg(dec) - sinDeg(latitude) * cosDeg(dec) * cosDeg(ha)
+        let az = normalized(atan2Deg(y, x))
+        return (alt, az)
+    }
+
+    static func eclipticToEquatorial(lon: Double, lat: Double, jd: Double) -> (ra: Double, dec: Double) {
+        let ob = 23.4393 - 3.563e-7 * (jd - 2451543.5)
+        let x = cosDeg(lon) * cosDeg(lat)
+        let y = sinDeg(lon) * cosDeg(lat) * cosDeg(ob) - sinDeg(lat) * sinDeg(ob)
+        let z = sinDeg(lon) * cosDeg(lat) * sinDeg(ob) + sinDeg(lat) * cosDeg(ob)
+        return (normalized(atan2Deg(y, x)), atan2Deg(z, sqrt(x * x + y * y)))
+    }
+
+    /// Sun, moon, and planets as chart-ready equatorial coordinates.
+    static func chartBodies(date: Date = Date()) -> [ChartBody] {
+        let jd = julianDay(date)
+        var bodies: [ChartBody] = []
+        let sun = eclipticToEquatorial(lon: solarEclipticLongitude(jd), lat: 0, jd: jd)
+        bodies.append(ChartBody(name: "Sun", kind: .sun, ra: sun.ra, dec: sun.dec))
+        let moon = moonPosition(jd)
+        let moonEq = eclipticToEquatorial(lon: moon.lon, lat: moon.lat, jd: jd)
+        bodies.append(ChartBody(name: "Moon", kind: .moon, ra: moonEq.ra, dec: moonEq.dec))
+        for name in ["Mercury", "Venus", "Mars", "Jupiter", "Saturn"] {
+            if let p = planetPosition(name, jd: jd) {
+                let eq = eclipticToEquatorial(lon: p.lon, lat: p.lat, jd: jd)
+                bodies.append(ChartBody(name: name, kind: .planet, ra: eq.ra, dec: eq.dec))
+            }
+        }
+        return bodies
+    }
+
     // MARK: Math helpers
 
     private static let rad2deg = 180.0 / Double.pi

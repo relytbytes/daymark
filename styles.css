@@ -5025,3 +5025,14 @@ body[data-phase="night"] #eveningActions {
 .desk-import { cursor: pointer; }
 
 .sky-radar { width: 100%; height: 300px; border: 1px solid var(--line); border-radius: 14px; display: block; }
+
+/* ---- The Dome ---- */
+.sky-dome {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  border-radius: 16px;
+  touch-action: none;
+  background: #0b1020;
+}
+.sky-dome-note { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; font-weight: 600; }

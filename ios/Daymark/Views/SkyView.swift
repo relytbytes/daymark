@@ -19,6 +19,7 @@ struct SkyView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
+                    domeSection
                     if let weather = app.weather {
                         conditionsBoard(weather)
                         precipSection(weather)
@@ -57,6 +58,24 @@ struct SkyView: View {
             InkRule().padding(.top, 12)
         }
         .padding(.top, 10)
+    }
+
+    // MARK: The Dome
+
+    private var domeSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                SectionRuleHeader(title: "The Dome")
+                LivePill(text: "Live")
+            }
+            .padding(.bottom, 8)
+            Text("The sky over Durham right now. Pinch to zoom, drag to pan, tap a star.")
+                .font(DS.label(11, weight: .semibold))
+                .foregroundStyle(Palette.muted)
+                .padding(.bottom, 10)
+            DomeView()
+        }
+        .padding(.top, 20)
     }
 
     // MARK: Current conditions
