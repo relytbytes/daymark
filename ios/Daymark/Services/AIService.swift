@@ -205,6 +205,48 @@ enum AIDesk {
         )
     }
 
+    /// Interview prep primer for a pipeline role at screen/interview stage.
+    static func interviewPrep(company: String, role: String, stage: String, track: String, notes: String, headlines: String) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            Ty has a \(stage.lowercased()) coming up:
+
+            Company: \(company)
+            Role: \(role)
+            Track: \(track.nilIfEmpty ?? "—")
+            His notes: \(notes.nilIfEmpty ?? "(none)")
+            Today's general headlines (mention only if relevant): \(headlines.nilIfEmpty ?? "(none)")
+
+            Write a tight prep primer with these plain-text sections:
+            THE PITCH — 2 sentences on how Ty's hospitality-operations background maps to this role.
+            LIKELY QUESTIONS — 4, with a one-line angle for each.
+            SMART QUESTIONS TO ASK — 4 thoughtful ones.
+            WATCH FOR — one risk or gap to get ahead of.
+            """,
+            maxTokens: 600
+        )
+    }
+
+    /// A follow-up email draft for a role that needs a nudge.
+    static func followUpDraft(company: String, role: String, stage: String, contact: String, daysSinceTouch: Int) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            Draft a follow-up email from Ty Shelton about this application:
+
+            Company: \(company) · Role: \(role) · Stage: \(stage)
+            Contact: \(contact.nilIfEmpty ?? "(unknown — generic greeting)")
+            Days since last movement: \(daysSinceTouch)
+
+            3-5 sentences, professional and warm, reaffirming interest and fit without
+            groveling. Start with a subject line on its own first line as "Subject: …".
+            No placeholders like [Name] — if the contact is unknown, write around it.
+            """,
+            maxTokens: 350
+        )
+    }
+
     /// The Sky Desk horoscope: grounded in the real computed transits.
     static func horoscope(transits: String) async throws -> String {
         try await AIService.complete(

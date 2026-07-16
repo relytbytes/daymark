@@ -89,6 +89,7 @@ struct LandedRole: Identifiable, Hashable {
     let track: String
     let status: String
     let priority: String
+    let contact: String
     let nextAction: String
     let notes: String
 

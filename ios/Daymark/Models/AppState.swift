@@ -729,6 +729,33 @@ final class AppState {
         defaults.set(baseline, forKey: "daymark-jobtouch-baseline")
         defaults.set(Array(touched), forKey: "daymark-jobtouch-touched")
         autoJobTouches = touched.count
+
+        // Ghost tracker: stamp a last-touched date per role whenever its
+        // fingerprint changes; first sighting counts as a touch.
+        var stamps = (defaults.dictionary(forKey: "daymark-jobtouch-stamps") as? [String: Double]) ?? [:]
+        var lastPrints = (defaults.dictionary(forKey: "daymark-jobtouch-lastprints") as? [String: String]) ?? [:]
+        let now = Date().timeIntervalSince1970
+        for (key, print) in fingerprints where lastPrints[key] != print {
+            stamps[key] = now
+            lastPrints[key] = print
+        }
+        defaults.set(stamps, forKey: "daymark-jobtouch-stamps")
+        defaults.set(lastPrints, forKey: "daymark-jobtouch-lastprints")
+        roleTouchStamps = stamps
+    }
+
+    var roleTouchStamps: [String: Double] = [:]
+
+    /// Days since this Landed role last changed in the sheet.
+    func daysSinceTouch(_ role: LandedRole) -> Int? {
+        guard let stamp = roleTouchStamps[role.company + "|" + role.role] else { return nil }
+        return Int(Date().timeIntervalSince1970 - stamp) / 86400
+    }
+
+    /// A role has gone cold: active stage, untouched for 10+ days.
+    func isGhosting(_ role: LandedRole) -> Bool {
+        guard role.stageRank <= 4, let days = daysSinceTouch(role) else { return false }
+        return days >= 10
     }
 
     /// Roles most worth attention: hot stages and high priority first.
@@ -897,6 +924,47 @@ final class AppState {
         Stated first move: \(persisted.tomorrowFirstMove.nilIfEmpty ?? "not set")
         """
         runAI("evening", into: \.aiEveningNote) { try await AIDesk.eveningNarrative(dayData: dayData) }
+    }
+
+    var aiPrep: [String: String] = [:]        // role key -> primer
+    var aiFollowUp: [String: String] = [:]    // role key -> draft
+
+    /// Keyed variant of runAI for per-role outputs.
+    private func runAIKeyed(slot: String, work: @escaping () async throws -> String, apply: @escaping (String) -> Void) {
+        guard AIService.isConfigured, !aiBusy.contains(slot) else { return }
+        aiBusy.insert(slot)
+        Task {
+            defer { aiBusy.remove(slot) }
+            do {
+                apply(try await work())
+            } catch {
+                toast("The AI desk didn't answer — try again.")
+            }
+        }
+    }
+
+    func runInterviewPrep(_ role: LandedRole) {
+        let key = role.company + "|" + role.role
+        let recentNews = news.prefix(6).map(\.title).joined(separator: "\n")
+        runAIKeyed(slot: "prep-\(key)") {
+            try await AIDesk.interviewPrep(
+                company: role.company, role: role.role, stage: role.status,
+                track: role.track, notes: role.notes, headlines: recentNews)
+        } apply: { [weak self] text in
+            self?.aiPrep[key] = text
+        }
+    }
+
+    func runFollowUp(_ role: LandedRole) {
+        let key = role.company + "|" + role.role
+        let days = daysSinceTouch(role) ?? 0
+        runAIKeyed(slot: "follow-\(key)") {
+            try await AIDesk.followUpDraft(
+                company: role.company, role: role.role, stage: role.status,
+                contact: role.contact, daysSinceTouch: days)
+        } apply: { [weak self] text in
+            self?.aiFollowUp[key] = text
+        }
     }
 
     func runHoroscope() {

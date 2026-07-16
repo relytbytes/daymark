@@ -153,6 +153,7 @@ final class GoogleService {
                 track: col(6),
                 status: col(7).nilIfEmpty ?? "Interested",
                 priority: col(8),
+                contact: col(9),
                 nextAction: col(10),
                 notes: col(11)
             )

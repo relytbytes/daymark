@@ -15,6 +15,7 @@ struct WorkView: View {
     @State private var editingApplication: JobApplication?
     @State private var creatingApplication = false
     @State private var addingWaiting = false
+    @State private var deskSheet: JobDeskSheet?
 
     var body: some View {
         let phase = DayPhase.current()
@@ -48,6 +49,9 @@ struct WorkView: View {
         }
         .sheet(isPresented: $addingWaiting) {
             WaitingEditor()
+        }
+        .sheet(item: $deskSheet) { sheet in
+            JobDeskSheetView(sheet: sheet)
         }
     }
 
@@ -88,6 +92,10 @@ struct WorkView: View {
                                         .lineLimit(1)
                                 }
                                 Spacer()
+                                if app.isGhosting(role), let days = app.daysSinceTouch(role) {
+                                    StatusChip(text: "Cold · \(days)d",
+                                               foreground: Palette.muted, background: Palette.paperDeep)
+                                }
                                 StatusChip(
                                     text: role.status,
                                     foreground: role.stageRank <= 1 ? Color(hex: 0x0E7A54) : Palette.coral,
@@ -95,9 +103,29 @@ struct WorkView: View {
                                 )
                             }
                             .padding(.vertical, 10)
+                            .contentShape(Rectangle())
+                            .contextMenu {
+                                if role.stageRank <= 2 {
+                                    Button {
+                                        app.runInterviewPrep(role)
+                                        deskSheet = JobDeskSheet(role: role, kind: .prep)
+                                    } label: {
+                                        Label("Interview prep", systemImage: "text.book.closed")
+                                    }
+                                }
+                                Button {
+                                    app.runFollowUp(role)
+                                    deskSheet = JobDeskSheet(role: role, kind: .followUp)
+                                } label: {
+                                    Label("Draft follow-up", systemImage: "envelope")
+                                }
+                            }
                         }
                     }
                     Hairline()
+                    Text("LONG-PRESS A ROLE FOR PREP OR A FOLLOW-UP DRAFT")
+                        .kickerStyle(Palette.subtle, size: 7, tracking: 1.0)
+                        .padding(.top, 8)
 
                     Button {
                         if let url = URL(string: "https://job-search-command-center-brown.vercel.app") {
@@ -565,5 +593,98 @@ struct WaitingEditor: View {
             }
         }
         .presentationDetents([.medium])
+    }
+}
+
+
+// MARK: - Job desk sheet (interview prep / follow-up draft)
+
+struct JobDeskSheet: Identifiable {
+    let role: LandedRole
+    let kind: Kind
+    enum Kind { case prep, followUp }
+    var id: String { role.company + role.role + (kind == .prep ? "p" : "f") }
+}
+
+struct JobDeskSheetView: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    let sheet: JobDeskSheet
+
+    private var key: String { sheet.role.company + "|" + sheet.role.role }
+    private var output: String? {
+        sheet.kind == .prep ? app.aiPrep[key] : app.aiFollowUp[key]
+    }
+    private var busy: Bool {
+        app.aiBusy.contains((sheet.kind == .prep ? "prep-" : "follow-") + key)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(sheet.kind == .prep ? "INTERVIEW PREP" : "FOLLOW-UP DRAFT")
+                        .kickerStyle(Palette.coral, size: 10, tracking: 1.4)
+                    Text("\(sheet.role.company) — \(sheet.role.role)")
+                        .font(DS.display(24))
+                        .foregroundStyle(Palette.ink)
+                    InkRule()
+
+                    if let output {
+                        Text(output)
+                            .font(DS.label(14, weight: .regular))
+                            .foregroundStyle(Palette.ink)
+                            .lineSpacing(4)
+                            .textSelection(.enabled)
+                        if sheet.kind == .followUp {
+                            AcidButton(label: "Open in Mail", systemImage: "envelope.fill") {
+                                openInMail(output)
+                            }
+                        }
+                    } else if busy {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("The desk is writing…")
+                                .font(DS.deck(14))
+                                .foregroundStyle(Palette.muted)
+                        }
+                        .padding(.top, 20)
+                    } else {
+                        Text(AIService.isConfigured
+                             ? "Nothing yet — close and long-press the role again."
+                             : "Add an AI key in Settings first.")
+                            .font(DS.deck(14))
+                            .foregroundStyle(Palette.muted)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(18)
+            }
+            .background(Palette.paper)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func openInMail(_ draft: String) {
+        var subject = "\(sheet.role.role) — following up"
+        var body = draft
+        if draft.lowercased().hasPrefix("subject:"),
+           let firstBreak = draft.firstIndex(of: "\n") {
+            subject = String(draft[draft.index(draft.startIndex, offsetBy: 8)..<firstBreak])
+                .trimmingCharacters(in: .whitespaces)
+            body = String(draft[draft.index(after: firstBreak)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        var components = URLComponents(string: "mailto:")!
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: subject),
+            URLQueryItem(name: "body", value: body),
+        ]
+        if let url = components.url {
+            UIApplication.shared.open(url)
+        }
     }
 }
