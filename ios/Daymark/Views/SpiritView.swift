@@ -17,6 +17,7 @@ struct SpiritView: View {
     @State private var question = ""
     @State private var spread: [TarotCard] = []
     @State private var tarotReading: String?
+    @State private var tarotError: String?
     @State private var tarotBusy = false
     @State private var meditation: String?
     @State private var meditationBusy = false
@@ -164,6 +165,20 @@ struct SpiritView: View {
                             .font(DS.deck(13))
                             .foregroundStyle(Palette.muted)
                     }
+                } else if let tarotError {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(tarotError)
+                            .font(DS.label(11, weight: .medium))
+                            .foregroundStyle(Palette.down)
+                        Button {
+                            requestReading()
+                        } label: {
+                            Text("READ AGAIN")
+                                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
+                                .foregroundStyle(Palette.ink)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 } else if !AIService.isConfigured {
                     Text("Add an AI key in Settings and the desk reads the spread against your question.")
                         .font(DS.label(11, weight: .regular))
@@ -192,8 +207,14 @@ struct SpiritView: View {
                         .font(.system(size: 6.5, weight: .heavy)).tracking(1.0)
                         .foregroundStyle(Palette.violet)
                 }
+                Text(card.meaning)
+                    .font(DS.label(9, weight: .medium))
+                    .foregroundStyle(Palette.muted)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.85)
             }
-            .frame(maxWidth: .infinity, minHeight: 92)
+            .frame(maxWidth: .infinity, minHeight: 116)
             .padding(8)
             .background(Palette.card)
             .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -204,8 +225,15 @@ struct SpiritView: View {
 
     private func drawSpread() {
         spread = Tarot.spread()
+        requestReading()
+    }
+
+    /// Ask the desk to read the current spread; failures surface with a
+    /// retry instead of vanishing.
+    private func requestReading() {
         tarotReading = nil
-        guard AIService.isConfigured else { return }
+        tarotError = nil
+        guard AIService.isConfigured, !spread.isEmpty else { return }
         tarotBusy = true
         let cards = spread.enumerated().map { index, card in
             (position: ["Past", "Present", "Future"][min(index, 2)],
@@ -215,7 +243,13 @@ struct SpiritView: View {
         let asked = question
         Task {
             defer { tarotBusy = false }
-            tarotReading = try? await AIDesk.tarotReading(question: asked, cards: cards)
+            do {
+                tarotReading = try await AIDesk.tarotReading(question: asked, cards: cards)
+            } catch let error as AIError {
+                tarotError = error.readable
+            } catch {
+                tarotError = error.localizedDescription
+            }
         }
     }
 
