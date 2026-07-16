@@ -2439,6 +2439,21 @@ function renderSkyDesk(body) {
           )
           .join("")}
       </div>
+      <h3 class="sky-section">COMING ATTRACTIONS</h3>
+      <div class="sky-events">
+        ${window.DaymarkAstro.upcomingEvents().map((event) => {
+          const days = Math.round((event.date - Date.now()) / 86400000);
+          const when = event.date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const glyph = event.kind === "shower" ? "✦" : event.kind === "eclipse" ? "◐" : "●";
+          return `
+            <div>
+              <i>${glyph}</i>
+              <div class="sky-event-copy"><span>${escapeHtml(event.title)}</span><small>${escapeHtml(event.detail)}</small></div>
+              <div class="sky-event-when"><b>${when}</b><em class="${days <= 3 ? "is-soon" : ""}">${days <= 0 ? "TONIGHT" : `IN ${days} DAY${days === 1 ? "" : "S"}`}</em></div>
+            </div>
+          `;
+        }).join("")}
+      </div>
       <h3 class="sky-section">THE ASTROLOGY DESK</h3>
       <div class="sky-astrology">
         <div class="sky-astrology-head">

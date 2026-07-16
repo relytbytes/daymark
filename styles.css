@@ -5036,3 +5036,15 @@ body[data-phase="night"] #eveningActions {
   background: #0b1020;
 }
 .sky-dome-note { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+
+/* ---- Coming attractions ---- */
+.sky-events > div { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+.sky-events > div:last-child { border-bottom: 1px solid var(--line); }
+.sky-events i { font-style: normal; color: var(--gold); width: 20px; text-align: center; }
+.sky-event-copy { flex: 1; min-width: 0; }
+.sky-event-copy span { display: block; font-size: 13px; font-weight: 600; }
+.sky-event-copy small { color: var(--muted); font-size: 10.5px; }
+.sky-event-when { text-align: right; }
+.sky-event-when b { display: block; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.sky-event-when em { font-size: 7.5px; font-style: normal; font-weight: 800; letter-spacing: 0.08em; color: var(--muted); }
+.sky-event-when em.is-soon { color: var(--coral); }

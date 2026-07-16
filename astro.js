@@ -297,5 +297,81 @@ window.DaymarkAstro = (() => {
     return bodies;
   }
 
-  return { snapshot, horizontal, chartBodies };
+  function elongationAt(date) {
+    const jd = julianDay(date);
+    return norm(moonPosition(jd).lon - solarEclipticLongitude(jd));
+  }
+
+  /// Next moment the moon's elongation crosses `target` (0 = new, 180 = full).
+  function nextPhase(target, from = new Date()) {
+    const delta = (date) => {
+      let d = (elongationAt(date) - target) % 360;
+      if (d <= -180) d += 360;
+      if (d > 180) d -= 360;
+      return d;
+    };
+    let t = from.getTime();
+    let prev = delta(new Date(t));
+    const step = 6 * 3600000;
+    for (let i = 0; i < 31 * 4; i += 1) {
+      const next = t + step;
+      const cur = delta(new Date(next));
+      if (prev < 0 && cur >= 0) {
+        let lo = t;
+        let hi = next;
+        for (let k = 0; k < 20; k += 1) {
+          const mid = lo + (hi - lo) / 2;
+          if (delta(new Date(mid)) < 0) lo = mid;
+          else hi = mid;
+        }
+        return new Date(hi);
+      }
+      prev = cur;
+      t = next;
+    }
+    return null;
+  }
+
+  const SHOWERS = [
+    [1, 3, "Quadrantids", 110, "Sharp overnight peak"],
+    [4, 22, "Lyrids", 18, "Best after midnight"],
+    [5, 5, "Eta Aquariids", 50, "Pre-dawn, Halley's debris"],
+    [7, 30, "Delta Aquariids", 25, "Best from midnight south"],
+    [8, 12, "Perseids", 100, "The summer classic"],
+    [10, 21, "Orionids", 20, "Pre-dawn, Halley's debris"],
+    [11, 17, "Leonids", 15, "Late night into dawn"],
+    [12, 13, "Geminids", 150, "The year's strongest"],
+    [12, 22, "Ursids", 10, "Quiet, near solstice"],
+  ];
+  const ECLIPSES = [
+    [2026, 8, 28, "Partial lunar eclipse", "Visible from the Americas, evening"],
+    [2028, 1, 12, "Partial lunar eclipse", "Visible from the Americas"],
+    [2028, 12, 31, "Total lunar eclipse", "Visible from the Americas"],
+  ];
+
+  /// The next several sky events, soonest first.
+  function upcomingEvents(limit = 6, now = new Date()) {
+    const events = [];
+    const full = nextPhase(180, now);
+    if (full) events.push({ date: full, title: "Full Moon", detail: "Rises around sunset", kind: "moon" });
+    const newMoon = nextPhase(0, now);
+    if (newMoon) events.push({ date: newMoon, title: "New Moon", detail: "Darkest skies of the month", kind: "moon" });
+    const year = now.getFullYear();
+    for (const [month, day, name, zhr, note] of SHOWERS) {
+      for (const y of [year, year + 1]) {
+        const date = new Date(y, month - 1, day, 22);
+        if (date >= now && date - now < 370 * 86400000) {
+          events.push({ date, title: `${name} peak`, detail: `${note} · up to ${zhr}/hr`, kind: "shower" });
+          break;
+        }
+      }
+    }
+    for (const [y, m, d, title, note] of ECLIPSES) {
+      const date = new Date(y, m - 1, d, 21);
+      if (date >= now) events.push({ date, title, detail: note, kind: "eclipse" });
+    }
+    return events.sort((a, b) => a.date - b.date).slice(0, limit);
+  }
+
+  return { snapshot, horizontal, chartBodies, upcomingEvents };
 })();

@@ -29,6 +29,7 @@ struct SkyView: View {
                     radarSection
                     almanacSection
                     planetsSection
+                    eventsSection
                     astrologySection
                 }
                 .padding(.horizontal, 18)
@@ -374,6 +375,54 @@ struct SkyView: View {
                 Hairline()
             }
             .padding(.top, 24)
+        }
+    }
+
+    // MARK: Coming attractions
+
+    private var eventsSection: some View {
+        let events = AstroEvents.upcoming()
+        return VStack(alignment: .leading, spacing: 0) {
+            SectionRuleHeader(title: "Coming Attractions")
+                .padding(.bottom, 6)
+            ForEach(events) { event in
+                VStack(spacing: 0) {
+                    Hairline()
+                    HStack(spacing: 10) {
+                        Image(systemName: eventSymbol(event.kind))
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.gold)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(event.title)
+                                .font(DS.label(13, weight: .semibold))
+                                .foregroundStyle(Palette.ink)
+                            Text(event.detail)
+                                .font(DS.label(10.5, weight: .regular))
+                                .foregroundStyle(Palette.muted)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(event.date.shortDate())
+                                .font(DS.label(11.5, weight: .bold))
+                                .foregroundStyle(Palette.ink)
+                            Text(event.daysAway == 0 ? "TONIGHT" : "IN \(event.daysAway) DAY\(event.daysAway == 1 ? "" : "S")")
+                                .kickerStyle(event.daysAway <= 3 ? Palette.coral : Palette.subtle, size: 7.5, tracking: 0.8)
+                        }
+                    }
+                    .padding(.vertical, 9)
+                }
+            }
+            Hairline()
+        }
+        .padding(.top, 24)
+    }
+
+    private func eventSymbol(_ kind: AstroEvent.Kind) -> String {
+        switch kind {
+        case .moon: return "moon.stars.fill"
+        case .shower: return "sparkles"
+        case .eclipse: return "circle.righthalf.filled"
         }
     }
 
