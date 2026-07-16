@@ -953,8 +953,8 @@ final class AppState {
                 } else {
                     toast("Wire playlist: none of today's tracks matched on Spotify.")
                 }
-            } catch HTTPError.status(let code) where code == 403 {
-                toast("Spotify refused the playlist (403) — disconnect and reconnect to grant playlist access.")
+            } catch let error as SpotifyAPIError {
+                toast(error.readable)
             } catch HTTPError.status(let code) {
                 toast("Wire playlist sync failed — Spotify error \(code).")
             } catch {
