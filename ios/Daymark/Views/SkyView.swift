@@ -361,10 +361,24 @@ struct SkyView: View {
                     Text("Sun in \(astro.sunSign) · Moon in \(astro.moon.zodiacSign)\(astro.mercuryRetrograde ? " · Mercury retrograde" : "")")
                         .font(DS.label(12, weight: .semibold))
                         .foregroundStyle(Palette.ink)
-                    Text(dailyHoroscopePlaceholder(astro))
+                    Text(app.aiHoroscope ?? dailyHoroscopePlaceholder(astro))
                         .font(DS.deck(14))
-                        .foregroundStyle(Palette.muted)
+                        .foregroundStyle(app.aiHoroscope == nil ? Palette.muted : Palette.ink)
                         .lineSpacing(3)
+                    if AIService.isConfigured {
+                        Button {
+                            app.runHoroscope()
+                        } label: {
+                            if app.aiBusy.contains("horoscope") {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text(app.aiHoroscope == nil ? "WRITE TODAY'S HOROSCOPE" : "REWRITE")
+                                    .kickerStyle(Palette.ink, size: 9, tracking: 1.2)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(app.aiBusy.contains("horoscope"))
+                    }
                 }
                 .inkPanel(padding: 15)
             }

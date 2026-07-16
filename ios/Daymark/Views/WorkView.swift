@@ -33,6 +33,7 @@ struct WorkView: View {
             }
 
             applicationsSection
+            aiCoachSection
             sprintSection
             decisionsSection
             waitingSection
@@ -46,6 +47,22 @@ struct WorkView: View {
         }
         .sheet(isPresented: $addingWaiting) {
             WaitingEditor()
+        }
+    }
+
+    // MARK: AI coach
+
+    @ViewBuilder
+    private var aiCoachSection: some View {
+        if !app.persisted.applications.filter({ $0.status != .closed }).isEmpty {
+            AIDeskCard(
+                kicker: "The AI desk · job coach",
+                emptyPrompt: "Which roles deserve attention today, and what exactly to do for each.",
+                output: app.aiJobCoach,
+                busy: app.aiBusy.contains("coach"),
+                run: { app.runJobCoach() }
+            )
+            .padding(.top, 14)
         }
     }
 

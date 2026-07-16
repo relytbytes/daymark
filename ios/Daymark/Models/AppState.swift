@@ -64,6 +64,15 @@ final class AppState {
     var isRefreshing = false
     var toastMessage: String?
 
+    // MARK: AI desk output
+
+    var aiPlan: String?
+    var aiJobCoach: String?
+    var aiMailTriage: String?
+    var aiEveningNote: String?
+    var aiHoroscope: String?
+    var aiBusy: Set<String> = []
+
     // MARK: Init
 
     init() {
@@ -504,5 +513,83 @@ final class AppState {
             morning: settings.morningBrief,
             evening: settings.eveningReview
         )
+    }
+
+    // MARK: - AI desk
+
+    private func runAI(_ slot: String, into keyPath: ReferenceWritableKeyPath<AppState, String?>, _ work: @escaping () async throws -> String) {
+        guard AIService.isConfigured, !aiBusy.contains(slot) else { return }
+        aiBusy.insert(slot)
+        Task {
+            defer { aiBusy.remove(slot) }
+            do {
+                self[keyPath: keyPath] = try await work()
+            } catch AIError.notConfigured {
+                toast("Add an AI key in Settings first.")
+            } catch {
+                toast("The AI desk didn't answer — try again.")
+            }
+        }
+    }
+
+    func runDailyPlan() {
+        let events = eventsToday.map { "\($0.start.timeText()) \($0.title)" }.joined(separator: "\n")
+        let captures = persisted.captures.filter { !$0.done }.map(\.title).joined(separator: "\n")
+        let apps = persisted.applications.filter { $0.status != .closed }
+            .map { "\($0.status.rawValue): \($0.organization) — \($0.role) (next: \($0.nextStep))" }
+            .joined(separator: "\n")
+        let briefing = """
+        Weather: \(weather.map { "\($0.tempF)°, \($0.description), rain \($0.rainPct)%" } ?? "unknown")
+        Calendar today:
+        \(events.nilIfEmpty ?? "(no events)")
+        Open captures:
+        \(captures.nilIfEmpty ?? "(none)")
+        Job pipeline:
+        \(apps.nilIfEmpty ?? "(none)")
+        """
+        runAI("plan", into: \.aiPlan) { try await AIDesk.dailyPlan(briefing: briefing) }
+    }
+
+    func runJobCoach() {
+        let now = Date()
+        let apps = persisted.applications.filter { $0.status != .closed }
+        guard !apps.isEmpty else { toast("No open applications to coach on."); return }
+        let pipeline = apps.map {
+            let days = Int(now.timeIntervalSince($0.updatedAt) / 86400)
+            return "\($0.status.rawValue) · \($0.organization) · \($0.role) · \(days)d since touch · next: \($0.nextStep)"
+        }.joined(separator: "\n")
+        runAI("coach", into: \.aiJobCoach) { try await AIDesk.jobCoach(pipeline: pipeline) }
+    }
+
+    func runMailTriage() {
+        guard !mail.isEmpty else { toast("No priority mail to triage."); return }
+        let messages = mail.prefix(8)
+            .map { "\($0.fromName) <\($0.fromEmail)> · \($0.subject) · \($0.snippet.prefix(140))" }
+            .joined(separator: "\n")
+        runAI("triage", into: \.aiMailTriage) { try await AIDesk.mailTriage(messages: messages) }
+    }
+
+    func runEveningNarrative() {
+        let review = eveningReview()
+        let scores = review.scoreLines.map { "\($0.label): \($0.done)/\($0.target)" }.joined(separator: ", ")
+        let dayData = """
+        Essentials landed: \(review.essentialsDone)/\(review.essentialsTotal)
+        Loops cleared: \(review.capturesCleared)
+        Scorecard: \(scores)
+        Tomorrow's first event: \(review.tomorrowFirst.map { "\($0.start.timeText()) \($0.title)" } ?? "none")
+        Stated first move: \(persisted.tomorrowFirstMove.nilIfEmpty ?? "not set")
+        """
+        runAI("evening", into: \.aiEveningNote) { try await AIDesk.eveningNarrative(dayData: dayData) }
+    }
+
+    func runHoroscope() {
+        guard let astro else { return }
+        let transits = """
+        Sun in \(astro.sunSign). Moon in \(astro.moon.zodiacSign), \(astro.moon.phaseName) \
+        (\(Int((astro.moon.illumination * 100).rounded()))% lit, day \(Int(astro.moon.ageDays.rounded()))).
+        Mercury retrograde: \(astro.mercuryRetrograde ? "yes" : "no").
+        Planets visible tonight: \(astro.planets.filter(\.visibleTonight).map(\.name).joined(separator: ", ").nilIfEmpty ?? "none").
+        """
+        runAI("horoscope", into: \.aiHoroscope) { try await AIDesk.horoscope(transits: transits) }
     }
 }

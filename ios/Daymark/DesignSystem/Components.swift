@@ -386,6 +386,54 @@ struct CircleCheck: View {
     }
 }
 
+// MARK: - AI desk card
+
+/// Editorial AI output block: kicker, prose, and a run/rerun action.
+/// Renders nothing when the AI desk isn't configured.
+struct AIDeskCard: View {
+    let kicker: String
+    let emptyPrompt: String
+    let output: String?
+    let busy: Bool
+    let run: () -> Void
+
+    var body: some View {
+        if AIService.isConfigured {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(kicker.uppercased()).kickerStyle(Palette.coral, size: 9, tracking: 1.4)
+                    Spacer()
+                    Button {
+                        run()
+                    } label: {
+                        if busy {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text(output == nil ? "WRITE IT" : "REWRITE")
+                                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
+                                .foregroundStyle(Palette.ink)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy)
+                }
+                if let output {
+                    Text(output)
+                        .font(DS.deck(14, weight: 450, italic: false))
+                        .foregroundStyle(Palette.ink)
+                        .lineSpacing(3)
+                        .textSelection(.enabled)
+                } else {
+                    Text(emptyPrompt)
+                        .font(DS.deck(13))
+                        .foregroundStyle(Palette.subtle)
+                }
+            }
+            .editorialPanel(padding: 14)
+        }
+    }
+}
+
 // MARK: - Safari
 
 struct SafariView: UIViewControllerRepresentable {

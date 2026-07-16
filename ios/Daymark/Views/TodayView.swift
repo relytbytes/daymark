@@ -36,13 +36,16 @@ struct TodayView: View {
             leadSection(phase: phase)
             focusBulletin
             essentialsSection(phase: phase)
+            aiPlanSection(phase: phase)
             timelineSection
             meetingPrepSection
             mailSection
+            aiTriageSection
             waitingSection
             inboxSection
             if phase.isEndOfDay {
                 eveningReviewSection
+                aiEveningSection
             }
         }
         .sheet(item: $openURLItem) { item in
@@ -637,6 +640,48 @@ struct TodayView: View {
             }
             .padding(.top, 14)
         }
+    }
+}
+
+extension TodayView {
+    @ViewBuilder
+    func aiPlanSection(phase: DayPhase) -> some View {
+        if !phase.isEndOfDay {
+            AIDeskCard(
+                kicker: "The AI desk · today's plan",
+                emptyPrompt: "Have the desk read your calendar, pipeline, captures, and the weather — and propose the Essential Three plus a first move.",
+                output: app.aiPlan,
+                busy: app.aiBusy.contains("plan"),
+                run: { app.runDailyPlan() }
+            )
+            .padding(.top, 14)
+        }
+    }
+
+    @ViewBuilder
+    var aiTriageSection: some View {
+        if app.googleConnected, !app.mail.isEmpty {
+            AIDeskCard(
+                kicker: "The AI desk · mail triage",
+                emptyPrompt: "One line per message: why it matters and the next step.",
+                output: app.aiMailTriage,
+                busy: app.aiBusy.contains("triage"),
+                run: { app.runMailTriage() }
+            )
+            .padding(.top, 14)
+        }
+    }
+
+    @ViewBuilder
+    var aiEveningSection: some View {
+        AIDeskCard(
+            kicker: "The AI desk · evening column",
+            emptyPrompt: "A short column about how the day actually went.",
+            output: app.aiEveningNote,
+            busy: app.aiBusy.contains("evening"),
+            run: { app.runEveningNarrative() }
+        )
+        .padding(.top, 14)
     }
 }
 

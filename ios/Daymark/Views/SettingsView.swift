@@ -16,6 +16,9 @@ struct SettingsView: View {
     @State private var newFeedURL = ""
     @State private var newSymbol = ""
     @State private var newSymbolLabel = ""
+    @State private var aiProvider = AIService.provider
+    @State private var aiKeyField = AIService.isConfigured ? "••••••••••••" : ""
+    @State private var aiKeyDirty = false
 
     var body: some View {
         @Bindable var app = app
@@ -61,6 +64,33 @@ struct SettingsView: View {
                     Toggle("Morning brief · 7:30 AM", isOn: $app.persisted.settings.morningBrief)
                     Toggle("Evening review · 8:30 PM", isOn: $app.persisted.settings.eveningReview)
                     Toggle("Travel time to next meeting", isOn: $app.persisted.settings.travelETA)
+                }
+
+                Section {
+                    Picker("Provider", selection: $aiProvider) {
+                        ForEach(AIProvider.allCases) { provider in
+                            Text(provider.rawValue).tag(provider)
+                        }
+                    }
+                    .onChange(of: aiProvider) { _, newValue in
+                        AIService.provider = newValue
+                    }
+                    SecureField("API key", text: $aiKeyField)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: aiKeyField) { _, _ in aiKeyDirty = true }
+                    if aiKeyDirty {
+                        Button("Save key") {
+                            AIService.apiKey = aiKeyField.trimmingCharacters(in: .whitespacesAndNewlines)
+                            aiKeyDirty = false
+                            aiKeyField = AIService.isConfigured ? "••••••••••••" : ""
+                            app.toast(AIService.isConfigured ? "AI desk is on." : "AI key cleared.")
+                        }
+                    }
+                } header: {
+                    Text("The AI desk")
+                } footer: {
+                    Text("Powers the daily plan, job coach, mail triage, evening column, and horoscope. The key is stored in the Keychain, never synced or committed. Start with OpenAI; switch the picker to Anthropic when your credits run out.")
                 }
 
                 Section {
