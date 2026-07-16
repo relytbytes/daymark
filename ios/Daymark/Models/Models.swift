@@ -55,8 +55,37 @@ struct CaptureItem: Identifiable, Codable, Hashable {
     var title: String
     var url: String?
     var note: String?
+    var imageFile: String?      // filename in the captures image store
     var createdAt = Date()
     var done = false
+}
+
+/// Photos attached to captures, stored as JPEGs in Application Support.
+enum CaptureImages {
+    static var directory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("captures", isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base
+    }
+
+    static func save(_ image: UIImage) -> String? {
+        let name = UUID().uuidString + ".jpg"
+        guard let data = image.jpegData(compressionQuality: 0.82) else { return nil }
+        do {
+            try data.write(to: directory.appendingPathComponent(name))
+            return name
+        } catch { return nil }
+    }
+
+    static func load(_ name: String) -> UIImage? {
+        UIImage(contentsOfFile: directory.appendingPathComponent(name).path)
+    }
+
+    static func delete(_ name: String?) {
+        guard let name else { return }
+        try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
+    }
 }
 
 enum ApplicationStatus: String, Codable, CaseIterable, Identifiable {
@@ -276,12 +305,26 @@ struct AppSettings: Codable, Hashable {
         FeedSource(name: "The Intercept", url: "https://theintercept.com/feed/?rss"),
         FeedSource(name: "The Nation", url: "https://www.thenation.com/feed/?post_type=article"),
         FeedSource(name: "Guardian US", url: "https://www.theguardian.com/us-news/rss"),
+        FeedSource(name: "Consortium News", url: "https://consortiumnews.com/feed/"),
+        FeedSource(name: "Common Dreams", url: "https://www.commondreams.org/rss.xml"),
+        FeedSource(name: "Democracy Now!", url: "https://www.democracynow.org/democracynow.rss"),
+        FeedSource(name: "Truthout", url: "https://truthout.org/feed/"),
+        FeedSource(name: "ProPublica", url: "https://www.propublica.org/feeds/propublica/main"),
+        FeedSource(name: "Mother Jones", url: "https://www.motherjones.com/feed/"),
+        FeedSource(name: "Drop Site", url: "https://www.dropsitenews.com/feed"),
+        FeedSource(name: "The Grayzone", url: "https://thegrayzone.com/feed/"),
+        FeedSource(name: "MintPress", url: "https://www.mintpressnews.com/feed/"),
+        FeedSource(name: "Black Agenda Report", url: "https://blackagendareport.com/rss.xml"),
+        FeedSource(name: "Grist", url: "https://grist.org/feed/"),
+        // Longform — the reading side of the brief.
         FeedSource(name: "Longreads", url: "https://longreads.com/feed/"),
+        FeedSource(name: "Harper's", url: "https://harpers.org/feed/"),
+        FeedSource(name: "Monthly Review", url: "https://monthlyreview.org/feed/"),
     ]
 
     /// Bumped when defaultFeeds gains sources; existing installs merge
     /// the newcomers once and never resurrect feeds the user deleted.
-    static let currentFeedsRevision = 2
+    static let currentFeedsRevision = 3
 
     static let defaultWatchlist: [WatchSymbol] = [
         WatchSymbol(symbol: "^spx", label: "S&P 500"),

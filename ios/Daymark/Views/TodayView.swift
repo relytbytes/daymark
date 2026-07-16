@@ -15,6 +15,7 @@ struct TodayView: View {
     @Binding var showSettings: Bool
     @State private var openURLItem: SheetLink?
     @State private var openEssential: String?
+    @State private var captureImageItem: CaptureImageSheet?
 
     var body: some View {
         let phase = DayPhase.current()
@@ -51,6 +52,19 @@ struct TodayView: View {
         }
         .sheet(item: $openURLItem) { item in
             SafariView(url: item.url).ignoresSafeArea()
+        }
+        .sheet(item: $captureImageItem) { item in
+            NavigationStack {
+                ScrollView([.horizontal, .vertical]) {
+                    Image(uiImage: item.image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                }
+                .background(Palette.ink)
+                .navigationTitle(item.title)
+                .navigationBarTitleDisplayMode(.inline)
+            }
         }
     }
 
@@ -551,6 +565,19 @@ struct TodayView: View {
                     VStack(spacing: 0) {
                         Hairline()
                         HStack(spacing: 12) {
+                            if let file = item.imageFile, let image = CaptureImages.load(file) {
+                                Button {
+                                    captureImageItem = CaptureImageSheet(image: image, title: item.title)
+                                } label: {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 44, height: 44)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Palette.line, lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.kind.label.uppercased())
                                     .kickerStyle(Palette.subtle, size: 8, tracking: 1.1)
@@ -738,4 +765,10 @@ extension TodayView {
 struct SheetLink: Identifiable {
     let url: URL
     var id: String { url.absoluteString }
+}
+
+struct CaptureImageSheet: Identifiable {
+    let image: UIImage
+    let title: String
+    var id: String { title }
 }
