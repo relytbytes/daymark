@@ -247,6 +247,42 @@ enum AIDesk {
         )
     }
 
+    /// A tarot reading woven from the actual drawn cards and the asker's question.
+    static func tarotReading(question: String, cards: [(position: String, name: String, meaning: String)]) async throws -> String {
+        let spread = cards.map { "\($0.position): \($0.name) — \($0.meaning)" }.joined(separator: "\n")
+        return try await AIService.complete(
+            system: voice,
+            user: """
+            Ty asked the cards: "\(question.nilIfEmpty ?? "What do I need to know today?")"
+
+            The spread drawn (these are the real cards — read THESE, do not invent others):
+            \(spread)
+
+            Write the reading: one short paragraph per card tying its meaning to his
+            question, then a closing line that draws the three together into one piece
+            of practical counsel. Warm, grounded, no doom, no hedging disclaimers.
+            """,
+            maxTokens: 550
+        )
+    }
+
+    /// A short guided meditation composed for today.
+    static func meditation(theme: String) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            Compose a short guided meditation for Ty — about 150 words, second person,
+            present tense, slow cadence with line breaks between beats. Today's thread:
+            \(theme)
+
+            Open with settling the body, move through three or four breaths of imagery
+            drawn from the thread, end with one sentence he can carry into the day.
+            No preamble, no title — just the meditation itself.
+            """,
+            maxTokens: 350
+        )
+    }
+
     /// The Sky Desk horoscope: grounded in the real computed transits.
     static func horoscope(transits: String) async throws -> String {
         try await AIService.complete(

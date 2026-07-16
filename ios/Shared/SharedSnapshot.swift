@@ -11,12 +11,20 @@
 import Foundation
 
 struct WidgetSnapshot: Codable {
+    struct Event: Codable, Hashable {
+        var title: String
+        var start: Date
+        var end: Date
+        var isTomorrow: Bool
+    }
+
     var updatedAt: Date
     var openLoops: Int
     var clearedPercent: Int
     var nextEventTitle: String?
     var nextEventTime: Date?
     var focusTitle: String?
+    var events: [Event] = []
 
     static let groupID = "group.com.relytbytes.daymark"
     static let filename = "daymark-widget.json"

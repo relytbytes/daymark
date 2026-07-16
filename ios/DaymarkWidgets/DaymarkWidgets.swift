@@ -285,6 +285,7 @@ struct GlanceWidgetView: View {
     var body: some View {
         switch family {
         case .systemMedium: medium
+        case .systemLarge: large
         case .accessoryCircular: circular
         case .accessoryInline: inline
         case .accessoryRectangular: rectangular
@@ -298,17 +299,22 @@ struct GlanceWidgetView: View {
         VStack(alignment: .leading, spacing: 6) {
             masthead
             Spacer(minLength: 0)
-            HStack(alignment: .lastTextBaseline, spacing: 7) {
+            HStack(alignment: .lastTextBaseline, spacing: 6) {
                 Text(entry.tempF.map { "\($0)°" } ?? "—")
-                    .font(.system(size: 42, weight: .bold, design: .serif))
+                    .font(.system(size: 38, weight: .bold, design: .serif))
                     .foregroundStyle(WPalette.ink)
+                    .fixedSize()
+                    .layoutPriority(2)
                 if let feels = feelsParen {
                     Text(feels)
-                        .font(.system(size: 15, weight: .bold, design: .serif))
+                        .font(.system(size: 14, weight: .bold, design: .serif))
                         .foregroundStyle(WPalette.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .layoutPriority(1)
                 }
                 Image(systemName: entry.symbol)
-                    .font(.system(size: 17))
+                    .font(.system(size: 15))
                     .foregroundStyle(WPalette.gold)
                 Spacer(minLength: 0)
             }
@@ -341,17 +347,22 @@ struct GlanceWidgetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 masthead
                 Spacer(minLength: 0)
-                HStack(alignment: .lastTextBaseline, spacing: 8) {
+                HStack(alignment: .lastTextBaseline, spacing: 7) {
                     Text(entry.tempF.map { "\($0)°" } ?? "—")
-                        .font(.system(size: 48, weight: .bold, design: .serif))
+                        .font(.system(size: 44, weight: .bold, design: .serif))
                         .foregroundStyle(WPalette.ink)
+                        .fixedSize()
+                        .layoutPriority(2)
                     if let feels = feelsParen {
                         Text(feels)
-                            .font(.system(size: 17, weight: .bold, design: .serif))
+                            .font(.system(size: 16, weight: .bold, design: .serif))
                             .foregroundStyle(WPalette.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .layoutPriority(1)
                     }
                     Image(systemName: entry.symbol)
-                        .font(.system(size: 19))
+                        .font(.system(size: 17))
                         .foregroundStyle(WPalette.gold)
                 }
                 Text(rangeLine)
@@ -407,6 +418,101 @@ struct GlanceWidgetView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(13)
+        .textCase(.uppercase)
+        .containerBackground(WPalette.paper, for: .widget)
+    }
+
+    // MARK: Large — the full front page: weather, scoreboard, and the day
+
+    private var large: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            masthead
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .lastTextBaseline, spacing: 6) {
+                        Text(entry.tempF.map { "\($0)°" } ?? "—")
+                            .font(.system(size: 40, weight: .bold, design: .serif))
+                            .foregroundStyle(WPalette.ink)
+                            .fixedSize()
+                            .layoutPriority(2)
+                        if let feels = feelsParen {
+                            Text(feels)
+                                .font(.system(size: 15, weight: .bold, design: .serif))
+                                .foregroundStyle(WPalette.muted)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                        }
+                        Image(systemName: entry.symbol)
+                            .font(.system(size: 16))
+                            .foregroundStyle(WPalette.gold)
+                    }
+                    Text(detailLine)
+                        .font(.system(size: 9, weight: .heavy))
+                        .tracking(0.3)
+                        .foregroundStyle(WPalette.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(entry.games, id: \.label) { game in
+                        gameRow(game, compact: true)
+                    }
+                    eveningRow
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            rule
+
+            // The day, from the app's calendar snapshot.
+            HStack {
+                Text("THE DAY")
+                    .font(.system(size: 8, weight: .heavy)).tracking(1.2)
+                    .foregroundStyle(WPalette.subtle)
+                Spacer()
+                if let desk = entry.desk {
+                    Text("\(desk.openLoops) OPEN · \(desk.clearedPercent)% CLEAR")
+                        .font(.system(size: 8, weight: .heavy)).tracking(0.6)
+                        .foregroundStyle(desk.openLoops > 0 ? WPalette.red : WPalette.muted)
+                }
+            }
+
+            let events = entry.desk?.events ?? []
+            if events.isEmpty {
+                Text(entry.desk == nil
+                     ? "Open Daymark once to connect the calendar"
+                     : "Clear calendar — nothing scheduled")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WPalette.muted)
+                Spacer(minLength: 0)
+            } else {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(Array(events.prefix(6).enumerated()), id: \.offset) { _, event in
+                        HStack(spacing: 7) {
+                            Rectangle()
+                                .fill(event.start <= entry.date && entry.date < event.end ? WPalette.red : WPalette.blue)
+                                .frame(width: 2.5, height: 18)
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text("\(event.isTomorrow ? "TOMORROW " : "")\(event.start.formatted(date: .omitted, time: .shortened))")
+                                    .font(.system(size: 7.5, weight: .heavy)).tracking(0.6)
+                                    .foregroundStyle(event.isTomorrow ? WPalette.subtle : WPalette.red)
+                                Text(event.title)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(WPalette.ink)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(14)
         .textCase(.uppercase)
         .containerBackground(WPalette.paper, for: .widget)
     }
@@ -567,7 +673,7 @@ struct AtAGlanceWidget: Widget {
         .description("Durham weather, the scoreboard, sunset, and the moon.")
         .contentMarginsDisabled()
         .supportedFamilies([
-            .systemSmall, .systemMedium,
+            .systemSmall, .systemMedium, .systemLarge,
             .accessoryCircular, .accessoryInline, .accessoryRectangular,
         ])
     }

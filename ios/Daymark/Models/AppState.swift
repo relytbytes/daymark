@@ -115,13 +115,20 @@ final class AppState {
     /// Keep the widget's personal numbers current.
     func publishWidgetSnapshot() {
         let next = nextMeeting
+        let today = eventsToday
+            .filter { $0.end > Date() }
+            .map { WidgetSnapshot.Event(title: $0.title, start: $0.start, end: $0.end, isTomorrow: false) }
+        let tomorrow = eventsTomorrow
+            .prefix(4)
+            .map { WidgetSnapshot.Event(title: $0.title, start: $0.start, end: $0.end, isTomorrow: true) }
         WidgetSnapshot.write(WidgetSnapshot(
             updatedAt: Date(),
             openLoops: openLoops,
             clearedPercent: Int((dayProgress * 100).rounded()),
             nextEventTitle: next?.title,
             nextEventTime: next?.start,
-            focusTitle: focusRunning ? focusTaskTitle : nil
+            focusTitle: focusRunning ? focusTaskTitle : nil,
+            events: Array((today + tomorrow).prefix(8))
         ))
     }
 
