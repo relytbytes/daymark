@@ -896,6 +896,7 @@ final class AppState {
            !cached.isEmpty {
             discoveryWire = cached
             if case .idle = discoveryStatus { discoveryStatus = .live(Date()) }
+            syncWirePlaylistIfNeeded(cached)
             return
         }
 
@@ -928,13 +929,23 @@ final class AppState {
         defaults.set(try? JSONEncoder().encode(wire), forKey: Self.discoveryCacheKey)
         defaults.set(surfaced + wire.map { $0.artist.lowercased() }, forKey: Self.discoverySurfacedKey)
 
-        // Mirror the fresh wire into its Spotify playlist so the whole
-        // batch is listenable in one place. Fire and forget — a miss
-        // never degrades the wire itself.
+        syncWirePlaylistIfNeeded(wire)
+    }
+
+    /// Mirror today's wire into its Spotify playlist, once per day —
+    /// also retried from the cached path, so connecting Spotify (or
+    /// granting the playlist scopes) later in the day still fills it.
+    /// Fire and forget; a miss never degrades the wire itself.
+    private func syncWirePlaylistIfNeeded(_ wire: [DiscoveryTrack]) {
+        let syncKey = "daymark-wire-synced-day"
+        guard UserDefaults.standard.string(forKey: syncKey) != Date().dayKey else { return }
         Task {
             let count = (try? await spotify.syncDiscoveryWirePlaylist(
                 tracks: wire.map { (title: $0.title, artist: $0.artist) })) ?? 0
-            if count > 0 { toast("Discovery Wire playlist updated — \(count) tracks.") }
+            if count > 0 {
+                UserDefaults.standard.set(Date().dayKey, forKey: syncKey)
+                toast("Discovery Wire playlist updated — \(count) tracks.")
+            }
         }
     }
 
