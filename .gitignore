@@ -1,3 +1,7 @@
 # Xcode user state
 xcuserdata/
 .DS_Store
+
+# Xcode build output
+ios/build/
+build/
