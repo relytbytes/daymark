@@ -1454,6 +1454,7 @@ async function loadGoogleData() {
 
   if (emailResult.status === "fulfilled") renderPriorityEmails(emailResult.value);
   else renderGooglePanelError("email", "Gmail access needs attention.");
+  refreshAIDesk();
 
   lastGoogleRefreshAt = Date.now();
   document.querySelector("#disconnectGoogle").hidden =
@@ -1594,6 +1595,48 @@ function refreshAIDesk() {
       };
     },
   );
+  const phase = getDayPhase();
+  const triageMount = document.querySelector("#aiTriageMount");
+  if (triageMount && (!lastPriorityEmailMessages.length || !aiConfigured())) triageMount.hidden = true;
+  if (lastPriorityEmailMessages.length) {
+    renderAIDeskCard(
+      "aiTriageMount",
+      "The AI desk · mail triage",
+      "One line per message: why it matters and the next step.",
+      () => ({
+        system: AI_VOICE,
+        user:
+          "Priority inbox (sender · subject · snippet):\n" +
+          lastPriorityEmailMessages
+            .slice(0, 8)
+            .map((m) => `${getSenderName(getMessageHeader(m, "From"))} · ${getMessageHeader(m, "Subject")} · ${(m.snippet || "").slice(0, 140)}`)
+            .join("\n") +
+          "\n\nFor each message, one line: why it matters and the suggested next step. Format each as \"Sender — action.\" Skip anything that needs no action.",
+      }),
+    );
+  }
+  const eveningMount = document.querySelector("#aiEveningMount");
+  if (eveningMount && (phase === "morning" || phase === "afternoon")) eveningMount.hidden = true;
+  if (phase === "evening" || phase === "night") {
+    renderAIDeskCard(
+      "aiEveningMount",
+      "The AI desk · evening column",
+      "A short column about how the day actually went.",
+      () => {
+        const doneTasks = Object.entries(state.tasks).filter(([, v]) => v).length;
+        const scores = Object.entries(state.weeklyScores)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ");
+        return {
+          system: AI_VOICE,
+          user:
+            `The day's ledger:\nTasks checked: ${doneTasks}\nScorecard: ${scores}\n` +
+            `Open captures: ${state.captures.filter((c) => !c.done && !c.archived).length}\n\n` +
+            "Write a 3-4 sentence evening column about how the day actually went — honest, a little wry, ending with one line about tomorrow's first move.",
+        };
+      },
+    );
+  }
   renderAIDeskCard(
     "aiCoachMount",
     "The AI desk · job coach",
