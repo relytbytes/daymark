@@ -9,7 +9,7 @@
 	<!-- Google: create an OAuth client of type *iOS* in your existing Google Cloud project
 	     (the web client id cannot be used by a native app). See ios/README.md. -->
 	<key>GoogleiOSClientID</key>
-	<string></string>
+	<string>963230744949-36mauoje0msh14sbea0bccs464a9i5at.apps.googleusercontent.com</string>
 	<!-- Landed (job-search-command-center): the Google Sheet ID from its
 	     GOOGLE_SHEET_ID env var — docs.google.com/spreadsheets/d/THIS_PART/edit.
 	     Leave empty to hide the Landed pipeline section. -->
