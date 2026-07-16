@@ -126,7 +126,7 @@ final class AppState {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
             JSONStore.save(snapshot)
-            await self.publishWidgetSnapshot()
+            self.publishWidgetSnapshot()
         }
     }
 
