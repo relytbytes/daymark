@@ -9,6 +9,8 @@
 
 import SwiftUI
 import UIKit
+import EventKit
+import EventKitUI
 
 struct TodayView: View {
     @Environment(AppState.self) private var app
@@ -16,6 +18,7 @@ struct TodayView: View {
     @State private var openURLItem: SheetLink?
     @State private var openEssential: String?
     @State private var captureImageItem: CaptureImageSheet?
+    @State private var editingEvent: EventEditTarget?
 
     var body: some View {
         let phase = DayPhase.current()
@@ -52,6 +55,16 @@ struct TodayView: View {
         }
         .sheet(item: $openURLItem) { item in
             SafariView(url: item.url).ignoresSafeArea()
+        }
+        .sheet(item: $editingEvent) { target in
+            EventEditorView(eventID: target.eventID, store: app.calendarService.eventStore) {
+                editingEvent = nil
+                Task {
+                    await app.refreshCalendar()
+                    app.publishWidgetSnapshot()
+                }
+            }
+            .ignoresSafeArea()
         }
         .sheet(item: $captureImageItem) { item in
             NavigationStack {
@@ -231,8 +244,13 @@ struct TodayView: View {
     @ViewBuilder
     private var timelineSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SectionRuleHeader(title: "The Day")
-                .padding(.bottom, 12)
+            HStack {
+                SectionRuleHeader(title: "The Day")
+                QuietButton(label: "+ Event") {
+                    editingEvent = EventEditTarget(eventID: nil)
+                }
+            }
+            .padding(.bottom, 12)
 
             if app.calendarAccess == false {
                 VStack(alignment: .leading, spacing: 8) {
@@ -271,34 +289,41 @@ struct TodayView: View {
                     .fill(live ? Palette.coral : Palette.hairline)
                     .frame(width: live ? 2.5 : 1)
                     .frame(maxHeight: .infinity)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(event.title)
-                            .font(DS.label(14, weight: .semibold))
-                            .foregroundStyle(Palette.ink)
-                            .lineLimit(2)
-                        if live {
-                            StatusChip(text: "Now", foreground: .white, background: Palette.coral)
+                // Tap the body of the row to edit the event in place.
+                Button {
+                    editingEvent = EventEditTarget(eventID: event.id)
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(event.title)
+                                .font(DS.label(14, weight: .semibold))
+                                .foregroundStyle(Palette.ink)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+                            if live {
+                                StatusChip(text: "Now", foreground: .white, background: Palette.coral)
+                            }
                         }
+                        Text(event.timeRangeText + (event.location.map { " · \($0)" } ?? ""))
+                            .font(DS.label(11, weight: .medium))
+                            .foregroundStyle(Palette.subtle)
+                            .lineLimit(1)
                     }
-                    Text(event.timeRangeText + (event.location.map { " · \($0)" } ?? ""))
-                        .font(DS.label(11, weight: .medium))
-                        .foregroundStyle(Palette.subtle)
-                        .lineLimit(1)
-                    if let join = event.joinURL {
-                        Button {
-                            UIApplication.shared.open(join)
-                        } label: {
-                            Label("Join", systemImage: "video.fill")
-                                .font(.system(size: 10, weight: .heavy))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(Palette.ink)
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.top, 3)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                if let join = event.joinURL {
+                    Button {
+                        UIApplication.shared.open(join)
+                    } label: {
+                        Label("Join", systemImage: "video.fill")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Palette.ink)
+                            .clipShape(Capsule())
                     }
+                    .buttonStyle(.plain)
                 }
                 Spacer(minLength: 0)
             }
@@ -839,4 +864,42 @@ struct CaptureImageSheet: Identifiable {
     let image: UIImage
     let title: String
     var id: String { title }
+}
+
+struct EventEditTarget: Identifiable {
+    let id = UUID()
+    let eventID: String?    // nil = create a new event
+}
+
+/// The system calendar editor, so events are created and changed
+/// without leaving the paper. Writes go straight to EventKit and sync
+/// to every calendar account on the phone.
+struct EventEditorView: UIViewControllerRepresentable {
+    let eventID: String?
+    let store: EKEventStore
+    let onFinish: () -> Void
+
+    func makeUIViewController(context: Context) -> EKEventEditViewController {
+        let controller = EKEventEditViewController()
+        controller.eventStore = store
+        if let eventID, let event = store.event(withIdentifier: eventID) {
+            controller.event = event
+        }
+        controller.editViewDelegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ controller: EKEventEditViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+
+    final class Coordinator: NSObject, EKEventEditViewDelegate {
+        let onFinish: () -> Void
+        init(onFinish: @escaping () -> Void) { self.onFinish = onFinish }
+
+        func eventEditViewController(_ controller: EKEventEditViewController,
+                                     didCompleteWith action: EKEventEditViewAction) {
+            onFinish()
+        }
+    }
 }
