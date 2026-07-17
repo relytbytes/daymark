@@ -385,10 +385,78 @@ struct TodayView: View {
                             QuietButton(label: link.host ?? "Link") { openURLItem = SheetLink(url: link) }
                         }
                     }
+
+                    prepBrief(for: meeting)
                 }
                 .editorialPanel()
             }
             .padding(.top, 26)
+        }
+    }
+
+    /// The desk's prep brief, composed on demand and cached per event.
+    @ViewBuilder
+    private func prepBrief(for meeting: CalendarEventLite) -> some View {
+        if app.meetingPrepFor == meeting.id, let output = app.meetingPrepOutput {
+            VStack(alignment: .leading, spacing: 8) {
+                InkRule()
+                HStack {
+                    Text("THE DESK BRIEF").kickerStyle(Palette.coral, size: 8, tracking: 1.3)
+                    Spacer()
+                    Button {
+                        app.runMeetingPrep(force: true)
+                    } label: {
+                        Text("REFRESH")
+                            .font(.system(size: 8.5, weight: .heavy)).tracking(0.8)
+                            .foregroundStyle(Palette.subtle)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(app.meetingPrepBusy)
+                }
+                Text(output)
+                    .font(DS.deck(13.5))
+                    .foregroundStyle(Palette.ink)
+                    .lineSpacing(4)
+                    .textSelection(.enabled)
+            }
+            .padding(.top, 4)
+        } else if app.meetingPrepBusy {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text("The desk is composing your brief…")
+                    .font(DS.deck(13))
+                    .foregroundStyle(Palette.muted)
+            }
+            .padding(.top, 4)
+        } else if let error = app.meetingPrepError {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(error)
+                    .font(DS.label(11, weight: .medium))
+                    .foregroundStyle(Palette.down)
+                Button {
+                    app.runMeetingPrep(force: true)
+                } label: {
+                    Text("TRY AGAIN")
+                        .font(.system(size: 9, weight: .heavy)).tracking(0.8)
+                        .foregroundStyle(Palette.ink)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 4)
+        } else if AIService.isConfigured {
+            Button {
+                app.runMeetingPrep()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "text.book.closed.fill")
+                        .font(.system(size: 10))
+                    Text("PREP ME — THE DESK BRIEF")
+                        .font(.system(size: 9.5, weight: .heavy)).tracking(1.0)
+                }
+                .foregroundStyle(Palette.coral)
+                .padding(.top, 4)
+            }
+            .buttonStyle(.plain)
         }
     }
 
