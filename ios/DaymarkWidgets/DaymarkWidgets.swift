@@ -30,6 +30,41 @@ private enum WPalette {
     static let down = Color(red: 0.863, green: 0.149, blue: 0.149)
 }
 
+// MARK: - Scheme (day paper / night edition, flipped by the sun)
+
+struct WScheme {
+    let paper: Color
+    let wash: Color
+    let ink: Color
+    let muted: Color
+    let subtle: Color
+    let red: Color
+    let gold: Color
+    let blue: Color
+    let line: Color
+    let up: Color
+    let down: Color
+
+    static let light = WScheme(
+        paper: WPalette.paper, wash: WPalette.wash, ink: WPalette.ink,
+        muted: WPalette.muted, subtle: WPalette.subtle, red: WPalette.red,
+        gold: WPalette.gold, blue: WPalette.blue, line: WPalette.line,
+        up: WPalette.up, down: WPalette.down)
+
+    static let dark = WScheme(
+        paper: Color(red: 0.075, green: 0.075, blue: 0.067),
+        wash: Color(red: 0.129, green: 0.125, blue: 0.110),
+        ink: Color(red: 0.929, green: 0.922, blue: 0.894),
+        muted: Color(red: 0.647, green: 0.635, blue: 0.592),
+        subtle: Color(red: 0.502, green: 0.490, blue: 0.451),
+        red: Color(red: 0.898, green: 0.231, blue: 0.329),
+        gold: Color(red: 0.831, green: 0.659, blue: 0.243),
+        blue: Color(red: 0.369, green: 0.612, blue: 0.941),
+        line: Color(red: 0.929, green: 0.922, blue: 0.894).opacity(0.16),
+        up: Color(red: 0.188, green: 0.749, blue: 0.545),
+        down: Color(red: 0.949, green: 0.361, blue: 0.361))
+}
+
 // MARK: - Entry
 
 struct GameLine: Hashable {
@@ -53,8 +88,10 @@ struct GlanceEntry: TimelineEntry {
     var high: Int?
     var low: Int?
     var rainPct: Int?
+    var conditionCode = 0
     var sunrise = "—"
     var sunset = "—"
+    var sunriseDate: Date?
     var sunsetDate: Date?
     var moonSymbol = "moon.fill"
     var moonName = ""
@@ -65,6 +102,15 @@ struct GlanceEntry: TimelineEntry {
     var isEvening: Bool {
         guard let sunsetDate else { return false }
         return date > sunsetDate.addingTimeInterval(-3600)
+    }
+
+    /// Sunset to sunrise wears the night edition.
+    var isNight: Bool {
+        if let sunsetDate, let sunriseDate {
+            return date >= sunsetDate || date < sunriseDate
+        }
+        let hour = Calendar.current.component(.hour, from: date)
+        return hour >= 21 || hour < 6
     }
 }
 
@@ -98,7 +144,9 @@ struct GlanceProvider: TimelineProvider {
                 entry.high = weather.high
                 entry.low = weather.low
                 entry.rainPct = weather.rainPct
+                entry.conditionCode = weather.conditionCode
                 entry.sunrise = weather.sunrise
+                entry.sunriseDate = weather.sunriseDate
                 entry.sunset = weather.sunset
                 entry.sunsetDate = weather.sunsetDate
             }
@@ -135,8 +183,10 @@ struct GlanceProvider: TimelineProvider {
         var high: Int?
         var low: Int?
         var rainPct: Int?
+        var conditionCode = 0
         var sunrise = "—"
         var sunset = "—"
+        var sunriseDate: Date?
         var sunsetDate: Date?
     }
 
@@ -173,6 +223,7 @@ struct GlanceProvider: TimelineProvider {
         bits.tempF = Int(response.current.temperature_2m.rounded())
         bits.feels = response.current.apparent_temperature.map { Int($0.rounded()) }
         (bits.condition, bits.symbol) = Self.condition(response.current.weather_code)
+        bits.conditionCode = response.current.weather_code
         bits.high = response.daily.temperature_2m_max?.first.map { Int($0.rounded()) }
         bits.low = response.daily.temperature_2m_min?.first.map { Int($0.rounded()) }
         bits.rainPct = response.daily.precipitation_probability_max?.first
@@ -188,6 +239,7 @@ struct GlanceProvider: TimelineProvider {
         }
         if let sunriseRaw = response.daily.sunrise?.first,
            let date = formatter.date(from: sunriseRaw) {
+            bits.sunriseDate = date
             bits.sunrise = out.string(from: date)
         }
         return bits
@@ -362,6 +414,20 @@ struct GlanceWidgetView: View {
     @Environment(\.widgetFamily) private var family
     var entry: GlanceEntry
 
+    /// Day paper or night edition, per this entry's moment.
+    private var pal: WScheme { entry.isNight ? .dark : .light }
+
+    /// After sunset, clear and partly-cloudy wear the moon.
+    private var conditionSymbol: String {
+        guard entry.isNight else { return entry.symbol }
+        switch entry.conditionCode {
+        case 0: return "moon.stars.fill"
+        case 1, 2: return "cloud.moon.fill"
+        case 51...67: return "cloud.moon.rain.fill"
+        default: return entry.symbol
+        }
+    }
+
     var body: some View {
         switch family {
         case .systemMedium: medium
@@ -382,13 +448,13 @@ struct GlanceWidgetView: View {
             HStack(alignment: .center, spacing: 11) {
                 Text(entry.tempF.map { "\($0)°" } ?? "—")
                     .font(.system(size: 38, weight: .bold, design: .serif))
-                    .foregroundStyle(WPalette.ink)
+                    .foregroundStyle(pal.ink)
                     .fixedSize()
                     .layoutPriority(2)
                 VStack(alignment: .center, spacing: 4) {
-                    Image(systemName: entry.symbol)
+                    Image(systemName: conditionSymbol)
                         .font(.system(size: 19))
-                        .foregroundStyle(WPalette.gold)
+                        .foregroundStyle(pal.gold)
                     feelsTag(size: 13)
                 }
                 Spacer(minLength: 0)
@@ -396,7 +462,7 @@ struct GlanceWidgetView: View {
             Text(detailLine)
                 .font(.system(size: 9.5, weight: .heavy))
                 .tracking(0.3)
-                .foregroundStyle(WPalette.muted)
+                .foregroundStyle(pal.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             rule
@@ -412,7 +478,7 @@ struct GlanceWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .padding(13)
         .textCase(.uppercase)
-        .containerBackground(WPalette.paper, for: .widget)
+        .containerBackground(pal.paper, for: .widget)
     }
 
     // MARK: Medium — weather desk + scoreboard
@@ -425,38 +491,38 @@ struct GlanceWidgetView: View {
                 HStack(alignment: .center, spacing: 13) {
                     Text(entry.tempF.map { "\($0)°" } ?? "—")
                         .font(.system(size: 44, weight: .bold, design: .serif))
-                        .foregroundStyle(WPalette.ink)
+                        .foregroundStyle(pal.ink)
                         .fixedSize()
                         .layoutPriority(2)
                     VStack(alignment: .center, spacing: 4) {
-                        Image(systemName: entry.symbol)
+                        Image(systemName: conditionSymbol)
                             .font(.system(size: 22))
-                            .foregroundStyle(WPalette.gold)
+                            .foregroundStyle(pal.gold)
                         feelsTag(size: 15)
                     }
                 }
                 Text(rangeLine)
                     .font(.system(size: 9.5, weight: .heavy))
                     .tracking(0.3)
-                    .foregroundStyle(WPalette.muted)
+                    .foregroundStyle(pal.muted)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Rectangle().fill(WPalette.line).frame(width: 1)
+            Rectangle().fill(pal.line).frame(width: 1)
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack {
                     Text("SCOREBOARD")
                         .font(.system(size: 7.5, weight: .heavy)).tracking(1.2)
-                        .foregroundStyle(WPalette.subtle)
+                        .foregroundStyle(pal.subtle)
                     Spacer()
                     if entry.games.contains(where: \.isLive) {
                         HStack(spacing: 3) {
-                            Circle().fill(WPalette.red).frame(width: 5, height: 5)
+                            Circle().fill(pal.red).frame(width: 5, height: 5)
                             Text("LIVE")
                                 .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
-                                .foregroundStyle(WPalette.red)
+                                .foregroundStyle(pal.red)
                         }
                     }
                 }
@@ -466,17 +532,17 @@ struct GlanceWidgetView: View {
                 if entry.games.isEmpty {
                     Text("No games today")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(WPalette.muted)
+                        .foregroundStyle(pal.muted)
                 }
                 Spacer(minLength: 0)
                 if let desk = entry.desk {
                     deskRow(desk)
                     if let title = desk.nextEventTitle, let time = desk.nextEventTime, time > entry.date {
                         HStack(spacing: 5) {
-                            Circle().fill(WPalette.blue).frame(width: 5, height: 5)
+                            Circle().fill(pal.blue).frame(width: 5, height: 5)
                             Text("\(Self.hm(time)) \(title)")
                                 .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(WPalette.ink)
+                                .foregroundStyle(pal.ink)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.75)
                         }
@@ -489,7 +555,7 @@ struct GlanceWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(13)
         .textCase(.uppercase)
-        .containerBackground(WPalette.paper, for: .widget)
+        .containerBackground(pal.paper, for: .widget)
     }
 
     // MARK: Large — the full front page: weather, scoreboard, and the day
@@ -502,20 +568,20 @@ struct GlanceWidgetView: View {
                     HStack(alignment: .center, spacing: 13) {
                         Text(entry.tempF.map { "\($0)°" } ?? "—")
                             .font(.system(size: 40, weight: .bold, design: .serif))
-                            .foregroundStyle(WPalette.ink)
+                            .foregroundStyle(pal.ink)
                             .fixedSize()
                             .layoutPriority(2)
                         VStack(alignment: .center, spacing: 4) {
-                            Image(systemName: entry.symbol)
+                            Image(systemName: conditionSymbol)
                                 .font(.system(size: 21))
-                                .foregroundStyle(WPalette.gold)
+                                .foregroundStyle(pal.gold)
                             feelsTag(size: 15)
                         }
                     }
                     Text(detailLine)
                         .font(.system(size: 9, weight: .heavy))
                         .tracking(0.3)
-                        .foregroundStyle(WPalette.muted)
+                        .foregroundStyle(pal.muted)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
@@ -548,12 +614,12 @@ struct GlanceWidgetView: View {
             HStack {
                 Text("THE DAY")
                     .font(.system(size: 8, weight: .heavy)).tracking(1.2)
-                    .foregroundStyle(WPalette.subtle)
+                    .foregroundStyle(pal.subtle)
                 Spacer()
                 if let desk = entry.desk {
                     Text("\(desk.openLoops) OPEN · \(desk.clearedPercent)% CLEAR")
                         .font(.system(size: 8, weight: .heavy)).tracking(0.6)
-                        .foregroundStyle(desk.openLoops > 0 ? WPalette.red : WPalette.muted)
+                        .foregroundStyle(desk.openLoops > 0 ? pal.red : pal.muted)
                 }
             }
 
@@ -565,22 +631,22 @@ struct GlanceWidgetView: View {
                      ? "Open Daymark once to connect the calendar"
                      : "Clear calendar — nothing scheduled")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(WPalette.muted)
+                    .foregroundStyle(pal.muted)
                 Spacer(minLength: 0)
             } else {
                 VStack(alignment: .leading, spacing: 5) {
                     ForEach(Array(events.prefix(entry.markets.isEmpty ? 8 : 7).enumerated()), id: \.offset) { _, event in
                         HStack(spacing: 7) {
                             Rectangle()
-                                .fill(event.start <= entry.date && entry.date < event.end ? WPalette.red : WPalette.blue)
+                                .fill(event.start <= entry.date && entry.date < event.end ? pal.red : pal.blue)
                                 .frame(width: 2.5, height: 18)
                             VStack(alignment: .leading, spacing: 0) {
                                 Text("\(event.isTomorrow ? "TOMORROW " : "")\(Self.hm(event.start))")
                                     .font(.system(size: 7.5, weight: .heavy)).tracking(0.6)
-                                    .foregroundStyle(event.isTomorrow ? WPalette.subtle : WPalette.red)
+                                    .foregroundStyle(event.isTomorrow ? pal.subtle : pal.red)
                                 Text(event.title)
                                     .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(WPalette.ink)
+                                    .foregroundStyle(pal.ink)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
                             }
@@ -600,14 +666,14 @@ struct GlanceWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(14)
         .textCase(.uppercase)
-        .containerBackground(WPalette.paper, for: .widget)
+        .containerBackground(pal.paper, for: .widget)
     }
 
     // MARK: Lock Screen accessories
 
     private var circular: some View {
         Gauge(value: Double(entry.tempF ?? 0), in: 0...110) {
-            Image(systemName: entry.symbol)
+            Image(systemName: conditionSymbol)
         } currentValueLabel: {
             Text(entry.tempF.map { "\($0)°" } ?? "—")
                 .font(.system(size: 18, weight: .bold, design: .serif))
@@ -620,7 +686,7 @@ struct GlanceWidgetView: View {
         Label {
             Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(feelsText.map { " \($0)" } ?? "")\(entry.high.flatMap { high in entry.low.map { " · H\(high) L\($0)" } } ?? "")")
         } icon: {
-            Image(systemName: entry.symbol)
+            Image(systemName: conditionSymbol)
         }
         .containerBackground(.clear, for: .widget)
     }
@@ -628,7 +694,7 @@ struct GlanceWidgetView: View {
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
-                Image(systemName: entry.symbol).font(.system(size: 11))
+                Image(systemName: conditionSymbol).font(.system(size: 11))
                 Text("\(entry.tempF.map { "\($0)°" } ?? "—")\(feelsText.map { " \($0)" } ?? "")")
                     .font(.system(size: 12, weight: .bold))
                     .lineLimit(1)
@@ -654,22 +720,22 @@ struct GlanceWidgetView: View {
     private var masthead: some View {
         HStack(spacing: 5) {
             HStack(alignment: .bottom, spacing: 1.5) {
-                Capsule().fill(WPalette.subtle).frame(width: 2.5, height: 4)
-                Capsule().fill(WPalette.subtle).frame(width: 2.5, height: 6.5)
-                Capsule().fill(WPalette.red).frame(width: 2.5, height: 9)
+                Capsule().fill(pal.subtle).frame(width: 2.5, height: 4)
+                Capsule().fill(pal.subtle).frame(width: 2.5, height: 6.5)
+                Capsule().fill(pal.red).frame(width: 2.5, height: 9)
             }
             Text("DAYMARK")
                 .font(.system(size: 7.5, weight: .heavy)).tracking(1.3)
-                .foregroundStyle(WPalette.subtle)
+                .foregroundStyle(pal.subtle)
             Spacer()
             Text(entry.date.formatted(.dateTime.weekday(.abbreviated)).uppercased())
                 .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
-                .foregroundStyle(WPalette.red)
+                .foregroundStyle(pal.red)
         }
     }
 
     private var rule: some View {
-        Rectangle().fill(WPalette.line).frame(height: 1)
+        Rectangle().fill(pal.line).frame(height: 1)
     }
 
     private static let hmFormatter: DateFormatter = {
@@ -689,10 +755,10 @@ struct GlanceWidgetView: View {
             HStack(spacing: 1.5) {
                 Image(systemName: "thermometer.medium")
                     .font(.system(size: size * 0.72))
-                    .foregroundStyle(WPalette.gold)
+                    .foregroundStyle(pal.gold)
                 Text("\(feels)°")
                     .font(.system(size: size, weight: .bold, design: .serif))
-                    .foregroundStyle(WPalette.muted)
+                    .foregroundStyle(pal.muted)
             }
             .lineLimit(1)
             .fixedSize()
@@ -718,16 +784,16 @@ struct GlanceWidgetView: View {
     private func gameRow(_ game: GameLine, compact: Bool) -> some View {
         HStack(spacing: 5) {
             if game.isLive {
-                Circle().fill(WPalette.red).frame(width: 5, height: 5)
+                Circle().fill(pal.red).frame(width: 5, height: 5)
             }
             Text(game.label)
                 .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
-                .foregroundStyle(game.isLive ? WPalette.red : WPalette.subtle)
+                .foregroundStyle(game.isLive ? pal.red : pal.subtle)
                 .frame(width: compact ? 38 : 42, alignment: .leading)
             Text(game.text)
                 .font(.system(size: compact ? 9.5 : 10.5, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(WPalette.ink)
+                .foregroundStyle(pal.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Spacer(minLength: 0)
@@ -737,12 +803,12 @@ struct GlanceWidgetView: View {
     /// Personal numbers from the app, via the App Group.
     private func deskRow(_ desk: WidgetSnapshot) -> some View {
         HStack(spacing: 5) {
-            Circle().fill(desk.openLoops > 0 ? WPalette.red : WPalette.muted).frame(width: 5, height: 5)
+            Circle().fill(desk.openLoops > 0 ? pal.red : pal.muted).frame(width: 5, height: 5)
             Text(desk.focusTitle.map { "FOCUS · \($0)" }
                  ?? "\(desk.openLoops) OPEN · \(desk.clearedPercent)% CLEAR")
                 .font(.system(size: 9, weight: .heavy))
                 .tracking(0.4)
-                .foregroundStyle(WPalette.ink)
+                .foregroundStyle(pal.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Spacer(minLength: 0)
@@ -753,10 +819,10 @@ struct GlanceWidgetView: View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 9))
-                .foregroundStyle(WPalette.gold)
+                .foregroundStyle(pal.gold)
             Text(text)
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(WPalette.ink)
+                .foregroundStyle(pal.ink)
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
@@ -769,15 +835,15 @@ struct GlanceWidgetView: View {
                 HStack(spacing: 4) {
                     Text(line.label)
                         .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
-                        .foregroundStyle(WPalette.subtle)
+                        .foregroundStyle(pal.subtle)
                     Text(line.price, format: .number.precision(.fractionLength(0)))
                         .font(.system(size: 10.5, weight: .bold))
                         .monospacedDigit()
-                        .foregroundStyle(WPalette.ink)
+                        .foregroundStyle(pal.ink)
                     Text("\(line.changePct >= 0 ? "▲" : "▼")\(abs(line.changePct), specifier: "%.1f")%")
                         .font(.system(size: 9, weight: .heavy))
                         .monospacedDigit()
-                        .foregroundStyle(line.changePct >= 0 ? WPalette.up : WPalette.down)
+                        .foregroundStyle(line.changePct >= 0 ? pal.up : pal.down)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -792,18 +858,18 @@ struct GlanceWidgetView: View {
             if entry.isEvening {
                 Image(systemName: entry.moonSymbol)
                     .font(.system(size: 9))
-                    .foregroundStyle(WPalette.gold)
+                    .foregroundStyle(pal.gold)
                 Text(entry.moonName)
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(WPalette.ink)
+                    .foregroundStyle(pal.ink)
                     .lineLimit(1)
             } else {
                 Image(systemName: "sunset.fill")
                     .font(.system(size: 9))
-                    .foregroundStyle(WPalette.gold)
+                    .foregroundStyle(pal.gold)
                 Text("Sunset \(entry.sunset)")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(WPalette.ink)
+                    .foregroundStyle(pal.ink)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)

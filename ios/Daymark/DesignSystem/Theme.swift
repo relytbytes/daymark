@@ -15,29 +15,41 @@ import CoreText
 enum Palette {
     // The Daily × Scoreboard system: white ground, ink, one disciplined red.
     // Red always means "now" — live dots, NOW markers, leave-by, the focus spine.
-    static let paper = Color(hex: 0xFDFDFC)
-    static let paperDeep = Color(hex: 0xF0EFEC)
-    static let card = Color(hex: 0xFFFFFF)
-    static let wash = Color(hex: 0xF8F7F5)
-    static let ink = Color(hex: 0x141412)
-    static let muted = Color(hex: 0x75726C)
-    static let subtle = Color(hex: 0x8A877F)
-    static let line = Color(hex: 0xE8E6E1)
-    static let coral = Color(hex: 0xC8102E)
-    static let coralSoft = Color(hex: 0xFBEDEF)
-    static let blue = Color(hex: 0x1D6FE0)
-    static let blueSoft = Color(hex: 0xEFF4FF)
-    static let acid = Color(hex: 0xF8F7F5)      // retired slab color, now the quiet wash
-    static let acidInk = Color(hex: 0x141412)
-    static let green = Color(hex: 0x0E9F6E)
-    static let greenSoft = Color(hex: 0xE9F7F1)
-    static let down = Color(hex: 0xDC2626)      // market direction only — never brand
-    static let violet = Color(hex: 0x6B4FA3)
-    static let gold = Color(hex: 0xB98A1F)
+    // Every color carries a night-edition variant; the scheme flips with
+    // the sun (or the Appearance setting), and these adapt automatically.
+    static let paper = Color(light: 0xFDFDFC, dark: 0x131311)
+    static let paperDeep = Color(light: 0xF0EFEC, dark: 0x26251F)
+    static let card = Color(light: 0xFFFFFF, dark: 0x1D1C19)
+    static let wash = Color(light: 0xF8F7F5, dark: 0x21201C)
+    static let ink = Color(light: 0x141412, dark: 0xEDEBE4)
+    static let muted = Color(light: 0x75726C, dark: 0xA5A297)
+    static let subtle = Color(light: 0x8A877F, dark: 0x807D73)
+    static let line = Color(light: 0xE8E6E1, dark: 0x2F2E29)
+    static let coral = Color(light: 0xC8102E, dark: 0xE53B54)
+    static let coralSoft = Color(light: 0xFBEDEF, dark: 0x3A1B21)
+    static let blue = Color(light: 0x1D6FE0, dark: 0x5E9CF0)
+    static let blueSoft = Color(light: 0xEFF4FF, dark: 0x1B2536)
+    static let acid = Color(light: 0xF8F7F5, dark: 0x21201C)   // retired slab color, now the quiet wash
+    static let acidInk = Color(light: 0x141412, dark: 0xEDEBE4)
+    static let green = Color(light: 0x0E9F6E, dark: 0x30BF8B)
+    static let greenSoft = Color(light: 0xE9F7F1, dark: 0x152E25)
+    static let down = Color(light: 0xDC2626, dark: 0xF25C5C)   // market direction only — never brand
+    static let violet = Color(light: 0x6B4FA3, dark: 0x9C7FD6)
+    static let gold = Color(light: 0xB98A1F, dark: 0xD4A83E)
 
     /// Hairline rules, per the newspaper system.
     static let hairline = ink.opacity(0.14)
     static let hairlineSoft = ink.opacity(0.09)
+}
+
+extension Color {
+    /// A trait-adaptive color: one hex for the day paper, one for the
+    /// night edition.
+    init(light: UInt32, dark: UInt32) {
+        self.init(UIColor { trait in
+            UIColor(Color(hex: trait.userInterfaceStyle == .dark ? dark : light))
+        })
+    }
 }
 
 // MARK: - Day phase
