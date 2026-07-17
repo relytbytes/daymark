@@ -414,7 +414,8 @@ final class AppState {
     /// event so reopening the page never re-bills.
     func runMeetingPrep(force: Bool = false) {
         guard let meeting = nextMeeting else { return }
-        let cacheKey = "daymark-meeting-prep-\(meeting.id)"
+        // v2: sharper prompt (company knowledge + background); retire v1 briefs.
+        let cacheKey = "daymark-meeting-prep-v2-\(meeting.id)"
         if !force, let cached = UserDefaults.standard.string(forKey: cacheKey), !cached.isEmpty {
             meetingPrepOutput = cached
             meetingPrepFor = meeting.id

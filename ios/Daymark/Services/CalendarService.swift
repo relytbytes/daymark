@@ -16,6 +16,9 @@ final class CalendarService {
     private let store = EKEventStore()
     private(set) var accessGranted: Bool?
 
+    /// The store, for the system event editor.
+    var eventStore: EKEventStore { store }
+
     private static let meetingHosts = [
         "zoom.us", "meet.google.com", "teams.microsoft.com", "teams.live.com",
         "webex.com", "whereby.com", "meet.jit.si",

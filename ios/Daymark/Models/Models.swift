@@ -533,13 +533,13 @@ struct CalendarEventLite: Identifiable, Hashable {
     let joinURL: URL?
     let links: [URL]
 
-    /// A "meeting" is anything with other people or a place to be —
-    /// invitees, a call link, a location, or an appointment-shaped title.
-    /// Self-created events (an interview typed into the calendar) carry
-    /// no attendees, so the title check matters.
+    /// A "meeting" is other people expecting you — invitees, a call
+    /// link, or an appointment-shaped title. Self-created events (an
+    /// interview typed into the calendar) carry no attendees, so the
+    /// title check matters. A location alone does NOT qualify — a
+    /// ballgame has a stadium, but it isn't a meeting.
     var isMeeting: Bool {
         if !attendees.isEmpty || joinURL != nil { return true }
-        if location?.nilIfEmpty != nil { return true }
         let haystack = title.lowercased()
         return ["interview", "meeting", "call", "appointment", "appt",
                 "screen", "1:1", "sync", "dr.", "dentist", "doctor"]

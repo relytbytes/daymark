@@ -252,18 +252,29 @@ enum AIDesk {
 
             \(details)
 
+            \(isInterview ? """
+            Ty's background, for fit: 15+ years of hospitality and restaurant \
+            operations leadership, now interviewing for operations, management, \
+            and guest-experience roles. He shows best when concrete numbers and \
+            war stories carry the answers.
+            """ : "")
+            You may draw on what you reliably know about the named company or \
+            venue — its business, city, reputation, industry pressures — to make \
+            this specific. Never invent people, interviewers, or role details \
+            beyond the data above.
+
             Write the desk's prep brief with these plain-text sections:
             WHY IT MATTERS — one sharp sentence.
-            GET READY — three concrete prep moves for the time remaining, \
-            specific to this exact appointment.
+            GET READY — three concrete prep moves for the time remaining, each \
+            naming something specific to THIS appointment (the company, the \
+            place, the people). If a line could appear in any generic prep \
+            guide, cut it and go more specific.
             \(isInterview
-              ? "LIKELY QUESTIONS — three they'll probably ask, each with a one-line angle.\nASK THEM — three smart questions that show homework."
+              ? "LIKELY QUESTIONS — three this specific company would plausibly ask, each with a one-line angle drawn from Ty's background.\nASK THEM — three questions that prove homework on this company."
               : "WORTH ASKING — two or three questions that make you the most prepared person in the room.")
             WATCH FOR — one risk or detail to get ahead of.
-
-            Use only the facts given; invent nothing. Keep it tight.
             """,
-            maxTokens: 550
+            maxTokens: 700
         )
     }
 
