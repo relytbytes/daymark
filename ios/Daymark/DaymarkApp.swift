@@ -31,10 +31,14 @@ struct DaymarkApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environment(app)
-                .preferredColorScheme(.light) // the paper is the brand
-                .tint(Palette.ink)
+            // The scheme follows the sun: day paper until sunset, the
+            // night edition until sunrise (or pinned in Settings).
+            TimelineView(.everyMinute) { context in
+                RootView()
+                    .environment(app)
+                    .preferredColorScheme(app.preferredScheme(at: context.date))
+                    .tint(Palette.ink)
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

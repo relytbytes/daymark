@@ -293,6 +293,7 @@ struct AppSettings: Codable, Hashable {
     var soundcloudArtists: [String] = []
     var focusPlaylist: String = ""       // Spotify playlist link/URI for focus blocks
     var feedsRevision: Int = AppSettings.currentFeedsRevision
+    var appearance: String = "auto"      // auto (sun-driven) / light / dark
 
     init() {}
 
@@ -311,6 +312,7 @@ struct AppSettings: Codable, Hashable {
         soundcloudArtists = (try? c.decodeIfPresent([String].self, forKey: .soundcloudArtists)) ?? nil ?? []
         focusPlaylist = (try? c.decodeIfPresent(String.self, forKey: .focusPlaylist)) ?? nil ?? ""
         feedsRevision = (try? c.decodeIfPresent(Int.self, forKey: .feedsRevision)) ?? nil ?? 1
+        appearance = (try? c.decodeIfPresent(String.self, forKey: .appearance)) ?? nil ?? "auto"
     }
 
     static let defaultFeeds: [FeedSource] = [
@@ -473,7 +475,12 @@ struct WeatherSnapshot {
     var rainWindow: String = ""
 
     var description: String { weatherDescription(code) }
-    var symbol: String { weatherSymbol(code) }
+    var symbol: String { weatherSymbol(code, night: isNight()) }
+
+    /// Between sunset and sunrise, the sky wears the moon.
+    func isNight(at date: Date = Date()) -> Bool {
+        date >= sunset || date < sunrise
+    }
 
     var daylightText: String {
         let minutes = max(0, Int(sunset.timeIntervalSince(sunrise) / 60))
@@ -500,13 +507,13 @@ func weatherDescription(_ code: Int) -> String {
     }
 }
 
-func weatherSymbol(_ code: Int) -> String {
+func weatherSymbol(_ code: Int, night: Bool = false) -> String {
     switch code {
-    case 0: return "sun.max.fill"
-    case 1, 2: return "cloud.sun.fill"
+    case 0: return night ? "moon.stars.fill" : "sun.max.fill"
+    case 1, 2: return night ? "cloud.moon.fill" : "cloud.sun.fill"
     case 3: return "cloud.fill"
     case 45, 48: return "cloud.fog.fill"
-    case 51...67: return "cloud.rain.fill"
+    case 51...67: return night ? "cloud.moon.rain.fill" : "cloud.rain.fill"
     case 71...77, 85, 86: return "cloud.snow.fill"
     case 80...82: return "cloud.heavyrain.fill"
     case 95...99: return "cloud.bolt.rain.fill"

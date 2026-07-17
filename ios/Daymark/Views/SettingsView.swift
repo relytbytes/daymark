@@ -314,7 +314,19 @@ struct SettingsView: View {
                 } header: {
                     Text("Markets watchlist")
                 } footer: {
-                    Text("Stooq symbols: indexes like ^spx, ^dji; US tickers as aapl.us.")
+                    Text("Indexes like ^spx, ^dji, ^ndq; plain US tickers like AAPL.")
+                }
+
+                Section {
+                    Picker("Appearance", selection: appearanceBinding) {
+                        Text("Auto — follows the sun").tag("auto")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
+                    }
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("Auto runs the day paper until sunset, then the night edition until sunrise.")
                 }
 
                 Section {
@@ -332,6 +344,13 @@ struct SettingsView: View {
                     }
                 }
             }
+    }
+
+    private var appearanceBinding: Binding<String> {
+        Binding(
+            get: { app.persisted.settings.appearance },
+            set: { app.persisted.settings.appearance = $0 }
+        )
     }
 
     @ViewBuilder

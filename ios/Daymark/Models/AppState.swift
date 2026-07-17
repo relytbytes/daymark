@@ -403,6 +403,21 @@ final class AppState {
         playbackTicker = nil
     }
 
+    // MARK: Appearance
+
+    /// The edition's color scheme: sun-driven by default (dark from
+    /// sunset to sunrise), or pinned by the Appearance setting.
+    func preferredScheme(at date: Date = Date()) -> ColorScheme {
+        switch persisted.settings.appearance {
+        case "light": return .light
+        case "dark": return .dark
+        default:
+            if let weather { return weather.isNight(at: date) ? .dark : .light }
+            let hour = Calendar.current.component(.hour, from: date)
+            return (hour >= 21 || hour < 6) ? .dark : .light
+        }
+    }
+
     // MARK: Toast
 
     func toast(_ message: String) {
@@ -1054,6 +1069,9 @@ final class AppState {
         persisted.musicLikes.removeAll { $0 == key }
         setWireVerdict(track, verdict: "pass")
         discoveryWire.removeAll { $0.id == track.id }
+        // Rewrite the day's cache, or the next refresh resurrects the track.
+        UserDefaults.standard.set(try? JSONEncoder().encode(discoveryWire),
+                                  forKey: Self.discoveryCacheKey)
     }
 
     /// Toggle the 30-second preview for a track; one preview at a time.
