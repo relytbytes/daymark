@@ -533,7 +533,18 @@ struct CalendarEventLite: Identifiable, Hashable {
     let joinURL: URL?
     let links: [URL]
 
-    var isMeeting: Bool { !attendees.isEmpty || joinURL != nil }
+    /// A "meeting" is anything with other people or a place to be —
+    /// invitees, a call link, a location, or an appointment-shaped title.
+    /// Self-created events (an interview typed into the calendar) carry
+    /// no attendees, so the title check matters.
+    var isMeeting: Bool {
+        if !attendees.isEmpty || joinURL != nil { return true }
+        if location?.nilIfEmpty != nil { return true }
+        let haystack = title.lowercased()
+        return ["interview", "meeting", "call", "appointment", "appt",
+                "screen", "1:1", "sync", "dr.", "dentist", "doctor"]
+            .contains { haystack.contains($0) }
+    }
     var timeRangeText: String {
         isAllDay ? "All day" : "\(start.timeText()) – \(end.timeText())"
     }

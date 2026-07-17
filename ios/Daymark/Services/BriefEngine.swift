@@ -56,6 +56,8 @@ extension AppState {
             let deck: String
             if let next = nextMeeting {
                 deck = "First up: \(next.title) at \(next.start.timeText())."
+            } else if let next = eventsToday.first(where: { !$0.isAllDay && $0.start > Date() }) {
+                deck = "Next on the calendar: \(next.title) at \(next.start.timeText())."
             } else {
                 deck = "No meetings scheduled today."
             }
