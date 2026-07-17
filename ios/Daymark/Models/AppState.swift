@@ -403,6 +403,64 @@ final class AppState {
         playbackTicker = nil
     }
 
+    // MARK: Meeting prep brief
+
+    var meetingPrepOutput: String?
+    var meetingPrepFor: String?          // event id the output belongs to
+    var meetingPrepBusy = false
+    var meetingPrepError: String?
+
+    /// The desk composes a prep brief for the next meeting, cached per
+    /// event so reopening the page never re-bills.
+    func runMeetingPrep(force: Bool = false) {
+        guard let meeting = nextMeeting else { return }
+        let cacheKey = "daymark-meeting-prep-\(meeting.id)"
+        if !force, let cached = UserDefaults.standard.string(forKey: cacheKey), !cached.isEmpty {
+            meetingPrepOutput = cached
+            meetingPrepFor = meeting.id
+            return
+        }
+        guard AIService.isConfigured, !meetingPrepBusy else { return }
+        meetingPrepBusy = true
+        meetingPrepError = nil
+
+        // Everything real we know about the moment.
+        var lines: [String] = []
+        lines.append("Title: \(meeting.title)")
+        lines.append("When: \(meeting.timeRangeText)")
+        if let location = meeting.location?.nilIfEmpty { lines.append("Where: \(location)") }
+        if !meeting.attendees.isEmpty { lines.append("With: \(meeting.attendees.joined(separator: ", "))") }
+        if let notes = meeting.notes?.nilIfEmpty { lines.append("Notes on the invite: \(notes.prefix(500))") }
+        if let travel, travel.eventID == meeting.id { lines.append("Drive time: \(travel.minutes) minutes") }
+        if let weather { lines.append("Weather: \(weather.tempF)°, \(weather.description)") }
+
+        // If the title names a pipeline company, bring the whole file.
+        let match = landedRoles.first { meeting.title.localizedCaseInsensitiveContains($0.company) }
+        if let match {
+            lines.append("Landed pipeline match: \(match.company) — \(match.role) · stage \(match.status)"
+                + (match.track.nilIfEmpty.map { " · track \($0)" } ?? "")
+                + (match.notes.nilIfEmpty.map { " · notes: \($0)" } ?? ""))
+        }
+        let looksLikeInterview = match != nil
+            || meeting.title.lowercased().contains("interview")
+            || meeting.title.lowercased().contains("screen")
+
+        Task {
+            defer { meetingPrepBusy = false }
+            do {
+                let brief = try await AIDesk.meetingPrep(
+                    details: lines.joined(separator: "\n"), isInterview: looksLikeInterview)
+                meetingPrepOutput = brief
+                meetingPrepFor = meeting.id
+                UserDefaults.standard.set(brief, forKey: cacheKey)
+            } catch let error as AIError {
+                meetingPrepError = error.readable
+            } catch {
+                meetingPrepError = error.localizedDescription
+            }
+        }
+    }
+
     // MARK: Appearance
 
     /// The edition's color scheme: sun-driven by default (dark from

@@ -242,6 +242,31 @@ enum AIDesk {
         )
     }
 
+    /// A prep brief for the next calendar appointment, grounded in the
+    /// event's real details (and the Landed pipeline when it matches).
+    static func meetingPrep(details: String, isInterview: Bool) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            Ty's next appointment, with everything known about it:
+
+            \(details)
+
+            Write the desk's prep brief with these plain-text sections:
+            WHY IT MATTERS — one sharp sentence.
+            GET READY — three concrete prep moves for the time remaining, \
+            specific to this exact appointment.
+            \(isInterview
+              ? "LIKELY QUESTIONS — three they'll probably ask, each with a one-line angle.\nASK THEM — three smart questions that show homework."
+              : "WORTH ASKING — two or three questions that make you the most prepared person in the room.")
+            WATCH FOR — one risk or detail to get ahead of.
+
+            Use only the facts given; invent nothing. Keep it tight.
+            """,
+            maxTokens: 550
+        )
+    }
+
     /// Interview prep primer for a pipeline role at screen/interview stage.
     static func interviewPrep(company: String, role: String, stage: String, track: String, notes: String, headlines: String) async throws -> String {
         try await AIService.complete(
