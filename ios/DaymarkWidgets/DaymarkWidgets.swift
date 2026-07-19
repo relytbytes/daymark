@@ -327,6 +327,7 @@ struct GlanceProvider: TimelineProvider {
                         struct Team: Decodable {
                             let abbreviation: String?
                             let teamName: String?
+                            let name: String?
                         }
                         let team: Team?
                         let score: Int?
@@ -345,14 +346,18 @@ struct GlanceProvider: TimelineProvider {
         components.queryItems = [
             URLQueryItem(name: "sportId", value: String(sportID)),
             URLQueryItem(name: "teamId", value: String(teamID)),
-            URLQueryItem(name: "hydrate", value: "linescore"),
+            // "team" matters: without it the schedule omits abbreviations
+            // and the score line renders as "— 5–0 —".
+            URLQueryItem(name: "hydrate", value: "team,linescore"),
         ]
         guard let (data, _) = try? await URLSession.shared.data(from: components.url!),
               let schedule = try? JSONDecoder().decode(Schedule.self, from: data),
               let game = schedule.dates.first?.games.first else { return nil }
 
         func abbr(_ side: Schedule.Game.Teams.Side?) -> String {
-            side?.team?.abbreviation ?? String(side?.team?.teamName?.prefix(3) ?? "—").uppercased()
+            if let abbreviation = side?.team?.abbreviation { return abbreviation }
+            let fallback = side?.team?.teamName ?? side?.team?.name ?? "—"
+            return String(fallback.prefix(3)).uppercased()
         }
         let away = abbr(game.teams?.away)
         let home = abbr(game.teams?.home)
@@ -789,7 +794,9 @@ struct GlanceWidgetView: View {
             Text(game.label)
                 .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
                 .foregroundStyle(game.isLive ? pal.red : pal.subtle)
-                .frame(width: compact ? 38 : 42, alignment: .leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: compact ? 44 : 46, alignment: .leading)
             Text(game.text)
                 .font(.system(size: compact ? 9.5 : 10.5, weight: .bold))
                 .monospacedDigit()
