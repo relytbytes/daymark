@@ -1818,50 +1818,10 @@ body[data-phase="night"] .day-progress i {
   color: #23664a;
 }
 
-.duke-watch {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 14px;
-  align-items: center;
-  margin-top: 12px;
-  padding: 18px;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  background: #0c286b;
-  color: white;
-}
 
-.duke-watch::after {
-  position: absolute;
-  right: -33px;
-  bottom: -58px;
-  width: 150px;
-  height: 150px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 50%;
-  content: "";
-}
 
-.duke-wordmark {
-  display: grid;
-  width: 42px;
-  height: 52px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 14px;
-  font-family: var(--serif);
-  font-size: 30px;
-}
 
-.duke-copy {
-  min-width: 0;
-}
 
-.duke-copy .panel-label {
-  margin-bottom: 10px;
-  color: rgba(255, 255, 255, 0.55);
-}
 
 .new-badge {
   margin-left: 7px;
@@ -1872,23 +1832,8 @@ body[data-phase="night"] .day-progress i {
   font-size: 9px;
 }
 
-.duke-copy strong,
-.duke-copy small {
-  display: block;
-}
 
-.duke-copy strong {
-  overflow: hidden;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.duke-copy small {
-  margin: 2px 0 8px;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 11px;
-}
 
 .round-arrow {
   position: relative;
@@ -1904,25 +1849,7 @@ body[data-phase="night"] .day-progress i {
   color: white;
 }
 
-.duke-actions {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  gap: 6px;
-}
 
-.duke-actions > button {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: white;
-  color: #0c286b;
-  font-size: 18px;
-}
 
 .sprint-score {
   display: flex;

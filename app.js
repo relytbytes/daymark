@@ -1395,6 +1395,7 @@ async function refreshLanded() {
       .filter((role) => role.company);
     lastLandedRows = rows;
     renderLanded(rows);
+    renderApplications();
   } catch {
     const summary = document.querySelector("#landedSummary");
     if (summary) summary.textContent = "Could not reach the Landed sheet — check access and the sheet ID.";
@@ -4311,7 +4312,9 @@ function renderApplications() {
   if (visibleApplications.length === 0) {
     const empty = document.createElement("div");
     empty.className = "tracker-empty";
-    empty.innerHTML = "<strong>No applications yet</strong><small>Add the first real role you want to track.</small>";
+    empty.innerHTML = lastLandedRows.length
+      ? "<strong>Pipeline synced from Landed</strong><small>The wire above carries the live roles - + Add is for one-offs outside the sheet.</small>"
+      : "<strong>No applications yet</strong><small>Add the first real role you want to track.</small>";
     list.append(empty);
   }
 
@@ -4343,9 +4346,16 @@ function renderApplications() {
     list.append(row);
   });
 
-  const active = visibleApplications.length;
-  const followups = visibleApplications.filter((app) => app.status === "Follow-up").length;
-  const interviews = visibleApplications.filter((app) => app.status === "Interview").length;
+  // The Landed sheet is the pipeline's source of truth when it's live;
+  // the manual tracker only counts for itself when Landed is dark.
+  const landedOpen = lastLandedRows.filter((row) => !/closed|rejected|declined|withdrawn/i.test(row.status));
+  const active = landedOpen.length || visibleApplications.length;
+  const followups = landedOpen.length
+    ? landedOpen.filter((row) => row.next).length
+    : visibleApplications.filter((app) => app.status === "Follow-up").length;
+  const interviews = landedOpen.length
+    ? landedOpen.filter((row) => /interview|screen/i.test(row.status)).length
+    : visibleApplications.filter((app) => app.status === "Interview").length;
   document.querySelector("#activeApps").textContent = String(active);
   document.querySelector("#followupApps").textContent = String(followups);
   document.querySelector("#interviewApps").textContent = String(interviews);

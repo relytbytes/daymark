@@ -634,9 +634,33 @@ final class AppState {
 
     // MARK: Applications
 
-    var applicationsActive: Int { persisted.applications.filter { $0.status != .closed }.count }
-    var applicationsInterviews: Int { persisted.applications.filter { $0.status == .interview }.count }
-    var applicationsFollowUps: Int { persisted.applications.filter { $0.status == .followUp }.count }
+    /// The Landed sheet is the pipeline's source of truth when it's live;
+    /// the manual tracker only counts for itself when Landed is dark.
+    private var landedOpenRoles: [LandedRole] {
+        landedRoles.filter { role in
+            !["closed", "rejected", "declined", "withdrawn"].contains {
+                role.status.lowercased().contains($0)
+            }
+        }
+    }
+
+    var applicationsActive: Int {
+        landedRoles.isEmpty
+            ? persisted.applications.filter { $0.status != .closed }.count
+            : landedOpenRoles.count
+    }
+
+    var applicationsInterviews: Int {
+        landedRoles.isEmpty
+            ? persisted.applications.filter { $0.status == .interview }.count
+            : landedOpenRoles.filter { $0.stageRank <= 2 }.count
+    }
+
+    var applicationsFollowUps: Int {
+        landedRoles.isEmpty
+            ? persisted.applications.filter { $0.status == .followUp }.count
+            : landedOpenRoles.filter { !$0.nextAction.isEmpty }.count
+    }
 
     func upsertApplication(_ application: JobApplication) {
         if let index = persisted.applications.firstIndex(where: { $0.id == application.id }) {
