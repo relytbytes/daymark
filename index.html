@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=29" />
+    <link rel="manifest" href="./manifest.webmanifest?v=30" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,9 +18,9 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=29" />
-    <script src="./config.js?v=29"></script>
-    <script src="./astro.js?v=29" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=30" />
+    <script src="./config.js?v=30"></script>
+    <script src="./astro.js?v=30" defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -253,7 +253,7 @@
                 </div>
                 <div class="section-heading-actions">
                   <button class="text-button text-button--muted" id="disconnectGoogle" type="button" hidden>End Google session</button>
-                  <button class="text-button" type="button" data-app-view="work" data-view-target="decisions">Decide next</button>
+                  
                 </div>
               </div>
 
@@ -379,53 +379,7 @@
           </div>
 
           <aside class="secondary-column">
-            <section class="section-block" id="decisions" data-view-section="work">
-              <div class="section-heading">
-                <div>
-                  <p class="section-kicker">DECISION QUEUE</p>
-                  <h2>Three calls, not thirty tabs</h2>
-                </div>
-              </div>
-
-              <div class="decision-stack">
-                <article class="decision-card" data-decision="pricing">
-                  <span class="decision-number">01</span>
-                  <div>
-                    <strong>Which Veraya offer leads?</strong>
-                    <small>Choose the focused research sprint or ongoing advisory.</small>
-                    <div class="choice-row">
-                      <button type="button" data-choice="Sprint">Sprint</button>
-                      <button type="button" data-choice="Advisory">Advisory</button>
-                      <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
-                    </div>
-                  </div>
-                </article>
-                <article class="decision-card" data-decision="duke-event">
-                  <span class="decision-number">02</span>
-                  <div>
-                    <strong>Open Duke’s alert setup?</strong>
-                    <small>Daymark cannot create the alert for you; use the official careers site.</small>
-                    <div class="choice-row">
-                      <button type="button" data-choice="Open">Open</button>
-                      <button type="button" data-choice="Later">Later</button>
-                      <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
-                    </div>
-                  </div>
-                </article>
-                <article class="decision-card" data-decision="housing-tour">
-                  <span class="decision-number">03</span>
-                  <div>
-                    <strong>Open the Durham home search?</strong>
-                    <small>Browse homes for sale around your $450,000 ceiling.</small>
-                    <div class="choice-row">
-                      <button type="button" data-choice="Open">Open</button>
-                      <button type="button" data-choice="Later">Later</button>
-                      <button class="defer-choice" type="button" data-choice="Defer">Defer</button>
-                    </div>
-                  </div>
-                </article>
-              </div>
-            </section>
+            
 
             <section class="section-block" id="scorecard" data-view-section="work">
               <div class="section-heading">
@@ -519,9 +473,10 @@
                   <button type="submit">Search</button>
                 </form>
                 <div class="search-chips" aria-label="Quick map searches">
-                  <button type="button" data-map-query="open houses under $450,000">Open houses</button>
-                  <button type="button" data-map-query="Nasher Museum of Art">Nasher</button>
                   <button type="button" data-map-query="coffee shops">Coffee</button>
+                  <button type="button" data-map-query="breweries">Breweries</button>
+                  <button type="button" data-map-query="hiking trails">Trails</button>
+                  <button type="button" data-map-query="dinner restaurants">Dinner</button>
                 </div>
               </article>
 
@@ -554,6 +509,16 @@
                   </a>
                 </div>
               </article>
+            </section>
+
+            <section class="section-block" id="spirit" data-view-section="life">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">THE SPIRIT DESK</p>
+                  <h2>The inner edition</h2>
+                </div>
+              </div>
+              <div id="spiritBody"></div>
             </section>
 
             <section class="section-block" id="sports" data-view-section="more">
@@ -729,6 +694,11 @@
                   <input type="text" id="deskLandedSheet" autocomplete="off" spellcheck="false" placeholder="from docs.google.com/spreadsheets/d/THIS_PART/edit" />
                 </label>
                 <label>AI provider
+                  <select id="deskAppearance" aria-label="Appearance">
+                    <option value="auto">Appearance: auto (follows the sun)</option>
+                    <option value="light">Appearance: light</option>
+                    <option value="dark">Appearance: dark</option>
+                  </select>
                   <select id="deskAIProvider">
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
@@ -812,7 +782,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>That’s the brief.</p>
-          <small>Daymark · Build 29</small>
+          <small>Daymark · Build 30</small>
         </footer>
       </main>
 
@@ -918,7 +888,7 @@
         <div class="command-jumps">
           <span>JUMP TO</span>
           <button type="button" data-command-jump="jobs">Applications</button>
-          <button type="button" data-command-jump="decisions">Decisions</button>
+          
           <button type="button" data-command-jump="reading">Reading</button>
           <button type="button" data-command-jump="durham">Durham</button>
         </div>
@@ -940,6 +910,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=29" defer></script>
+    <script src="./app.js?v=30" defer></script>
   </body>
 </html>
