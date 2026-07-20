@@ -766,11 +766,11 @@ body[data-phase="night"] .day-progress i {
   justify-content: center;
   border-color: var(--ink) !important;
   background: var(--ink);
-  color: white;
+  color: var(--paper);
 }
 
 .focus-start.is-running {
-  background: white;
+  background: var(--paper);
   color: var(--ink);
 }
 
@@ -2012,7 +2012,7 @@ body[data-phase="night"] .day-progress i {
 .choice-row button.is-selected {
   border-color: var(--ink);
   background: var(--ink);
-  color: white;
+  color: var(--paper);
 }
 
 .choice-row .defer-choice {
@@ -2441,7 +2441,7 @@ body[data-phase="night"] .day-progress i {
   border: 0;
   border-radius: 12px;
   background: var(--ink);
-  color: white;
+  color: var(--paper);
   font-size: 10px;
   font-weight: 850;
 }
@@ -4294,7 +4294,7 @@ footer small {
 
 .nav-button.is-active {
   background: var(--ink);
-  color: white;
+  color: var(--paper);
 }
 
 .nav-capture {
@@ -4492,7 +4492,7 @@ body[data-phase="night"] #eveningActions {
 .capture-types input:checked + span {
   border-color: var(--ink);
   background: var(--ink);
-  color: white;
+  color: var(--paper);
 }
 
 .command-jumps {
@@ -4528,7 +4528,7 @@ body[data-phase="night"] #eveningActions {
   border: 0;
   border-radius: 13px;
   background: var(--ink);
-  color: white;
+  color: var(--paper);
   font-size: 11px;
   font-weight: 800;
 }
@@ -4543,7 +4543,7 @@ body[data-phase="night"] #eveningActions {
   padding: 11px 16px;
   border-radius: 15px;
   background: var(--ink);
-  color: white;
+  color: var(--paper);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.4;
