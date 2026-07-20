@@ -1396,9 +1396,16 @@ async function refreshLanded() {
     lastLandedRows = rows;
     renderLanded(rows);
     renderApplications();
-  } catch {
+  } catch (error) {
     const summary = document.querySelector("#landedSummary");
-    if (summary) summary.textContent = "Could not reach the Landed sheet — check access and the sheet ID.";
+    if (summary) {
+      const detail = String(error?.message || "");
+      summary.textContent = detail.includes("403")
+        ? "Google refused the sheet (403) — disconnect and reconnect Google here on the web so the grant includes Sheets."
+        : detail.includes("404")
+          ? "Sheet not found (404) — recheck the Landed sheet ID in Desk settings."
+          : `Could not reach the Landed sheet — ${detail || "check access and the sheet ID"}.`;
+    }
     section.hidden = false;
   }
 }
@@ -4274,35 +4281,6 @@ function renderScoreTrends() {
       .join("");
 }
 
-function hydrateDecisions() {
-  document.querySelectorAll(".decision-card").forEach((card) => {
-    const id = card.dataset.decision;
-    const selected = state.decisions[id];
-    card.querySelectorAll("[data-choice]").forEach((button) => {
-      button.classList.toggle("is-selected", button.dataset.choice === selected);
-      button.addEventListener("click", () => {
-        state.decisions[id] = button.dataset.choice;
-        saveState();
-        card.querySelectorAll("[data-choice]").forEach((item) => {
-          item.classList.toggle("is-selected", item === button);
-        });
-        card.classList.add("is-decided");
-        if (button.dataset.choice === "Open" && id === "duke-event") {
-          window.open("https://careers.duke.edu/", "_blank", "noopener,noreferrer");
-        }
-        if (button.dataset.choice === "Open" && id === "housing-tour") {
-          window.open(
-            "https://www.redfin.com/city/4909/NC/Durham/filter/max-price=450k",
-            "_blank",
-            "noopener,noreferrer",
-          );
-        }
-        showToast(`${button.dataset.choice} saved. Decision off your mind.`);
-      });
-    });
-    card.classList.toggle("is-decided", Boolean(selected));
-  });
-}
 
 function renderApplications() {
   const list = document.querySelector("#applicationList");
@@ -4694,7 +4672,6 @@ formatDate();
 saveState();
 bindGoogleConnectButtons();
 hydrateTasks();
-hydrateDecisions();
 renderApplications();
 renderCaptureInbox();
 renderReadingQueue();
@@ -4736,3 +4713,312 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js?v=19").catch(() => {});
   });
 }
+
+// ---------------------------------------------------------------------------
+// The night edition — sun-driven dark scheme (Appearance in Desk settings).
+// ---------------------------------------------------------------------------
+
+function applyEdition() {
+  const mode = localStorage.getItem("daymark-appearance") || "auto";
+  let night = mode === "dark";
+  if (mode === "auto") {
+    const now = new Date();
+    let sunrise = null;
+    let sunset = null;
+    try {
+      const astro = window.DaymarkAstro ? window.DaymarkAstro.snapshot(35.994, -78.8986) : null;
+      sunrise = astro?.sun?.sunrise || null;
+      sunset = astro?.sun?.sunset || null;
+    } catch {}
+    if (sunrise && sunset) {
+      night = now >= sunset || now < sunrise;
+    } else {
+      const hour = now.getHours();
+      night = hour >= 21 || hour < 6;
+    }
+  }
+  document.documentElement.dataset.theme = night ? "night" : "day";
+}
+
+(() => {
+  const select = document.querySelector("#deskAppearance");
+  if (select) {
+    select.value = localStorage.getItem("daymark-appearance") || "auto";
+    select.addEventListener("change", () => {
+      localStorage.setItem("daymark-appearance", select.value);
+      applyEdition();
+    });
+  }
+  applyEdition();
+  window.setInterval(applyEdition, 60000);
+})();
+
+// ---------------------------------------------------------------------------
+// The Spirit Desk — horoscope, tarot, oracle, crystals, chakras, the sit.
+// Daily draws hold steady all day; tarot answers whatever you ask it.
+// ---------------------------------------------------------------------------
+
+const TAROT_MAJORS = [
+  ["The Fool", "beginnings, leap of faith, openness", "hesitation, recklessness, false starts"],
+  ["The Magician", "will, resourcefulness, manifestation", "scattered energy, untapped talent"],
+  ["The High Priestess", "intuition, the inner voice, mystery", "ignored instincts, secrets kept too long"],
+  ["The Empress", "abundance, nurture, creation", "creative block, smothering, depletion"],
+  ["The Emperor", "structure, authority, stability", "rigidity, control issues, absent discipline"],
+  ["The Hierophant", "tradition, mentorship, systems", "dogma, empty convention, rebellion"],
+  ["The Lovers", "alignment, choice, union", "misalignment, avoidance of a choice"],
+  ["The Chariot", "drive, willpower, momentum", "stalling, pulled in two directions"],
+  ["Strength", "quiet courage, patience, resolve", "self-doubt, forcing what needs coaxing"],
+  ["The Hermit", "solitude, reflection, inner guidance", "isolation, refusing counsel"],
+  ["Wheel of Fortune", "turning points, cycles, luck", "resisting change, bad timing"],
+  ["Justice", "fairness, truth, consequence", "imbalance, avoidance of accountability"],
+  ["The Hanged Man", "surrender, new perspective, pause", "stalling for its own sake, martyrdom"],
+  ["Death", "endings that feed beginnings", "clinging to what is finished"],
+  ["Temperance", "balance, patience, blending", "excess, impatience, extremes"],
+  ["The Devil", "attachment, patterns, appetite", "breaking chains, reclaiming power"],
+  ["The Tower", "sudden change, revelation, release", "disaster resisted, prolonged collapse"],
+  ["The Star", "hope, renewal, guidance", "dimmed faith, disconnection"],
+  ["The Moon", "uncertainty, dreams, the subconscious", "clarity emerging, fears named"],
+  ["The Sun", "vitality, success, plain joy", "clouded optimism, delayed wins"],
+  ["Judgement", "reckoning, awakening, the call", "self-judgment, ignoring the call"],
+  ["The World", "completion, integration, arrival", "loose ends, the last mile"],
+];
+const TAROT_SUITS = [["Wands", "will, work, and fire"], ["Cups", "feeling, relationship, and water"], ["Swords", "mind, truth, and air"], ["Pentacles", "body, money, and earth"]];
+const TAROT_RANKS = [
+  ["Ace", "a seed of", "a delayed start in"], ["Two", "a choice within", "indecision about"],
+  ["Three", "early growth in", "setbacks in"], ["Four", "stability in", "stagnation in"],
+  ["Five", "conflict over", "recovery from strife in"], ["Six", "harmony and progress in", "nostalgia blocking"],
+  ["Seven", "assessment of", "doubt about"], ["Eight", "movement and mastery in", "burnout around"],
+  ["Nine", "near-completion in", "anxiety about"], ["Ten", "culmination of", "overload from"],
+  ["Page", "curiosity toward", "immaturity around"], ["Knight", "pursuit of", "recklessness in"],
+  ["Queen", "mastery and care in", "insecurity within"], ["King", "command of", "misuse of"],
+];
+const TAROT_DECK = (() => {
+  const deck = TAROT_MAJORS.map(([name, up, down]) => ({ name, up, down }));
+  TAROT_SUITS.forEach(([suit, domain]) => {
+    TAROT_RANKS.forEach(([rank, up, down]) => {
+      deck.push({ name: `${rank} of ${suit}`, up: `${up} ${domain}`, down: `${down} ${domain}` });
+    });
+  });
+  return deck;
+})();
+
+const ORACLE_DECK = [
+  ["The Threshold", "A door you already opened is waiting for you to walk through it."],
+  ["The Anchor", "Hold one thing steady today and let the rest move around it."],
+  ["The Ember", "Something small is still burning. Feed it before tending anything new."],
+  ["The Tide", "This is a pulling day, not a pushing day. Time your effort to the water."],
+  ["The Ledger", "Count what you actually have. The math is better than the feeling."],
+  ["The Compass", "You know the direction. The speed matters less than you think."],
+  ["The Garden", "Whatever you planted needs tending, not replanting."],
+  ["The Bridge", "Someone on the other side is closer than they appear. Reach."],
+  ["The Lantern", "Light only the next few feet. That is enough to keep walking."],
+  ["The Bell", "Say the thing plainly today. It will ring louder than eloquence."],
+  ["The Root", "Go down before you go up. The foundation is asking for attention."],
+  ["The Feather", "Carry today lightly. Not everything needs your full weight."],
+  ["The Key", "The lock you keep testing opens from the other side. Ask."],
+  ["The Mirror", "What irritates you today is information. Read it, then release it."],
+  ["The Harvest", "Take the win that is ready. Perfection would cost the season."],
+  ["The Quiet", "The answer arrives in the gap. Make one on purpose."],
+  ["The Knot", "Untangle, do not cut — the thread is worth keeping."],
+  ["The Horizon", "Lift your eyes once today. Fuel comes from distance, not detail."],
+  ["The Spark", "Follow the flicker of interest. It is not a distraction; it is a lead."],
+  ["The Stone", "Be unmoved once today, kindly and completely."],
+  ["The River", "The current is doing some of the work. Stop swimming against the easy part."],
+  ["The Nest", "Home is an instrument. Tune it and everything plays better."],
+];
+
+const CRYSTAL_CABINET = [
+  ["Clear Quartz", "amplification and clarity", ["Manifesting", "Clarity", "Amplifying"], "Program it: hold it, state the intention once, plainly, and keep the stone where you can see it. It amplifies whatever it's charged with — including the other stones on this shelf."],
+  ["Amethyst", "calm and intuition", ["Calm", "Intuition", "Sleep"], "Bedside for sleep, desk edge for deep work. When the head races, hold it and take ten slow breaths — it's the settling stone."],
+  ["Citrine", "confidence and abundance", ["Confidence", "Abundance", "Manifesting"], "Pocket it into interviews and negotiations; touch it once before you speak first. It's the merchant's stone — it likes bold, specific asks."],
+  ["Black Tourmaline", "protection and grounding", ["Protection", "Grounding", "Boundaries"], "Set it at the door or the edge of the desk to catch the day's static before it reaches you. Rinse and sun it weekly — it works by absorbing."],
+  ["Rose Quartz", "warmth and self-regard", ["Self-regard", "Warmth", "Healing"], "Wear it near the heart or keep it within reach on heavy days. Its work is the inner voice — it softens how you speak to yourself."],
+  ["Tiger's Eye", "focus and courage", ["Courage", "Focus", "Strength"], "Pocket it before hard conversations and roll it in the palm when resolve wavers. It holds the middle ground between caution and nerve."],
+  ["Green Aventurine", "luck and new opportunity", ["Luck", "Opportunity", "Growth"], "Carry it when applying, pitching, or betting on yourself. The gambler's stone only works in motion — pair it with an actual swing taken."],
+  ["Labradorite", "transformation and insight", ["Transformation", "Insight", "Magic"], "Hold it while journaling or before a crossroads decision, and write down the first thing that surfaces. It favors the question you've been avoiding."],
+  ["Carnelian", "vitality and momentum", ["Vitality", "Momentum", "Creativity"], "Keep it near workouts and morning starts. It backs the first move of anything — the opening rep, the first sentence, the send button."],
+  ["Sodalite", "clear communication", ["Communication", "Truth", "Logic"], "Wear it at the throat or hold it before writing and interviews. It steadies the voice by cooling the head first."],
+  ["Moonstone", "cycles and intuition", ["New beginnings", "Cycles", "Intuition"], "Strongest on new and full moons — carry it at fresh starts and endings. Set it on the windowsill overnight to recharge in moonlight."],
+  ["Obsidian", "truth and release", ["Release", "Truth", "Protection"], "Hold it when letting something go: name the thing out loud, breathe out slowly, set the stone down. The putting-down is the practice."],
+  ["Selenite", "cleansing and reset", ["Cleansing", "Reset", "Peace"], "Sweep it slowly from crown to floor at week's end to clear the residue. It cleanses the other stones too — lay them beside it overnight. Never water; it dissolves."],
+  ["Pyrite", "prosperity and will", ["Prosperity", "Will", "Action"], "Keep it on the desk where money matters get handled. Fool's gold is the reminder that real gold takes work — it backs effort, not wishes."],
+];
+
+const CHAKRA_WHEEL = [
+  ["Root", "Muladhara", "#c0392b", "safety, grounding, the body", "Stand barefoot for two minutes; exhale longer than you inhale.", "Base of the spine", "Anxiety with no clear cause, money dread, restlessness, feeling unsafe in a safe room."],
+  ["Sacral", "Svadhisthana", "#e67e22", "creativity, pleasure, flow", "Do one thing today purely because it feels good.", "Just below the navel", "Creative block, numbness to things you used to enjoy, guilt about rest and pleasure."],
+  ["Solar Plexus", "Manipura", "#f1c40f", "will, confidence, fire", "Name one boundary and keep it all day.", "Upper abdomen, below the ribs", "Self-doubt, people-pleasing, swallowing decisions, a fire that won't light."],
+  ["Heart", "Anahata", "#27ae60", "connection, compassion, breath", "Send one unprompted kind message.", "Center of the chest", "Guardedness, old grudges kept warm, loneliness even in company, shallow breath."],
+  ["Throat", "Vishuddha", "#2980b9", "voice, truth, expression", "Say the true thing once, gently and without apology.", "The throat", "Swallowed words, saying yes while meaning no, a tight jaw, honesty by omission."],
+  ["Third Eye", "Ajna", "#34495e", "insight, imagination, pattern", "Before deciding anything big, sit with eyes closed for ten breaths.", "Between the brows", "Overthinking that never lands, ignoring a gut call you knew was right, fog where the pattern should be."],
+  ["Crown", "Sahasrara", "#8e44ad", "meaning, perspective, stillness", "Spend five minutes under open sky doing absolutely nothing.", "Crown of the head", "Cynicism, disconnection, the sense that none of it means anything — usually a tired crown, not a true verdict."],
+];
+
+const CHAKRA_SYSTEM_NOTE = "The seven centers stack like a ladder up the spine, each governing a register of the day: the lower three run survival, appetite, and will; the heart bridges; the upper three run voice, insight, and meaning. Energy moves bottom-up, so a blocked lower center starves everything above it — confidence trouble is often a root problem, and a lost voice is often a heart problem. Balance from the ground up.";
+
+function spiritDayIndex(count) {
+  const days = Math.floor(Date.now() / 86400000);
+  return ((days % count) + count) % count;
+}
+
+function spiritDayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+const SPIRIT_VOICE = "You are the desk editor of Daymark, Ty's personal morning-paper app. Write in a literate, warm, concise editorial voice — a great local columnist, not an assistant. Ty is the only reader: address them directly as \"you\" and never refer to them in the third person or by any pronoun. Never invent facts that are not in the briefing data.";
+
+async function spiritAI(cacheKey, user, maxTokens = 400) {
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) return cached;
+  const text = await aiComplete(SPIRIT_VOICE, user, maxTokens);
+  localStorage.setItem(cacheKey, text);
+  return text;
+}
+
+function renderSpiritDesk() {
+  const body = document.querySelector("#spiritBody");
+  if (!body) return;
+  const hasAI = Boolean(loadDeskSettings().aiKey);
+  const oracle = ORACLE_DECK[spiritDayIndex(ORACLE_DECK.length)];
+  const crystal = CRYSTAL_CABINET[spiritDayIndex(CRYSTAL_CABINET.length)];
+  const chakra = CHAKRA_WHEEL[spiritDayIndex(CHAKRA_WHEEL.length)];
+
+  body.innerHTML = `
+    <article class="spirit-panel" id="spiritHoroscope">
+      <p class="spirit-kicker">Today's Horoscope · Taurus</p>
+      <p class="spirit-reading" data-slot="horoscope">${hasAI ? "Reading the sky…" : "Add an AI key in Desk settings and the horoscope reads today's actual transits."}</p>
+    </article>
+
+    <article class="spirit-panel" id="spiritTarot">
+      <p class="spirit-kicker">The Cards</p>
+      <p class="spirit-deck">Ask a question — or draw open-handed.</p>
+      <div class="spirit-row">
+        <input id="tarotQuestion" type="text" placeholder="What do I need to know about…" />
+        <button class="spirit-button" id="tarotDraw" type="button">DRAW</button>
+      </div>
+      <div class="tarot-cards" data-slot="spread"></div>
+      <p class="spirit-reading" data-slot="tarotReading" hidden></p>
+      <p class="spirit-error" data-slot="tarotError" hidden></p>
+    </article>
+
+    <article class="spirit-panel" id="spiritOracle">
+      <p class="spirit-kicker">The Oracle · Today's Card</p>
+      <h3 class="spirit-title">${oracle[0]}</h3>
+      <p class="spirit-deck">${oracle[1]}</p>
+      <p class="spirit-reading" data-slot="oracleReading" hidden></p>
+    </article>
+
+    <article class="spirit-panel" id="spiritCrystal">
+      <p class="spirit-kicker">The Crystal Cabinet</p>
+      <h3 class="spirit-title">${crystal[0]}</h3>
+      <p class="spirit-deck">For ${crystal[1]}.</p>
+      <details class="spirit-details">
+        <summary>Open the cabinet ›</summary>
+        <div>${CRYSTAL_CABINET.map(([name, property, tags, practice]) => `
+          <div class="spirit-item">
+            <strong>${name}</strong>
+            <div class="spirit-tags">${tags.map((tag) => `<span>${tag}</span>`).join("")}</div>
+            <small>${practice}</small>
+          </div>`).join("")}
+        </div>
+      </details>
+    </article>
+
+    <article class="spirit-panel" id="spiritChakra">
+      <p class="spirit-kicker">Chakra of the Day</p>
+      <h3 class="spirit-title">${chakra[0]} · ${chakra[1]}</h3>
+      <p class="spirit-deck">${chakra[3].charAt(0).toUpperCase() + chakra[3].slice(1)} — ${chakra[4]}</p>
+      <details class="spirit-details">
+        <summary>The full wheel ›</summary>
+        <p class="spirit-deck" style="padding-top:8px">${CHAKRA_SYSTEM_NOTE}</p>
+        <div>${[...CHAKRA_WHEEL].reverse().map(([name, sanskrit, color, theme, practice, where, signs]) => `
+          <div class="spirit-item">
+            <strong><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px"></span>${name} · ${sanskrit}</strong>
+            <small><b>Where:</b> ${where}</small>
+            <small><b>Out of balance:</b> ${signs}</small>
+            <small><b>To balance:</b> ${practice}</small>
+          </div>`).join("")}
+        </div>
+      </details>
+    </article>
+
+    <article class="spirit-panel" id="spiritSit">
+      <p class="spirit-kicker">The Sit</p>
+      <p class="spirit-reading" data-slot="meditation" hidden></p>
+      <div class="spirit-row">
+        <button class="spirit-button quiet" id="composeMeditation" type="button" ${hasAI ? "" : "disabled"}>${hasAI ? "Compose today's meditation" : "Add an AI key for the sit"}</button>
+      </div>
+    </article>`;
+
+  // Horoscope (cached daily)
+  if (hasAI) {
+    let transits = "";
+    try {
+      const astro = window.DaymarkAstro ? window.DaymarkAstro.snapshot(35.994, -78.8986) : null;
+      if (astro?.moon) transits = `Moon: ${astro.moon.phaseName || ""} ${astro.moon.zodiacSign ? "in " + astro.moon.zodiacSign : ""}`.trim();
+    } catch {}
+    spiritAI(`daymark-web-horoscope-${spiritDayKey()}`,
+      `Ty is a Taurus (born April 21, 1986). Today's real computed sky: ${transits || "unavailable — keep it seasonal and grounded"}. Write today's horoscope, addressed directly to Ty as "you": 3-4 sentences, editorial and a little playful. No generic filler.`,
+      300)
+      .then((text) => { const slot = body.querySelector('[data-slot="horoscope"]'); if (slot) slot.textContent = text; })
+      .catch(() => { const slot = body.querySelector('[data-slot="horoscope"]'); if (slot) slot.textContent = "The horoscope didn't come through — it retries tomorrow (or re-check the AI key in Desk settings)."; });
+
+    // Oracle deeper reading (cached daily)
+    spiritAI(`daymark-web-oracle-${spiritDayKey()}`,
+      `Today's oracle card for Ty is "${oracle[0]}". Its keynote line: "${oracle[1]}" Write the deeper reading in two short paragraphs: first unfold the card's symbolism, then ground it in an ordinary day with one concrete way to honor it before the day ends. Warm, specific, no doom.`,
+      400)
+      .then((text) => { const slot = body.querySelector('[data-slot="oracleReading"]'); if (slot) { slot.textContent = text; slot.hidden = false; } })
+      .catch(() => {});
+  }
+
+  // Tarot
+  document.querySelector("#tarotDraw")?.addEventListener("click", async () => {
+    const spreadSlot = body.querySelector('[data-slot="spread"]');
+    const readingSlot = body.querySelector('[data-slot="tarotReading"]');
+    const errorSlot = body.querySelector('[data-slot="tarotError"]');
+    const positions = ["PAST", "PRESENT", "FUTURE"];
+    const spread = [...TAROT_DECK].sort(() => Math.random() - 0.5).slice(0, 3)
+      .map((card) => ({ ...card, reversed: Math.random() < 0.5 }));
+    spreadSlot.innerHTML = spread.map((card, index) => `
+      <div class="tarot-card">
+        <small>${positions[index]}</small>
+        <strong>${card.name}</strong>
+        ${card.reversed ? '<span class="rev">REVERSED</span>' : ""}
+        <em>${card.reversed ? card.down : card.up}</em>
+      </div>`).join("");
+    readingSlot.hidden = true;
+    errorSlot.hidden = true;
+    if (!Boolean(loadDeskSettings().aiKey)) return;
+    readingSlot.hidden = false;
+    readingSlot.textContent = "Reading the spread…";
+    const question = document.querySelector("#tarotQuestion")?.value.trim() || "What do I need to know today?";
+    const lines = spread.map((card, index) =>
+      `${positions[index]}: ${card.name}${card.reversed ? " (reversed)" : ""} — ${card.reversed ? card.down : card.up}`).join("\n");
+    try {
+      const text = await aiComplete(SPIRIT_VOICE,
+        `Ty asked the cards: "${question}"\n\nThe spread drawn (these are the real cards — read THESE):\n${lines}\n\nWrite the reading, speaking directly to Ty as "you": one short paragraph per card tying its meaning to the question, then a closing line of practical counsel. Warm, grounded, no doom.`,
+        550);
+      readingSlot.textContent = text;
+    } catch (error) {
+      readingSlot.hidden = true;
+      errorSlot.textContent = `The reading didn't come through — ${error?.message || "try again"}.`;
+      errorSlot.hidden = false;
+    }
+  });
+
+  // Meditation
+  document.querySelector("#composeMeditation")?.addEventListener("click", async () => {
+    const slot = body.querySelector('[data-slot="meditation"]');
+    slot.hidden = false;
+    slot.textContent = "Composing…";
+    try {
+      slot.textContent = await aiComplete(SPIRIT_VOICE,
+        `Compose a short guided meditation for Ty — about 150 words, second person, present tense, slow cadence with line breaks between beats. Today's thread: chakra focus ${chakra[0]} (${chakra[3]}). Open with settling the body, end with one sentence to carry into the day. No preamble, no title.`,
+        350);
+    } catch (error) {
+      slot.textContent = `The sit didn't compose — ${error?.message || "try again"}.`;
+    }
+  });
+}
+
+renderSpiritDesk();
