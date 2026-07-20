@@ -308,8 +308,11 @@ final class AppState {
     private func announceGameTransitions(old: GameInfo?, new: GameInfo?, team: String) {
         guard persisted.settings.gameAlerts, let new else { return }
         if new.state == "Preview", let start = new.date, start > Date() {
+            // The tail is the ballpark, not the tracked team — "Knights at
+            // Bulls — Bulls" read like the home side twice.
+            let place = new.venue ?? team
             NotificationService.scheduleGameAlerts(games: [
-                (id: String(new.id), title: "\(new.away.name) at \(new.home.name) — \(team), \(start.timeText())", start: start)
+                (id: String(new.id), title: "\(new.away.name) at \(new.home.name) — \(place), \(start.timeText())", start: start)
             ])
         }
         if new.state == "Final", let old, old.id == new.id, old.state != "Final" {
