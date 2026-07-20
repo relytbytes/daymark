@@ -2068,7 +2068,7 @@ function initializeDeskSettings() {
     const partial = {
       landedSheetId: sheet?.value.trim() || "",
       aiProvider: provider?.value || "openai",
-      soundcloudUser: scUser?.value.trim().toLowerCase() || "",
+      soundcloudUser: normalizeSoundCloudSlug(scUser?.value || ""),
       soundcloudArtists: scArtists?.value.trim() || "",
       focusPlaylist: document.querySelector("#deskFocusPlaylist")?.value.trim() || "",
     };
@@ -5022,3 +5022,86 @@ function renderSpiritDesk() {
 }
 
 renderSpiritDesk();
+
+// ---------------------------------------------------------------------------
+// Desk diagnostics — test every connection and say exactly what's wrong.
+// ---------------------------------------------------------------------------
+
+function normalizeSoundCloudSlug(raw) {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return "";
+  // Accept a pasted profile URL and keep just the slug.
+  const match = trimmed.match(/soundcloud\.com\/([^/?#]+)/);
+  return (match ? match[1] : trimmed).replace(/^@/, "");
+}
+
+async function runDeskDiagnostics() {
+  const out = document.querySelector("#deskDiagnosticsOut");
+  if (!out) return;
+  out.hidden = false;
+  out.innerHTML = "<div>Running the checks…</div>";
+  const desk = loadDeskSettings();
+  const lines = [];
+  const ok = (label, detail) => lines.push(`<div><span class="ok">✓</span> <b>${label}</b> — ${detail}</div>`);
+  const bad = (label, detail) => lines.push(`<div><span class="bad">✕</span> <b>${label}</b> — ${detail}</div>`);
+
+  // AI key
+  if (!desk.aiKey) {
+    bad("AI desk", "no key saved — paste it and Save (the field shows dots once stored).");
+  } else {
+    try {
+      await aiComplete("Reply with exactly: OK", "Ping", 5);
+      ok("AI desk", `${desk.aiProvider === "anthropic" ? "Anthropic" : "OpenAI"} answered.`);
+    } catch (error) {
+      bad("AI desk", `${error?.message || "no answer"} — recheck the key.`);
+    }
+  }
+
+  // Google session
+  let googleOK = false;
+  try {
+    googleOK = await ensureGoogleAccessToken();
+  } catch {}
+  if (googleOK) ok("Google", "signed in with a live token.");
+  else bad("Google", "no live session — use Connect Google on the Today page, and approve the Sheets permission on the consent screen.");
+
+  // Landed sheet
+  if (!desk.landedSheetId) {
+    bad("Landed", "no sheet ID saved.");
+  } else if (!googleOK) {
+    bad("Landed", "blocked on the Google session above.");
+  } else {
+    try {
+      const data = await fetchGoogleJson(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(desk.landedSheetId)}/values/Tracker!A2:L`,
+      );
+      const count = (data.values || []).filter((row) => (row[0] || "").trim()).length;
+      ok("Landed", `Tracker tab reachable — ${count} roles on the sheet.`);
+    } catch (error) {
+      const detail = String(error?.message || "");
+      bad("Landed", detail.includes("403")
+        ? "Google refused the sheet (403). Disconnect and reconnect Google here on the web — the grant must include Sheets."
+        : detail.includes("404")
+          ? "sheet not found (404) — the ID looks wrong."
+          : detail || "unreachable.");
+    }
+  }
+
+  // Spotify
+  if (typeof spotifyRefreshToken !== "undefined" && spotifyRefreshToken) {
+    ok("Spotify", "connected on this browser.");
+  } else if (localStorage.getItem(SPOTIFY_SESSION_KEY)) {
+    ok("Spotify", "session stored on this browser.");
+  } else {
+    bad("Spotify", "not connected here — the web app has its own Spotify session.");
+  }
+
+  // SoundCloud
+  const slug = normalizeSoundCloudSlug(document.querySelector("#deskSCUser")?.value || desk.soundcloudUser || "");
+  if (slug) ok("SoundCloud", `using profile slug “${slug}” (full URLs are auto-trimmed now).`);
+  else bad("SoundCloud", "no username saved.");
+
+  out.innerHTML = lines.join("");
+}
+
+document.querySelector("#deskDiagnostics")?.addEventListener("click", runDeskDiagnostics);

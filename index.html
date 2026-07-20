@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=32" />
+    <link rel="manifest" href="./manifest.webmanifest?v=33" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,9 +18,9 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=32" />
-    <script src="./config.js?v=32"></script>
-    <script src="./astro.js?v=32" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=33" />
+    <script src="./config.js?v=33"></script>
+    <script src="./astro.js?v=33" defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -693,12 +693,14 @@
                 <label>Landed sheet ID
                   <input type="text" id="deskLandedSheet" autocomplete="off" spellcheck="false" placeholder="from docs.google.com/spreadsheets/d/THIS_PART/edit" />
                 </label>
-                <label>AI provider
-                  <select id="deskAppearance" aria-label="Appearance">
-                    <option value="auto">Appearance: auto (follows the sun)</option>
-                    <option value="light">Appearance: light</option>
-                    <option value="dark">Appearance: dark</option>
+                <label>Appearance
+                  <select id="deskAppearance">
+                    <option value="auto">Auto — follows the sun</option>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
                   </select>
+                </label>
+                <label>AI provider
                   <select id="deskAIProvider">
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
@@ -717,6 +719,8 @@
                   <input type="text" id="deskFocusPlaylist" autocomplete="off" spellcheck="false" placeholder="https://open.spotify.com/playlist/…" />
                 </label>
                 <button class="dialog-submit" id="deskSettingsSave" type="button">Save desk settings</button>
+                <button class="text-button" id="deskDiagnostics" type="button">Run diagnostics — test every connection</button>
+                <div id="deskDiagnosticsOut" class="desk-diagnostics" hidden></div>
                 <div class="desk-backup">
                   <button class="text-button" id="deskExport" type="button">Export backup</button>
                   <label class="text-button desk-import">Import backup<input type="file" id="deskImportFile" accept="application/json" hidden /></label>
@@ -782,7 +786,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>That’s the brief.</p>
-          <small>Daymark · Build 32</small>
+          <small>Daymark · Build 33</small>
         </footer>
       </main>
 
@@ -910,6 +914,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=32" defer></script>
+    <script src="./app.js?v=33" defer></script>
   </body>
 </html>
