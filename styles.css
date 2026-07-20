@@ -4942,6 +4942,10 @@ body[data-phase="night"] #eveningActions {
 
 /* ---- The Sky Desk ---- */
 .weather-links { display: flex; align-items: center; justify-content: space-between; }
+.sky-overlay[hidden] {
+  display: none;
+}
+
 .sky-overlay {
   position: fixed;
   inset: 0;
