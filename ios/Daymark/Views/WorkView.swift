@@ -170,7 +170,9 @@ struct WorkView: View {
             .padding(.bottom, 10)
 
             if app.persisted.applications.isEmpty {
-                EmptyNote(text: "No applications tracked yet. Add the first real role you want to move.")
+                EmptyNote(text: app.landedRoles.isEmpty
+                          ? "No applications tracked yet. Add the first real role you want to move."
+                          : "The pipeline lives in Landed — \(app.applicationsActive) open roles on the wire above. + Add is for one-offs outside the sheet.")
             } else {
                 ForEach(app.persisted.applications) { application in
                     VStack(spacing: 0) {
