@@ -10,39 +10,24 @@
 
 import SwiftUI
 
-struct SkyView: View {
+struct SkySectionsView: View {
     @Environment(AppState.self) private var app
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    header
-                    domeSection
-                    if let weather = app.weather {
-                        conditionsBoard(weather)
-                        precipSection(weather)
-                        weekSection(weather)
-                    }
-                    airSection
-                    radarSection
-                    almanacSection
-                    planetsSection
-                    eventsSection
-                    astrologySection
-                }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 40)
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            domeSection
+            if let weather = app.weather {
+                conditionsBoard(weather)
+                precipSection(weather)
+                weekSection(weather)
             }
-            .background(Palette.paper)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Palette.ink)
-                }
-            }
+            airSection
+            radarSection
+            almanacSection
+            planetsSection
+            eventsSection
+            astrologySection
         }
     }
 
@@ -54,11 +39,11 @@ struct SkyView: View {
                 .kickerStyle(Palette.coral, size: 10, tracking: 1.5)
                 .padding(.bottom, 8)
             Text("Above the Bull City.")
-                .font(DS.display(34))
+                .font(DS.display(28))
                 .foregroundStyle(Palette.ink)
             InkRule().padding(.top, 12)
         }
-        .padding(.top, 10)
+        .padding(.top, 34)
     }
 
     // MARK: The Dome
