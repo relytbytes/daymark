@@ -105,8 +105,8 @@ enum BaseballService {
 
         let nlWest = division
             .first { $0.division?.id == 203 }
-            .map { rows(from: $0) } ?? []
-        let wc = wildcard.first.map { rows(from: $0, limit: 8) } ?? []
+            .map { rows(from: $0, wildCardGB: false) } ?? []
+        let wc = wildcard.first.map { rows(from: $0, limit: 8, wildCardGB: true) } ?? []
         return (nlWest, wc)
     }
 
@@ -120,7 +120,8 @@ enum BaseballService {
         return try await HTTP.json(StandingsResponse.self, components.url!).records
     }
 
-    private static func rows(from record: StandingsResponse.Record, limit: Int = 5) -> [StandingRow] {
+    private static func rows(from record: StandingsResponse.Record, limit: Int = 5,
+                             wildCardGB: Bool) -> [StandingRow] {
         record.teamRecords.prefix(limit).map { tr in
             StandingRow(
                 id: String(tr.team?.id ?? 0),
@@ -128,7 +129,10 @@ enum BaseballService {
                 wins: tr.wins ?? 0,
                 losses: tr.losses ?? 0,
                 pct: tr.winningPercentage ?? "—",
-                gamesBack: tr.wildCardGamesBack ?? tr.gamesBack ?? "—",
+                // Division view shows division deficit; wild card view
+                // shows the wild-card deficit. Mixing them put wild-card
+                // numbers under the NL West toggle.
+                gamesBack: (wildCardGB ? tr.wildCardGamesBack : tr.gamesBack) ?? "—",
                 isDbacks: tr.team?.id == dbacksID
             )
         }

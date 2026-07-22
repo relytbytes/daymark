@@ -419,8 +419,9 @@ struct GlanceWidgetView: View {
     @Environment(\.widgetFamily) private var family
     var entry: GlanceEntry
 
-    /// Day paper or night edition, per this entry's moment.
-    private var pal: WScheme { entry.isNight ? .dark : .light }
+    /// The widgets wear the night edition around the clock — Ty's call.
+    /// (entry.isNight still drives the moon iconography.)
+    private var pal: WScheme { .dark }
 
     /// After sunset, clear and partly-cloudy wear the moon.
     private var conditionSymbol: String {

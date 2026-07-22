@@ -64,41 +64,71 @@ struct MoreView: View {
                     AgeStamp(status: app.newsStatus)
                 }
             } else {
-                ForEach(app.news.prefix(10)) { article in
+                ForEach(app.news.prefix(20)) { article in
                     VStack(spacing: 0) {
                         Hairline()
-                        Button {
-                            openURLItem = SheetLink(url: article.link)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(article.source.uppercased())
-                                        .kickerStyle(Palette.coral, size: 8, tracking: 1.2)
-                                    if !article.otherSources.isEmpty {
-                                        Text("+\(article.otherSources.count) SOURCE\(article.otherSources.count == 1 ? "" : "S")")
-                                            .font(.system(size: 7.5, weight: .heavy)).tracking(0.6)
-                                            .foregroundStyle(Palette.muted)
-                                            .padding(.horizontal, 6).padding(.vertical, 2)
-                                            .background(Capsule().fill(Palette.wash))
-                                            .overlay(Capsule().stroke(Palette.line, lineWidth: 1))
+                        HStack(alignment: .top, spacing: 8) {
+                            Button {
+                                openURLItem = SheetLink(url: article.link)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(article.source.uppercased())
+                                            .kickerStyle(Palette.coral, size: 8, tracking: 1.2)
+                                        if !article.otherSources.isEmpty {
+                                            Text("+\(article.otherSources.count) SOURCE\(article.otherSources.count == 1 ? "" : "S")")
+                                                .font(.system(size: 7.5, weight: .heavy)).tracking(0.6)
+                                                .foregroundStyle(Palette.muted)
+                                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                                .background(Capsule().fill(Palette.wash))
+                                                .overlay(Capsule().stroke(Palette.line, lineWidth: 1))
+                                        }
+                                        Spacer()
+                                        if let published = article.published {
+                                            Text(relativeAge(published))
+                                                .font(DS.label(9.5, weight: .semibold))
+                                                .foregroundStyle(Palette.subtle)
+                                        }
                                     }
-                                    Spacer()
-                                    if let published = article.published {
-                                        Text(relativeAge(published))
-                                            .font(DS.label(9.5, weight: .semibold))
-                                            .foregroundStyle(Palette.subtle)
-                                    }
+                                    Text(article.title)
+                                        .font(DS.deck(16, weight: 500, italic: false))
+                                        .foregroundStyle(Palette.ink)
+                                        .multilineTextAlignment(.leading)
+                                        .lineLimit(3)
                                 }
-                                Text(article.title)
-                                    .font(DS.deck(16, weight: 500, italic: false))
-                                    .foregroundStyle(Palette.ink)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(3)
+                                .padding(.vertical, 11)
+                                .contentShape(Rectangle())
                             }
-                            .padding(.vertical, 11)
-                            .contentShape(Rectangle())
+                            .buttonStyle(.plain)
+
+                            // One tap files it in the reading queue — no
+                            // open-copy-paste-capture dance.
+                            Button {
+                                app.addCapture(kind: .reading, title: article.title,
+                                               url: article.link.absoluteString,
+                                               note: article.source)
+                            } label: {
+                                Image(systemName: "plus.circle")
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundStyle(Palette.subtle)
+                                    .padding(.top, 12)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                app.addCapture(kind: .reading, title: article.title,
+                                               url: article.link.absoluteString,
+                                               note: article.source)
+                            } label: {
+                                Label("Read later", systemImage: "book")
+                            }
+                            Button {
+                                openURLItem = SheetLink(url: article.link)
+                            } label: {
+                                Label("Open", systemImage: "safari")
+                            }
+                        }
                     }
                 }
                 Hairline()
