@@ -147,30 +147,61 @@ struct SectionPage<Content: View>: View {
     @Environment(AppState.self) private var app
     let tag: String
     @Binding var showSettings: Bool
+    var index: [(label: String, anchor: String)] = []
     @ViewBuilder var content: Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                MastheadTopline(
-                    tag: tag,
-                    refreshing: app.isRefreshing,
-                    onRefresh: { Task { await app.refreshAll(force: true) } },
-                    onSettings: { showSettings = true }
-                )
-                .padding(.bottom, 14)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    MastheadTopline(
+                        tag: tag,
+                        refreshing: app.isRefreshing,
+                        onRefresh: { Task { await app.refreshAll(force: true) } },
+                        onSettings: { showSettings = true }
+                    )
+                    .padding(.bottom, index.isEmpty ? 14 : 8)
 
-                content
+                    if !index.isEmpty {
+                        indexRow(proxy)
+                            .padding(.bottom, 8)
+                    }
 
-                footer
+                    content
+
+                    footer
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 8)
+                .padding(.bottom, 108)
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 8)
-            .padding(.bottom, 108)
+            .scrollIndicators(.hidden)
+            .refreshable { await app.refreshAll(force: true) }
+            .background(Palette.paper)
         }
-        .scrollIndicators(.hidden)
-        .refreshable { await app.refreshAll(force: true) }
-        .background(Palette.paper)
+    }
+
+    /// The section index: one tap jumps a long page to its desks.
+    private func indexRow(_ proxy: ScrollViewProxy) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(index, id: \.anchor) { item in
+                    Button {
+                        withAnimation(.snappy(duration: 0.35)) {
+                            proxy.scrollTo(item.anchor, anchor: .top)
+                        }
+                    } label: {
+                        Text(item.label.uppercased())
+                            .font(.system(size: 8.5, weight: .heavy)).tracking(0.9)
+                            .foregroundStyle(Palette.ink)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(Capsule().fill(Palette.wash))
+                            .overlay(Capsule().stroke(Palette.line, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     private var footer: some View {

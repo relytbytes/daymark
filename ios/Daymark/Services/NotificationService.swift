@@ -71,6 +71,27 @@ enum NotificationService {
         center.add(UNNotificationRequest(identifier: "daymark.leaveby", content: content, trigger: trigger))
     }
 
+    /// The interview autopilot's morning delivery: the composed desk
+    /// brief lands at 7:45 on the day of the interview.
+    static func scheduleInterviewBrief(eventID: String, title: String, body: String) {
+        let center = UNUserNotificationCenter.current()
+        let identifier = "daymark.autopilot.\(eventID)"
+        center.removePendingNotificationRequests(withIdentifiers: [identifier])
+
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+
+        var components = Calendar.current.dateComponents(
+            [.year, .month, .day],
+            from: Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date())
+        components.hour = 7
+        components.minute = 45
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+    }
+
     // MARK: Game alerts
 
     /// First-pitch notifications for today's D-backs and Bulls games.

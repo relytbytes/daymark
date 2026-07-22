@@ -378,6 +378,8 @@ struct PersistedState: Codable {
     var sprintNotes: [String: String] = [:]    // SprintMilestone.id -> working note
     var sprintLedger: String = ""              // the desk's running sprint summary
     var sprintLedgerAt: Date?
+    var weekReview: String = ""                // the Sunday column
+    var weekReviewKey: String = ""             // weekKey it belongs to
 
     init() {}
 
@@ -409,6 +411,8 @@ struct PersistedState: Codable {
         sprintNotes = (try? c.decodeIfPresent([String: String].self, forKey: .sprintNotes)) ?? nil ?? [:]
         sprintLedger = (try? c.decodeIfPresent(String.self, forKey: .sprintLedger)) ?? nil ?? ""
         sprintLedgerAt = try? c.decodeIfPresent(Date.self, forKey: .sprintLedgerAt) ?? nil
+        weekReview = (try? c.decodeIfPresent(String.self, forKey: .weekReview)) ?? nil ?? ""
+        weekReviewKey = (try? c.decodeIfPresent(String.self, forKey: .weekReviewKey)) ?? nil ?? ""
     }
 }
 
