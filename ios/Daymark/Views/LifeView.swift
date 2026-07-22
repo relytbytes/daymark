@@ -18,7 +18,13 @@ struct LifeView: View {
     var body: some View {
         let phase = DayPhase.current()
 
-        SectionPage(tag: "Section C · Durham", showSettings: $showSettings) {
+        SectionPage(tag: "Section C · Durham", showSettings: $showSettings, index: [
+            (label: "Weather", anchor: "life-weather"),
+            (label: "Sky", anchor: "life-sky"),
+            (label: "Training", anchor: "life-training"),
+            (label: "Durham", anchor: "life-durham"),
+            (label: "Spirit", anchor: "life-spirit"),
+        ]) {
             TimelineView(.everyMinute) { context in
                 VStack(alignment: .leading, spacing: 0) {
                     Masthead(
@@ -31,14 +37,14 @@ struct LifeView: View {
                 }
             }
 
-            weatherFeature
+            weatherFeature.id("life-weather")
             hourlyStrip
-            SkySectionsView()
-            trainingDesk
-            aroundTown
+            SkySectionsView().id("life-sky")
+            trainingDesk.id("life-training")
+            aroundTown.id("life-durham")
             bullsSection
             remindersSection
-            SpiritSectionsView()
+            SpiritSectionsView().id("life-spirit")
         }
         .scrollDismissesKeyboard(.immediately)
         // Tapping anywhere outside a field drops the keyboard;
@@ -77,7 +83,21 @@ struct LifeView: View {
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
                             if let nest = app.nestReading {
-                                detailLine("Indoor \(nest.indoorF)°\(nest.hvacActive ? " · running" : "")")
+                                // Tap the indoor line to nudge the thermostat.
+                                Menu {
+                                    Button { app.nudgeNest(by: 1) } label: {
+                                        Label("Warmer · +1°", systemImage: "thermometer.sun")
+                                    }
+                                    Button { app.nudgeNest(by: -1) } label: {
+                                        Label("Cooler · −1°", systemImage: "thermometer.snowflake")
+                                    }
+                                    if let setpoint = nest.setpointF {
+                                        Text("Set to \(setpoint)° · \(nest.mode.capitalized)")
+                                    }
+                                } label: {
+                                    detailLine("Indoor \(nest.indoorF)°\(nest.hvacActive ? " · running" : "") ⌄")
+                                }
+                                .disabled(app.nestAdjusting)
                             }
                             detailLine("H \(weather.high) · L \(weather.low)")
                             detailLine("Rain \(weather.rainPct)%")

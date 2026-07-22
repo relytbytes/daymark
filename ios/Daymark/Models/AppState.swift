@@ -163,6 +163,11 @@ final class AppState {
                 CaptureImages.delete(capture.imageFile)
             }
             persisted.captures.removeAll { $0.done }
+            // Reading queue hygiene: read items go, and anything saved
+            // more than 30 days ago has answered its own question.
+            persisted.readingQueue.removeAll {
+                $0.done || $0.savedAt < now.addingTimeInterval(-30 * 86400)
+            }
             persisted.focusEndsAt = nil
             persisted.focusTaskID = nil
             persisted.tomorrowFirstMove = ""
@@ -212,6 +217,9 @@ final class AppState {
             for await _ in group {}
         }
         publishWidgetSnapshot()
+        scheduleInterviewAutopilot()
+        pickTodaysRead()
+        if weekReviewWindowOpen { composeWeekReview() }
     }
 
     private func degrade(_ status: FeedStatus) -> FeedStatus {
@@ -463,6 +471,165 @@ final class AppState {
                 meetingPrepError = error.localizedDescription
             }
         }
+    }
+
+    // MARK: Interview autopilot
+
+    /// When tomorrow's calendar holds an interview that matches a Landed
+    /// role, compose the desk brief tonight and deliver it with breakfast.
+    func scheduleInterviewAutopilot() {
+        guard AIService.isConfigured else { return }
+        let tomorrowMeetings = eventsTomorrow.filter { event in
+            event.isMeeting && !event.isAllDay
+        }
+        for meeting in tomorrowMeetings {
+            let match = landedRoles.first { meeting.title.localizedCaseInsensitiveContains($0.company) }
+            let looksLikeInterview = match != nil || meeting.title.lowercased().contains("interview")
+                || meeting.title.lowercased().contains("screen")
+            guard looksLikeInterview else { continue }
+            let doneKey = "daymark-autopilot-\(meeting.id)"
+            guard !UserDefaults.standard.bool(forKey: doneKey) else { continue }
+            UserDefaults.standard.set(true, forKey: doneKey)
+
+            var lines = ["Title: \(meeting.title)", "When: tomorrow, \(meeting.timeRangeText)"]
+            if let location = meeting.location?.nilIfEmpty { lines.append("Where: \(location)") }
+            if let match {
+                lines.append("Landed pipeline: \(match.company) — \(match.role) · stage \(match.status)"
+                    + (match.notes.nilIfEmpty.map { " · notes: \($0)" } ?? ""))
+            }
+            Task {
+                guard let brief = try? await AIDesk.meetingPrep(
+                    details: lines.joined(separator: "\n"), isInterview: true) else { return }
+                // Same cache the meeting card reads, so it's there on open.
+                UserDefaults.standard.set(brief, forKey: "daymark-meeting-prep-v2-\(meeting.id)")
+                NotificationService.scheduleInterviewBrief(
+                    eventID: meeting.id,
+                    title: "The desk brief: \(meeting.title)",
+                    body: String(brief.prefix(500)))
+            }
+        }
+    }
+
+    // MARK: The Week in Review
+
+    var weekReviewBusy = false
+
+    /// Sundays from 17:00, and Monday mornings, carry the column.
+    var weekReviewWindowOpen: Bool {
+        let weekday = Calendar.current.component(.weekday, from: Date())
+        let hour = Calendar.current.component(.hour, from: Date())
+        return (weekday == 1 && hour >= 17) || (weekday == 2 && hour < 12)
+    }
+
+    func composeWeekReview(force: Bool = false) {
+        guard AIService.isConfigured, !weekReviewBusy else { return }
+        // The column belongs to the week being reviewed (Sunday's weekKey).
+        let key = Date().weekKey
+        if !force, persisted.weekReviewKey == key, !persisted.weekReview.isEmpty { return }
+        weekReviewBusy = true
+
+        var lines: [String] = []
+        for category in ScoreCategory.defaults {
+            lines.append("\(category.label): \(score(category.key)) of \(category.target)")
+        }
+        lines.append("Job pipeline rows touched this week: \(autoJobTouches)")
+        lines.append("Veraya sprint: \(sprintPercent)% complete"
+            + (persisted.sprintLedger.nilIfEmpty.map { " — ledger: \($0.prefix(200))" } ?? ""))
+        let likes = persisted.wireArchive.filter { $0.verdict == "like" }.suffix(5)
+            .map { "\($0.title) — \($0.artist)" }.joined(separator: "; ")
+        lines.append("Music discoveries kept: \(likes.nilIfEmpty ?? "(none)")")
+
+        Task {
+            defer { weekReviewBusy = false }
+            if let column = try? await AIDesk.weekInReview(ledger: lines.joined(separator: "\n")) {
+                persisted.weekReview = column
+                persisted.weekReviewKey = key
+            }
+        }
+    }
+
+    // MARK: Today's read
+
+    var todaysReadID: UUID?
+
+    /// The desk picks one saved piece per day.
+    func pickTodaysRead() {
+        guard AIService.isConfigured else { return }
+        let queue = persisted.readingQueue.filter { !$0.done }
+        guard queue.count >= 2 else {
+            todaysReadID = queue.first?.id
+            return
+        }
+        let dayKey = Date().dayKey
+        let cacheKey = "daymark-todays-read-\(dayKey)"
+        if let cached = UserDefaults.standard.string(forKey: cacheKey),
+           let id = UUID(uuidString: cached),
+           queue.contains(where: { $0.id == id }) {
+            todaysReadID = id
+            return
+        }
+        let listing = queue.enumerated()
+            .map { "\($0.offset + 1). \($0.element.title)" }
+            .joined(separator: "\n")
+        Task {
+            guard let reply = try? await AIDesk.todaysRead(queue: listing),
+                  let number = Int(reply.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)),
+                  number >= 1, number <= queue.count else { return }
+            let pick = queue[number - 1]
+            todaysReadID = pick.id
+            UserDefaults.standard.set(pick.id.uuidString, forKey: cacheKey)
+        }
+    }
+
+    // MARK: Nest control
+
+    var nestAdjusting = false
+
+    func nudgeNest(by deltaF: Int) {
+        guard !nestAdjusting else { return }
+        nestAdjusting = true
+        Task {
+            defer { nestAdjusting = false }
+            do {
+                let target = try await nest.adjustSetpoint(by: deltaF)
+                toast("Nest set to \(target)°.")
+                nestReading = try? await nest.thermostat()
+            } catch {
+                toast("Nest didn't take it: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: The Spoken Edition
+
+    let spokenEdition = SpokenEdition()
+
+    /// The brief as a radio script — what you'd want read aloud in the car.
+    func spokenScript() -> String {
+        var parts: [String] = []
+        let phase = DayPhase.current()
+        parts.append("Good \(phase == .morning ? "morning" : phase == .afternoon ? "afternoon" : "evening"), Ty. Here's the brief.")
+        if let weather {
+            parts.append("Durham weather: \(weather.tempF) degrees and \(weather.description.lowercased()). High of \(weather.high), low of \(weather.low). Rain chance \(weather.rainPct) percent.")
+        }
+        let lead = leadStory(for: phase)
+        parts.append(lead.headline + ". " + lead.deck)
+        if let plan = aiPlan?.nilIfEmpty {
+            parts.append("The plan. " + plan.replacingOccurrences(of: "\n", with: ". "))
+        } else {
+            let open = EssentialTask.forPhase(phase).filter { !essentialDone($0.id) }.map(\.title)
+            if !open.isEmpty {
+                parts.append("Still open: " + open.joined(separator: ". ") + ".")
+            }
+        }
+        if let next = nextMeeting {
+            parts.append("Next on the calendar: \(next.title) at \(next.start.timeText()).")
+        }
+        if let game = dbacksGame {
+            parts.append("Diamondbacks: \(game.detail).")
+        }
+        parts.append("That's the edition.")
+        return parts.joined(separator: " ")
     }
 
     // MARK: Appearance

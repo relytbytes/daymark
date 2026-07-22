@@ -19,6 +19,7 @@ struct TodayView: View {
     @State private var openEssential: String?
     @State private var captureImageItem: CaptureImageSheet?
     @State private var editingEvent: EventEditTarget?
+    @State private var spokenTick = 0
 
     var body: some View {
         let phase = DayPhase.current()
@@ -38,6 +39,7 @@ struct TodayView: View {
                 }
             }
 
+            spokenRow
             leadSection(phase: phase)
             focusBulletin
             essentialsSection(phase: phase)
@@ -48,6 +50,9 @@ struct TodayView: View {
             aiTriageSection
             waitingSection
             inboxSection
+            if app.weekReviewWindowOpen || !app.persisted.weekReview.isEmpty && app.persisted.weekReviewKey == Date().weekKey {
+                weekReviewSection
+            }
             if phase.isEndOfDay {
                 eveningReviewSection
                 aiEveningSection
@@ -361,6 +366,85 @@ struct TodayView: View {
         let hours = minutes / 60
         let rest = minutes % 60
         return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
+    }
+
+    // MARK: The Spoken Edition
+
+    /// One tap and the brief reads itself — car, kitchen, dog walk.
+    private var spokenRow: some View {
+        HStack {
+            Spacer()
+            Button {
+                app.spokenEdition.toggle(script: app.spokenScript())
+                spokenTick += 1
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: app.spokenEdition.isSpeaking ? "stop.fill" : "speaker.wave.2.fill")
+                        .font(.system(size: 10))
+                    Text(app.spokenEdition.isSpeaking ? "STOP" : "SPOKEN EDITION")
+                        .font(.system(size: 8.5, weight: .heavy)).tracking(1.0)
+                }
+                .foregroundStyle(Palette.coral)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .overlay(Capsule().stroke(Palette.line, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .id(spokenTick)
+        }
+        .padding(.top, 10)
+    }
+
+    // MARK: The Week in Review
+
+    private var weekReviewSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionRuleHeader(title: "The Week in Review")
+                .padding(.bottom, 10)
+            VStack(alignment: .leading, spacing: 8) {
+                if !app.persisted.weekReview.isEmpty {
+                    Text(app.persisted.weekReview)
+                        .font(DS.deck(14.5))
+                        .foregroundStyle(Palette.ink)
+                        .lineSpacing(5)
+                        .textSelection(.enabled)
+                    Button {
+                        app.composeWeekReview(force: true)
+                    } label: {
+                        Text("REWRITE THE COLUMN")
+                            .font(.system(size: 8.5, weight: .heavy)).tracking(0.8)
+                            .foregroundStyle(Palette.subtle)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(app.weekReviewBusy)
+                } else if app.weekReviewBusy {
+                    HStack(spacing: 10) {
+                        ProgressView().controlSize(.small)
+                        Text("The desk is writing the Sunday column…")
+                            .font(DS.deck(13))
+                            .foregroundStyle(Palette.muted)
+                    }
+                } else {
+                    Text(AIService.isConfigured
+                         ? "The Sunday column composes from the week's scores, pipeline movement, and discoveries."
+                         : "Add an AI key in Settings and the desk writes the Sunday column.")
+                        .font(DS.label(11.5, weight: .regular))
+                        .foregroundStyle(Palette.subtle)
+                    if AIService.isConfigured {
+                        Button {
+                            app.composeWeekReview()
+                        } label: {
+                            Text("WRITE THE COLUMN")
+                                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
+                                .foregroundStyle(Palette.coral)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .editorialPanel()
+        }
+        .padding(.top, 26)
     }
 
     // MARK: Meeting prep

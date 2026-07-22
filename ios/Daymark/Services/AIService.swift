@@ -397,6 +397,40 @@ enum AIDesk {
         )
     }
 
+    /// The Sunday column: the week's ledger, honestly told.
+    static func weekInReview(ledger: String) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            The week's ledger, from the paper's own records:
+
+            \(ledger)
+
+            Write "The Week in Review" — a Sunday column of 4-6 sentences:
+            what actually moved this week (scores, pipeline, the sprint),
+            one honest observation about the pattern, and a closing line
+            setting up Monday. Concrete numbers over adjectives; no pep.
+            """,
+            maxTokens: 400
+        )
+    }
+
+    /// Pick tonight's read from the saved queue.
+    static func todaysRead(queue: String) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            Ty's saved reading queue (one per line, prefixed by its number):
+
+            \(queue)
+
+            Pick the single best one to read today and reply with ONLY its
+            number — no other words.
+            """,
+            maxTokens: 8
+        )
+    }
+
     /// The Sky Desk horoscope: grounded in the real computed transits.
     static func horoscope(transits: String) async throws -> String {
         try await AIService.complete(

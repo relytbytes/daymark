@@ -99,6 +99,55 @@ final class NestService {
         return access
     }
 
+    // MARK: Adjust the thermostat
+
+    /// Nudge the setpoint by whole degrees Fahrenheit, respecting the
+    /// current mode (COOL adjusts the cool setpoint, HEAT the heat one).
+    func adjustSetpoint(by deltaF: Int) async throws -> Int {
+        guard let reading = try await thermostat(), let current = reading.setpointF else {
+            throw ServiceError.auth("No setpoint to adjust — is the thermostat off?")
+        }
+        let targetF = current + deltaF
+        let targetC = Double(targetF - 32) * 5 / 9
+        let (command, field): (String, String) = reading.mode == "HEAT"
+            ? ("SetHeat", "heatCelsius")
+            : ("SetCool", "coolCelsius")
+
+        let token = try await validToken()
+        let devicesURL = URL(string:
+            "https://smartdevicemanagement.googleapis.com/v1/enterprises/\(AppConfig.nestProjectID)/devices")!
+        var listRequest = URLRequest(url: devicesURL, timeoutInterval: 20)
+        listRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (listData, _) = try await URLSession.shared.data(for: listRequest)
+        struct Devices: Decodable {
+            struct Device: Decodable {
+                let name: String?
+                let type: String?
+            }
+            let devices: [Device]?
+        }
+        guard let device = (try? JSONDecoder().decode(Devices.self, from: listData))?
+            .devices?.first(where: { $0.type?.contains("THERMOSTAT") == true }),
+              let deviceName = device.name
+        else { throw ServiceError.auth("Thermostat not found.") }
+
+        var request = URLRequest(
+            url: URL(string: "https://smartdevicemanagement.googleapis.com/v1/\(deviceName):executeCommand")!,
+            timeoutInterval: 20)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "command": "sdm.devices.commands.ThermostatTemperatureSetpoint.\(command)",
+            "params": [field: targetC],
+        ])
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw HTTPError.status((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        return targetF
+    }
+
     // MARK: Read the thermostat
 
     func thermostat() async throws -> NestReading? {

@@ -19,7 +19,14 @@ struct MoreView: View {
     var body: some View {
         let phase = DayPhase.current()
 
-        SectionPage(tag: "Section D · Arts & Media", showSettings: $showSettings) {
+        SectionPage(tag: "Section D · Arts & Media", showSettings: $showSettings, index: [
+            (label: "Brief", anchor: "more-news"),
+            (label: "Markets", anchor: "more-markets"),
+            (label: "Sports", anchor: "more-sports"),
+            (label: "Music", anchor: "more-music"),
+            (label: "Wire", anchor: "more-wire"),
+            (label: "Reading", anchor: "more-reading"),
+        ]) {
             TimelineView(.everyMinute) { context in
                 VStack(alignment: .leading, spacing: 0) {
                     Masthead(
@@ -32,13 +39,13 @@ struct MoreView: View {
                 }
             }
 
-            newsSection
-            marketsSection
-            sportsSection
-            spotifySection
-            discoverySection
+            newsSection.id("more-news")
+            marketsSection.id("more-markets")
+            sportsSection.id("more-sports")
+            spotifySection.id("more-music")
+            discoverySection.id("more-wire")
             soundcloudSection
-            readingSection
+            readingSection.id("more-reading")
             watchSection
         }
         .sheet(item: $openURLItem) { item in
@@ -418,6 +425,14 @@ struct MoreView: View {
                                 }
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
+                                    if app.todaysReadID == item.id {
+                                        Text("TODAY'S READ")
+                                            .font(.system(size: 7, weight: .heavy)).tracking(1.0)
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 6).padding(.vertical, 2)
+                                            .background(Palette.coral)
+                                            .clipShape(Capsule())
+                                    }
                                     Text(item.title)
                                         .font(DS.label(14, weight: .semibold))
                                         .foregroundStyle(Palette.ink)

@@ -27,6 +27,7 @@ struct DaymarkApp: App {
     init() {
         UNUserNotificationCenter.current().delegate = notificationDelegate
         MorningBriefTask.register()
+        EveningReviewTask.register()
     }
 
     var body: some Scene {
@@ -44,6 +45,7 @@ struct DaymarkApp: App {
             if phase == .active {
                 app.rolloverIfNeeded()
                 MorningBriefTask.scheduleNext()
+                EveningReviewTask.scheduleNext()
                 if UserDefaults.standard.bool(forKey: "daymark-pending-focus") {
                     UserDefaults.standard.set(false, forKey: "daymark-pending-focus")
                     // Reload in case an intent captured while we were closed.
