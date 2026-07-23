@@ -123,6 +123,7 @@ struct GlanceCellModel: Identifiable {
     var accent: Bool = false
     var symbol: String?
     var symbolColor: Color = Palette.gold
+    var onTap: (() -> Void)?
 }
 
 struct GlanceRibbon: View {
@@ -143,7 +144,15 @@ struct GlanceRibbon: View {
                             .frame(maxHeight: .infinity)
                             .padding(.vertical, 6)
                     }
-                    GlanceCell(model: cell)
+                    if let onTap = cell.onTap {
+                        Button(action: onTap) {
+                            GlanceCell(model: cell)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        GlanceCell(model: cell)
+                    }
                 }
             }
             .fixedSize(horizontal: false, vertical: true)

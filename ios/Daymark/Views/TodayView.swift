@@ -20,6 +20,7 @@ struct TodayView: View {
     @State private var captureImageItem: CaptureImageSheet?
     @State private var editingEvent: EventEditTarget?
     @State private var spokenTick = 0
+    @State private var showThermostat = false
 
     var body: some View {
         let phase = DayPhase.current()
@@ -60,6 +61,16 @@ struct TodayView: View {
         }
         .sheet(item: $openURLItem) { item in
             SafariView(url: item.url).ignoresSafeArea()
+        }
+        .sheet(isPresented: $showThermostat) {
+            ThermostatSheet()
+                .presentationDetents([.medium, .large])
+        }
+        .onChange(of: app.thermostatRequested) { _, requested in
+            if requested {
+                showThermostat = true
+                app.thermostatRequested = false
+            }
         }
         .sheet(item: $editingEvent) { target in
             EventEditorView(eventID: target.eventID, store: app.calendarService.eventStore) {
