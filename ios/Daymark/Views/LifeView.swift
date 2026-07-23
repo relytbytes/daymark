@@ -18,9 +18,6 @@ struct LifeView: View {
     @State private var showThermostat = false
     @State private var standingsView = "division"
     @State private var addingPlant = false
-    @State private var plantName = ""
-    @State private var plantNote = ""
-    @State private var plantDays = 7
     @State private var openPlant: UUID?
 
     var body: some View {
@@ -81,23 +78,9 @@ struct LifeView: View {
         )) { target in
             PlantSheet(plantID: target.id)
         }
-        .alert("New plant", isPresented: $addingPlant) {
-            TextField("Name (Monstera, tomatoes…)", text: $plantName)
-            TextField("Note (window, porch…)", text: $plantNote)
-            Button("Every 3 days") { savePlant(days: 3) }
-            Button("Weekly") { savePlant(days: 7) }
-            Button("Every 2 weeks") { savePlant(days: 14) }
-            Button("Cancel", role: .cancel) { plantName = ""; plantNote = "" }
-        } message: {
-            Text("Pick the watering cadence.")
+        .sheet(isPresented: $addingPlant) {
+            PlantIntakeSheet()
         }
-    }
-
-    private func savePlant(days: Int) {
-        guard let name = plantName.nilIfEmpty else { return }
-        app.addPlant(name: name, note: plantNote, everyDays: days)
-        plantName = ""
-        plantNote = ""
     }
 
     // MARK: The Home Desk (Nest, in its own quarters)
@@ -1162,4 +1145,196 @@ struct PlantSheet: View {
 
 struct PlantSheetTarget: Identifiable {
     let id: UUID
+}
+
+
+// MARK: - The intake: a new plant joins the bench
+
+struct PlantIntakeSheet: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var species = ""
+    @State private var potSize = ""
+    @State private var soil = ""
+    @State private var light = ""
+    @State private var note = ""
+    @State private var outdoor = false
+    @State private var cadence: Int? = 7      // nil = the desk sets it
+    @State private var stagedPhoto: UIImage?
+    @State private var libraryItem: PhotosPickerItem?
+    @State private var showCamera = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("NEW ON THE BENCH")
+                        .kickerStyle(Palette.coral, size: 10, tracking: 1.5)
+                        .padding(.bottom, 8)
+                    Text(name.isEmpty ? "The intake" : name)
+                        .font(DS.display(28))
+                        .foregroundStyle(Palette.ink)
+                    InkRule().padding(.vertical, 12)
+
+                    intakeField("Name (Monstera, tomatoes…)", text: $name)
+                        .padding(.bottom, 12)
+
+                    Text("THE PROFILE").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                        .padding(.bottom, 6)
+                    VStack(spacing: 8) {
+                        intakeField("Species (pothos, monstera…)", text: $species)
+                        intakeField("Pot & size (8\" terracotta…)", text: $potSize)
+                        intakeField("Soil (standard potting mix…)", text: $soil)
+                        intakeField("Light (bright indirect, porch sun…)", text: $light)
+                        intakeField("Note (by the east window…)", text: $note)
+                    }
+                    .padding(.bottom, 10)
+
+                    HStack(spacing: 8) {
+                        chip("Indoors", icon: "house", active: !outdoor) { outdoor = false }
+                        chip("Outdoors", icon: "sun.max", active: outdoor) { outdoor = true }
+                        Spacer()
+                        if outdoor {
+                            Text("FROST & HEAT WATCH ON")
+                                .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
+                                .foregroundStyle(Palette.subtle)
+                        }
+                    }
+                    .padding(.bottom, 16)
+
+                    Text("THE CADENCE").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                        .padding(.bottom, 6)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            chip("Every 3 days", icon: "drop", active: cadence == 3) { cadence = 3 }
+                            chip("Weekly", icon: "drop", active: cadence == 7) { cadence = 7 }
+                            chip("Every 2 weeks", icon: "drop", active: cadence == 14) { cadence = 14 }
+                            if AIService.isConfigured {
+                                chip("The desk sets it", icon: "sparkles", active: cadence == nil) { cadence = nil }
+                            }
+                        }
+                    }
+                    if cadence == nil {
+                        Text("The desk reads the profile and today's weather, sets the schedule, and files a care plan.")
+                            .font(DS.deck(12))
+                            .foregroundStyle(Palette.muted)
+                            .padding(.top, 6)
+                    }
+
+                    Text("FIRST PHOTO · OPTIONAL").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                        .padding(.top, 16)
+                        .padding(.bottom, 6)
+                    HStack(spacing: 8) {
+                        if let stagedPhoto {
+                            Image(uiImage: stagedPhoto)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 64, height: 64)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .onTapGesture { self.stagedPhoto = nil }
+                        }
+                        Button { showCamera = true } label: {
+                            photoTile(icon: "camera")
+                        }
+                        .buttonStyle(.plain)
+                        PhotosPicker(selection: $libraryItem, matching: .images) {
+                            photoTile(icon: "photo.on.rectangle")
+                        }
+                        Spacer()
+                    }
+                    .padding(.bottom, 20)
+
+                    DeskAction(label: cadence == nil ? "Plant it — the desk takes it from here"
+                                                     : "Plant it",
+                               systemImage: "leaf.fill") {
+                        plantIt()
+                    }
+                    .opacity(name.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 30)
+            }
+            .background(Palette.paper)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") { dismiss() }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Palette.muted)
+                }
+            }
+            .onChange(of: libraryItem) { _, item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        stagedPhoto = image
+                    }
+                    libraryItem = nil
+                }
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPicker { image in stagedPhoto = image }
+                    .ignoresSafeArea()
+            }
+        }
+    }
+
+    private func plantIt() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        let id = app.addPlant(name: trimmed, note: note.trimmingCharacters(in: .whitespaces),
+                              everyDays: cadence ?? 7,
+                              species: species.trimmingCharacters(in: .whitespaces),
+                              potSize: potSize.trimmingCharacters(in: .whitespaces),
+                              soil: soil.trimmingCharacters(in: .whitespaces),
+                              light: light.trimmingCharacters(in: .whitespaces),
+                              outdoor: outdoor)
+        if let stagedPhoto {
+            app.addPlantPhoto(id, image: stagedPhoto)
+        }
+        if cadence == nil {
+            app.composePlantPlan(id)
+        }
+        dismiss()
+    }
+
+    private func intakeField(_ placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text)
+            .font(DS.label(13, weight: .medium))
+            .padding(10)
+            .background(Palette.card)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.line, lineWidth: 1))
+    }
+
+    private func chip(_ label: String, icon: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 10))
+                Text(label).font(.system(size: 11, weight: .bold))
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(active ? Palette.ink : Palette.wash)
+            .foregroundStyle(active ? Palette.paper : Palette.muted)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func photoTile(icon: String) -> some View {
+        VStack {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(Palette.green)
+        }
+        .frame(width: 64, height: 64)
+        .background(Palette.wash)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10)
+            .stroke(Palette.line, style: StrokeStyle(lineWidth: 1, dash: [4])))
+    }
 }

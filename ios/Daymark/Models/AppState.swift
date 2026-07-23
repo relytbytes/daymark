@@ -379,9 +379,19 @@ final class AppState {
         toast("\(persisted.plants[index].name) watered.")
     }
 
-    func addPlant(name: String, note: String, everyDays: Int) {
-        persisted.plants.append(Plant(name: name, note: note, waterEveryDays: max(1, everyDays)))
+    @discardableResult
+    func addPlant(name: String, note: String, everyDays: Int,
+                  species: String = "", potSize: String = "", soil: String = "",
+                  light: String = "", outdoor: Bool = false) -> UUID {
+        var plant = Plant(name: name, note: note, waterEveryDays: max(1, everyDays))
+        plant.species = species
+        plant.potSize = potSize
+        plant.soil = soil
+        plant.light = light
+        plant.outdoor = outdoor
+        persisted.plants.append(plant)
         toast("\(name) joins the garden.")
+        return plant.id
     }
 
     func removePlant(_ id: UUID) {
