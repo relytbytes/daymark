@@ -1151,6 +1151,52 @@ final class AppState {
         }
     }
 
+    // MARK: Landed write-back
+
+    static let landedStages = ["Interested", "Applied", "Screen", "Interview", "Offer", "Closed"]
+
+    var landedWriting = false
+
+    private func landedDataRow(_ role: LandedRole) -> Int? {
+        Int(role.id.dropFirst())
+    }
+
+    func updateLandedStatus(_ role: LandedRole, to status: String) {
+        guard let row = landedDataRow(role), !landedWriting else { return }
+        landedWriting = true
+        Task {
+            defer { landedWriting = false }
+            do {
+                try await google.updateLandedCell(
+                    sheetID: AppConfig.landedSheetID, dataRow: row, column: "H", value: status)
+                toast("\(role.company): \(status).")
+                await refreshLanded()
+            } catch let error as LandedFetchError where error.status == 403 {
+                toast("Google needs edit access — disconnect and reconnect Google in Settings.")
+            } catch {
+                toast("The sheet didn't take it: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func updateLandedNextAction(_ role: LandedRole, to next: String) {
+        guard let row = landedDataRow(role), !landedWriting else { return }
+        landedWriting = true
+        Task {
+            defer { landedWriting = false }
+            do {
+                try await google.updateLandedCell(
+                    sheetID: AppConfig.landedSheetID, dataRow: row, column: "K", value: next)
+                toast("Next action noted for \(role.company).")
+                await refreshLanded()
+            } catch let error as LandedFetchError where error.status == 403 {
+                toast("Google needs edit access — disconnect and reconnect Google in Settings.")
+            } catch {
+                toast("The sheet didn't take it: \(error.localizedDescription)")
+            }
+        }
+    }
+
     /// Job-search auto-score: count pipeline rows whose stage or next action
     /// changed since Monday, tracked by comparing per-row fingerprints against
     /// a weekly snapshot (the read-only sheet has no timestamps).

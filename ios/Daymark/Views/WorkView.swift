@@ -17,6 +17,8 @@ struct WorkView: View {
     @State private var addingWaiting = false
     @State private var deskSheet: JobDeskSheet?
     @State private var openMilestone: String?
+    @State private var editingNextActionFor: LandedRole?
+    @State private var nextActionDraft = ""
 
     var body: some View {
         let phase = DayPhase.current()
@@ -52,6 +54,21 @@ struct WorkView: View {
         }
         .sheet(item: $deskSheet) { sheet in
             JobDeskSheetView(sheet: sheet)
+        }
+        .alert("Next action", isPresented: Binding(
+            get: { editingNextActionFor != nil },
+            set: { if !$0 { editingNextActionFor = nil } }
+        )) {
+            TextField("Follow up Friday, send the deck…", text: $nextActionDraft)
+            Button("Save to the sheet") {
+                if let role = editingNextActionFor {
+                    app.updateLandedNextAction(role, to: nextActionDraft)
+                }
+                editingNextActionFor = nil
+            }
+            Button("Cancel", role: .cancel) { editingNextActionFor = nil }
+        } message: {
+            Text(editingNextActionFor.map { "\($0.company) — \($0.role)" } ?? "")
         }
     }
 
@@ -117,6 +134,29 @@ struct WorkView: View {
                                         deskSheet = JobDeskSheet(role: role, kind: .followUp)
                                     } label: {
                                         Label("Draft follow-up", systemImage: "envelope")
+                                    }
+                                    Divider()
+                                    // Write-back: stage and next action land in the sheet.
+                                    Menu {
+                                        ForEach(AppState.landedStages, id: \.self) { stage in
+                                            Button {
+                                                app.updateLandedStatus(role, to: stage)
+                                            } label: {
+                                                if role.status.localizedCaseInsensitiveContains(stage) {
+                                                    Label(stage, systemImage: "checkmark")
+                                                } else {
+                                                    Text(stage)
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        Label("Set stage", systemImage: "arrow.right.circle")
+                                    }
+                                    Button {
+                                        nextActionDraft = role.nextAction
+                                        editingNextActionFor = role
+                                    } label: {
+                                        Label("Edit next action", systemImage: "pencil.line")
                                     }
                                 } label: {
                                     Image(systemName: "ellipsis.circle")
