@@ -54,6 +54,10 @@ struct CaptureSheet: View {
                     }
                 }
 
+                Text(destinationNote)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(Palette.subtle)
+
                 VStack(alignment: .leading, spacing: 12) {
                     captureField("What needs your attention?", text: $title)
                         .focused($titleFocused)
@@ -147,6 +151,16 @@ struct CaptureSheet: View {
                         .ignoresSafeArea()
                 }
             }
+        }
+    }
+
+    /// Where this capture lands — the fan-out, made visible.
+    private var destinationNote: String {
+        switch kind {
+        case .task: return "Files to: Today's inbox"
+        case .job: return "Files to: the job pipeline (Work)"
+        case .reading: return "Files to: the Reading List (Media)"
+        case .reminder: return "Files to: Practical reminders (Life)"
         }
     }
 

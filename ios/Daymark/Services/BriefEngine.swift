@@ -184,12 +184,32 @@ extension AppState {
     }
 
     func glanceWork() -> [GlanceCellModel] {
-        [
-            GlanceCellModel(id: "active", label: "Active", value: String(applicationsActive), sub: "apps"),
-            GlanceCellModel(id: "interviews", label: "Interviews", value: String(applicationsInterviews),
-                            sub: "scheduled", accent: true),
+        let cold = landedRoles.filter { isGhosting($0) }.count
+        return [
+            GlanceCellModel(id: "touches", label: "Touches", value: String(autoJobTouches),
+                            sub: "this week", accent: true),
+            GlanceCellModel(id: "cold", label: "Cold", value: String(cold), sub: "going stale"),
             GlanceCellModel(id: "waiting", label: "Waiting", value: String(waitingOpen.count), sub: "replies due"),
             GlanceCellModel(id: "sprint", label: "Sprint", value: "\(sprintPercent)%", sub: "complete"),
+        ]
+    }
+
+    func glanceSky() -> [GlanceCellModel] {
+        [
+            weatherCell(),
+            GlanceCellModel(
+                id: "sunset", label: "Sunset",
+                value: weather.map { $0.sunset.clockText() } ?? "—", sub: "Durham"
+            ),
+            GlanceCellModel(
+                id: "rain", label: "Rain",
+                value: weather.map { "\($0.rainPct)%" } ?? "—", sub: "chance today"
+            ),
+            GlanceCellModel(
+                id: "moon", label: "Moon",
+                value: astro?.moon.zodiacSign ?? "—",
+                sub: astro?.moon.phaseName.lowercased() ?? " "
+            ),
         ]
     }
 

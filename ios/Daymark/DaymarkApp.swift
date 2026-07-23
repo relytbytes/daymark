@@ -64,7 +64,7 @@ struct DaymarkApp: App {
                         case identifier.hasPrefix("daymark.evening"):
                             app.navigate(tab: "today", anchor: "today-close")
                         case identifier.hasPrefix("daymark.game"), identifier.hasPrefix("daymark.final"):
-                            app.navigate(tab: "more", anchor: "more-sports")
+                            app.navigate(tab: "life", anchor: "life-scoreboard")
                         case identifier == "daymark.leaveby":
                             app.navigate(tab: "today", anchor: "today-day")
                         default:

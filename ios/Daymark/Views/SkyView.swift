@@ -10,6 +10,39 @@
 
 import SwiftUI
 
+
+struct SkyTabView: View {
+    @Environment(AppState.self) private var app
+    @Binding var showSettings: Bool
+
+    var body: some View {
+        let phase = DayPhase.current()
+
+        SectionPage(tag: "Section C · The Sky", showSettings: $showSettings, index: [
+            (label: "Now", anchor: "sky-conditions"),
+            (label: "Radar", anchor: "sky-radar"),
+            (label: "Week", anchor: "sky-week"),
+            (label: "Almanac", anchor: "sky-almanac"),
+            (label: "Dome", anchor: "sky-dome"),
+            (label: "Astro", anchor: "sky-astro"),
+        ]) {
+            TimelineView(.everyMinute) { context in
+                VStack(alignment: .leading, spacing: 0) {
+                    Masthead(
+                        dateline: context.date.dateline(),
+                        phaseLabel: phase.label,
+                        accent: phase.accent,
+                        title: Text("Sky")
+                    )
+                    GlanceRibbon(cells: app.glanceSky())
+                }
+            }
+
+            SkySectionsView()
+        }
+    }
+}
+
 struct SkySectionsView: View {
     @Environment(AppState.self) private var app
 
@@ -17,20 +50,20 @@ struct SkySectionsView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             if let weather = app.weather {
-                conditionsBoard(weather)
+                conditionsBoard(weather).id("sky-conditions")
                 hourlyStrip
                 precipSection(weather)
             }
-            radarSection
+            radarSection.id("sky-radar")
             if let weather = app.weather {
-                weekSection(weather)
+                weekSection(weather).id("sky-week")
             }
             airSection
-            almanacSection
-            domeSection
+            almanacSection.id("sky-almanac")
+            domeSection.id("sky-dome")
             planetsSection
             eventsSection
-            astrologySection
+            astrologySection.id("sky-astro")
         }
     }
 

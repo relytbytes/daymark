@@ -15,14 +15,16 @@ struct LifeView: View {
     @State private var openURLItem: SheetLink?
     @State private var mapQuery = ""
     @State private var showThermostat = false
+    @State private var standingsView = "division"
 
     var body: some View {
         let phase = DayPhase.current()
 
-        SectionPage(tag: "Section C · Durham", showSettings: $showSettings, index: [
+        SectionPage(tag: "Section D · Durham", showSettings: $showSettings, index: [
             (label: "Home", anchor: "life-home"),
-            (label: "Sky", anchor: "life-sky"),
+            (label: "Training", anchor: "life-training"),
             (label: "Durham", anchor: "life-durham"),
+            (label: "Scoreboard", anchor: "life-scoreboard"),
             (label: "Spirit", anchor: "life-spirit"),
         ]) {
             TimelineView(.everyMinute) { context in
@@ -38,11 +40,11 @@ struct LifeView: View {
             }
 
             homeDesk.id("life-home")
-            SkySectionsView().id("life-sky")
-            trainingDesk
+            trainingDesk.id("life-training")
             aroundTown.id("life-durham")
-            bullsSection
             remindersSection
+            sportsSection.id("life-scoreboard")
+            bullsSection
             SpiritSectionsView().id("life-spirit")
         }
         .scrollDismissesKeyboard(.immediately)
@@ -309,6 +311,116 @@ struct LifeView: View {
             if let url = URL(string: "maps://?q=\(q)&near=Durham,NC") {
                 UIApplication.shared.open(url)
             }
+        }
+    }
+
+    // MARK: Sports
+
+    private var sportsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                SectionRuleHeader(title: "The Scoreboard")
+            }
+            .padding(.bottom, 12)
+
+            if let game = app.dbacksGame {
+                VStack(alignment: .leading, spacing: 0) {
+                    gameBox(game, headline: "Diamondbacks", status: app.baseballStatus)
+                    BoxScoreGrid(game: game)
+                    if let next = app.dbacksNext {
+                        UpNextRow(game: next)
+                    }
+                }
+            } else {
+                HStack {
+                    EmptyNote(text: "No D-backs game in the current window.")
+                    AgeStamp(status: app.baseballStatus)
+                }
+            }
+
+            // Standings toggle
+            HStack(spacing: 7) {
+                standingsTab("NL West", key: "division")
+                standingsTab("Wild Card", key: "wildcard")
+                Spacer()
+                AgeStamp(status: app.baseballStatus)
+            }
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+
+            let rows = standingsView == "division" ? app.nlWest : app.wildcard
+            if rows.isEmpty {
+                EmptyNote(text: "Standings will appear when MLB responds.")
+            } else {
+                standingsTable(rows)
+            }
+        }
+        .padding(.top, 26)
+    }
+
+    private func standingsTab(_ label: String, key: String) -> some View {
+        let active = standingsView == key
+        return Button {
+            standingsView = key
+        } label: {
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(active ? Palette.card : Palette.ink)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(active ? Palette.ink : Palette.card)
+                .overlay(RoundedRectangle(cornerRadius: 999).stroke(Palette.line, lineWidth: active ? 0 : 1))
+                .clipShape(RoundedRectangle(cornerRadius: 999))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func standingsTable(_ rows: [StandingRow]) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("TEAM").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                Spacer()
+                Text("W–L").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                    .frame(width: 52, alignment: .trailing)
+                Text("PCT").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                    .frame(width: 44, alignment: .trailing)
+                Text("GB").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                    .frame(width: 36, alignment: .trailing)
+                Text("L10").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                    .frame(width: 38, alignment: .trailing)
+            }
+            .padding(.vertical, 7)
+            ForEach(rows) { row in
+                VStack(spacing: 0) {
+                    Hairline()
+                    HStack {
+                        StandingLogo(url: row.logoURL)
+                        Text(row.name)
+                            .font(DS.label(13, weight: row.isDbacks ? .bold : .medium))
+                            .foregroundStyle(row.isDbacks ? Palette.coral : Palette.ink)
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(row.wins)–\(row.losses)")
+                            .font(DS.label(12, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 52, alignment: .trailing)
+                        Text(row.pct)
+                            .font(DS.label(12, weight: .regular))
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: 44, alignment: .trailing)
+                        Text(row.gamesBack)
+                            .font(DS.label(12, weight: .regular))
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: 36, alignment: .trailing)
+                        Text(row.l10)
+                            .font(DS.label(12, weight: .regular)).monospacedDigit()
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: 38, alignment: .trailing)
+                    }
+                    .padding(.vertical, 9)
+                }
+            }
+            Hairline()
         }
     }
 

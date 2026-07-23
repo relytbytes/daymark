@@ -49,7 +49,6 @@ struct TodayView: View {
             meetingPrepSection.id("today-prep")
             mailSection
             aiTriageSection
-            waitingSection
             inboxSection.id("today-inbox")
             if app.weekReviewWindowOpen || !app.persisted.weekReview.isEmpty && app.persisted.weekReviewKey == Date().weekKey {
                 weekReviewSection
