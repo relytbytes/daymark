@@ -45,6 +45,7 @@ struct SkyTabView: View {
 
 struct SkySectionsView: View {
     @Environment(AppState.self) private var app
+    @State private var expandedDay: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -223,36 +224,92 @@ struct SkySectionsView: View {
             SectionRuleHeader(title: "The Week Ahead")
                 .padding(.bottom, 6)
             ForEach(weather.week) { day in
+                let isOpen = expandedDay == day.date
                 VStack(spacing: 0) {
                     Hairline()
-                    HStack(spacing: 10) {
-                        Text(day.date.weekdayText())
-                            .font(DS.label(13, weight: .bold))
-                            .foregroundStyle(Palette.ink)
-                            .frame(width: 44, alignment: .leading)
-                        Image(systemName: day.symbol)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Palette.gold)
-                            .frame(width: 24)
-                        Text(day.rainPct > 20 ? "\(day.rainPct)%" : " ")
-                            .font(DS.label(10, weight: .bold))
-                            .foregroundStyle(Palette.blue)
-                            .frame(width: 34, alignment: .leading)
-                        Spacer()
-                        tempRange(day, weekLow: weather.week.map(\.low).min() ?? day.low,
-                                  weekHigh: weather.week.map(\.high).max() ?? day.high)
-                        Text("\(day.low)°–\(day.high)°")
-                            .font(DS.label(12, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(Palette.ink)
-                            .frame(width: 66, alignment: .trailing)
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            expandedDay = isOpen ? nil : day.date
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(day.date.weekdayText())
+                                .font(DS.label(13, weight: .bold))
+                                .foregroundStyle(Palette.ink)
+                                .frame(width: 44, alignment: .leading)
+                            Image(systemName: day.symbol)
+                                .font(.system(size: 13))
+                                .foregroundStyle(Palette.gold)
+                                .frame(width: 24)
+                            Text(day.rainPct > 20 ? "\(day.rainPct)%" : " ")
+                                .font(DS.label(10, weight: .bold))
+                                .foregroundStyle(Palette.blue)
+                                .frame(width: 34, alignment: .leading)
+                            Spacer()
+                            tempRange(day, weekLow: weather.week.map(\.low).min() ?? day.low,
+                                      weekHigh: weather.week.map(\.high).max() ?? day.high)
+                            Text("\(day.low)°–\(day.high)°")
+                                .font(DS.label(12, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(Palette.ink)
+                                .frame(width: 66, alignment: .trailing)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Palette.subtle)
+                                .rotationEffect(.degrees(isOpen ? 180 : 0))
+                        }
+                        .padding(.vertical, 9)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 9)
+                    .buttonStyle(.plain)
+
+                    if isOpen {
+                        dayHourly(for: day.date, weather: weather)
+                            .padding(.bottom, 10)
+                    }
                 }
             }
             Hairline()
         }
         .padding(.top, 24)
+    }
+
+
+    /// The tapped day's hours, 6:00 onward — temp and rain chance.
+    @ViewBuilder
+    private func dayHourly(for day: Date, weather: WeatherSnapshot) -> some View {
+        let calendar = Calendar.current
+        let hours = weather.allHours.filter {
+            calendar.isDate($0.time, inSameDayAs: day)
+                && calendar.component(.hour, from: $0.time) >= 6
+        }
+        if hours.isEmpty {
+            EmptyNote(text: "Hourly detail runs out this far ahead.")
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(hours) { hour in
+                        VStack(spacing: 5) {
+                            Text(hour.time.clockHourText())
+                                .kickerStyle(Palette.subtle, size: 7.5, tracking: 0.5)
+                            Image(systemName: weatherSymbol(hour.code))
+                                .font(.system(size: 11))
+                                .foregroundStyle(Palette.gold)
+                            Text("\(hour.temp)°")
+                                .font(DS.display(13))
+                                .foregroundStyle(Palette.ink)
+                            Text(hour.precip > 0 ? "\(hour.precip)%" : " ")
+                                .font(DS.label(8, weight: .bold))
+                                .foregroundStyle(Palette.blue)
+                        }
+                        .frame(width: 44)
+                    }
+                }
+            }
+            .padding(8)
+            .background(Palette.wash)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
     }
 
     private func tempRange(_ day: DayForecast, weekLow: Int, weekHigh: Int) -> some View {
