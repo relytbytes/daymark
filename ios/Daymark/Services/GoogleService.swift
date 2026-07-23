@@ -206,12 +206,14 @@ struct LandedFetchError: Error {
 
     var readable: String {
         switch status {
+        case 403 where message.contains("has not been used") || message.contains("disabled"):
+            return "The Google Sheets API is disabled in the Google Cloud project — enable it at console.cloud.google.com > APIs & Services > Library > Google Sheets API."
         case 403:
-            return "Google denied Sheets access — disconnect and reconnect Google in Settings to grant the spreadsheet permission."
+            return "Google denied Sheets access (403\(message.isEmpty ? "" : " — \(message)")) — if this mentions scopes, disconnect and reconnect Google in Settings."
         case 404:
             return "Sheet not found — the Landed sheet ID looks wrong, or this Google account can't open it."
         case 400:
-            return "The sheet has no 'Tracker' tab — check the tab name in the Landed spreadsheet."
+            return "Sheet error 400\(message.isEmpty ? "" : " — \(message)") — likely the 'Tracker' tab name."
         default:
             return "Landed sheet error \(status)\(message.isEmpty ? "" : ": \(message)")"
         }
