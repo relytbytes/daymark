@@ -77,7 +77,7 @@ final class GoogleService {
             URLQueryItem(name: "client_id", value: AppConfig.googleClientID),
             URLQueryItem(name: "redirect_uri", value: AppConfig.googleRedirectURI),
             URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/spreadsheets.readonly"),
+            URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/spreadsheets"),
             URLQueryItem(name: "code_challenge", value: PKCE.challenge(for: verifier)),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "prompt", value: "consent"),
@@ -167,6 +167,30 @@ final class GoogleService {
                 nextAction: col(10),
                 notes: col(11)
             )
+        }
+    }
+
+    /// Write one cell of the Tracker — the write-back half of the wire.
+    /// Data row 0 lives on sheet row 2 (row 1 is the header).
+    func updateLandedCell(sheetID: String, dataRow: Int, column: String, value: String) async throws {
+        let token = try await validToken()
+        let range = "Tracker!\(column)\(dataRow + 2)"
+        var components = URLComponents(
+            string: "https://sheets.googleapis.com/v4/spreadsheets/\(sheetID)/values/\(range)")!
+        components.queryItems = [URLQueryItem(name: "valueInputOption", value: "USER_ENTERED")]
+        var request = URLRequest(url: components.url!, timeoutInterval: 20)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["values": [[value]]])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            struct GoogleError: Decodable {
+                struct Inner: Decodable { let message: String? }
+                let error: Inner?
+            }
+            let message = (try? JSONDecoder().decode(GoogleError.self, from: data))?.error?.message ?? ""
+            throw LandedFetchError(status: http.statusCode, message: message)
         }
     }
 
