@@ -1145,6 +1145,12 @@ final class AppState {
         } catch let error as LandedFetchError {
             landedStatus = degrade(landedStatus)
             landedError = error.readable
+        } catch let error as URLError where error.code == .cancelled {
+            // A dismissed pull-to-refresh cancels in-flight requests;
+            // that's not a failure worth wearing. Try again quietly.
+            if landedRoles.isEmpty { landedStatus = .checking }
+        } catch is CancellationError {
+            if landedRoles.isEmpty { landedStatus = .checking }
         } catch {
             landedStatus = degrade(landedStatus)
             landedError = error.localizedDescription

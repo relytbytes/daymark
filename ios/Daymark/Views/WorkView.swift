@@ -85,10 +85,15 @@ struct WorkView: View {
                 .padding(.bottom, 4)
 
                 if app.landedRoles.isEmpty {
-                    EmptyNote(text: app.landedError
-                              ?? (app.landedStatus == .unavailable
-                                  ? "Could not reach the Landed sheet — check that this Google account can open it."
-                                  : "Reading the pipeline from Landed…"))
+                    VStack(alignment: .leading, spacing: 8) {
+                        EmptyNote(text: app.landedError
+                                  ?? (app.landedStatus == .unavailable
+                                      ? "Could not reach the Landed sheet — check that this Google account can open it."
+                                      : "Reading the pipeline from Landed…"))
+                        DeskAction(label: "Retry the wire", systemImage: "arrow.clockwise") {
+                            Task { await app.refreshLanded() }
+                        }
+                    }
                 } else {
                     Text("\(app.landedRoles.count) open roles · \(app.landedFocusQueue.count) worth attention today")
                         .font(DS.label(11, weight: .semibold))
