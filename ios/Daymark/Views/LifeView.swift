@@ -37,8 +37,8 @@ struct LifeView: View {
                 }
             }
 
-            weatherFeature.id("life-weather")
-            hourlyStrip
+            homeDesk
+            hourlyStrip.id("life-weather")
             SkySectionsView().id("life-sky")
             trainingDesk
             aroundTown.id("life-durham")
@@ -60,56 +60,59 @@ struct LifeView: View {
             ThermostatSheet()
                 .presentationDetents([.medium, .large])
         }
+        .onChange(of: app.thermostatRequested) { _, requested in
+            if requested {
+                showThermostat = true
+                app.thermostatRequested = false
+            }
+        }
     }
 
-    // MARK: Weather feature
+    // MARK: The Home Desk (Nest, in its own quarters)
 
-    private var weatherFeature: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("WEATHER").kickerStyle(Palette.coral, size: 9, tracking: 1.4)
-                Spacer()
-                AgeStamp(status: app.weatherStatus)
-            }
-            .padding(.bottom, 6)
+    @ViewBuilder
+    private var homeDesk: some View {
+        if let nest = app.nestReading {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("THE HOME DESK").kickerStyle(Palette.coral, size: 9, tracking: 1.4)
+                    Spacer()
+                    Text(nest.roomName.uppercased())
+                        .kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                }
+                .padding(.bottom, 8)
 
-            if let weather = app.weather {
-                VStack {
-                    HStack(alignment: .bottom, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("\(weather.tempF)°")
-                                .font(DS.display(56))
+                Button {
+                    showThermostat = true
+                } label: {
+                    HStack(alignment: .center, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("\(nest.indoorF)°")
+                                .font(DS.display(40))
                                 .foregroundStyle(Palette.ink)
-                            Text("\(weather.description)\(abs(weather.feels - weather.tempF) >= 3 ? " · feels \(weather.feels)°" : "")")
-                                .font(DS.label(12, weight: .semibold))
-                                .foregroundStyle(Color(hex: 0x4A4940))
+                            Text(nest.hvacActive
+                                 ? "\(nest.mode.capitalized) running"
+                                 : (nest.mode == "OFF" ? "System off" : "\(nest.mode.capitalized) · idle"))
+                                .font(DS.label(11, weight: .semibold))
+                                .foregroundStyle(nest.hvacActive ? Palette.coral : Palette.muted)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
-                            if let nest = app.nestReading {
-                                // Tap the indoor line for the thermostat sheet.
-                                Button {
-                                    showThermostat = true
-                                } label: {
-                                    detailLine("Indoor \(nest.indoorF)°\(nest.hvacActive ? " · running" : "") ⌄")
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            detailLine("H \(weather.high) · L \(weather.low)")
-                            detailLine("Rain \(weather.rainPct)%")
-                            detailLine("Sunset \(weather.sunset.clockText())")
+                            if let setpoint = nest.setpointF { detailLine("Set to \(setpoint)°") }
+                            if let humidity = nest.humidity { detailLine("\(humidity)% humidity") }
+                            detailLine(nest.fanRunning ? "Fan on" : "Fan auto")
                         }
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Palette.subtle)
                     }
+                    .contentShape(Rectangle())
                 }
-                .padding(.bottom, 14)
-            } else {
-                EmptyNote(text: app.weatherStatus == .unavailable
-                          ? "Could not reach the weather source. It will retry quietly."
-                          : "Checking Durham weather…")
+                .buttonStyle(.plain)
+                .editorialPanel(padding: 14)
             }
-            Hairline()
+            .padding(.top, 22)
         }
-        .padding(.top, 22)
     }
 
     // MARK: Training desk (live from Cadence's app group)

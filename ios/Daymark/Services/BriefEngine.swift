@@ -194,7 +194,14 @@ extension AppState {
     func glanceLife() -> [GlanceCellModel] {
         [
             weatherCell(),
-            nowCell(),
+            nestReading.map { nest in
+                GlanceCellModel(
+                    id: "indoor", label: "Indoor",
+                    value: "\(nest.indoorF)°",
+                    sub: nest.hvacActive ? "running" : (nest.setpointF.map { "set \($0)°" } ?? "idle"),
+                    onTap: { [weak self] in self?.thermostatRequested = true }
+                )
+            } ?? nowCell(),
             GlanceCellModel(
                 id: "sunset", label: "Sunset",
                 value: weather.map { $0.sunset.clockText() } ?? "—", sub: "Durham"
