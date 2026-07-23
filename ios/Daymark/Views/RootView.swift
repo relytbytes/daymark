@@ -153,7 +153,7 @@ struct SectionPage<Content: View>: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     MastheadTopline(
                         tag: tag,
                         refreshing: app.isRefreshing,
@@ -162,14 +162,19 @@ struct SectionPage<Content: View>: View {
                     )
                     .padding(.bottom, index.isEmpty ? 14 : 8)
 
-                    if !index.isEmpty {
-                        indexRow(proxy)
-                            .padding(.bottom, 8)
+                    if index.isEmpty {
+                        content
+                        footer
+                    } else {
+                        // The index pins to the top while the page scrolls,
+                        // so any desk is one tap away from anywhere.
+                        Section {
+                            content
+                            footer
+                        } header: {
+                            indexRow(proxy)
+                        }
                     }
-
-                    content
-
-                    footer
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 8)
@@ -184,7 +189,7 @@ struct SectionPage<Content: View>: View {
     /// The section index: one tap jumps a long page to its desks.
     private func indexRow(_ proxy: ScrollViewProxy) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
+            HStack(spacing: 8) {
                 ForEach(index, id: \.anchor) { item in
                     Button {
                         withAnimation(.snappy(duration: 0.35)) {
@@ -192,15 +197,21 @@ struct SectionPage<Content: View>: View {
                         }
                     } label: {
                         Text(item.label.uppercased())
-                            .font(.system(size: 8.5, weight: .heavy)).tracking(0.9)
+                            .font(.system(size: 11, weight: .heavy)).tracking(1.0)
                             .foregroundStyle(Palette.ink)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .padding(.horizontal, 14).padding(.vertical, 9)
                             .background(Capsule().fill(Palette.wash))
                             .overlay(Capsule().stroke(Palette.line, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.vertical, 9)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.paper)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Palette.hairlineSoft).frame(height: 1)
         }
     }
 
