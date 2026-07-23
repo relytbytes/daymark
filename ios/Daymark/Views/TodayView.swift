@@ -40,6 +40,7 @@ struct TodayView: View {
                 }
             }
 
+            alertBanner
             spokenRow
             leadSection(phase: phase)
             focusBulletin
@@ -247,6 +248,13 @@ struct TodayView: View {
         .padding(.top, 26)
     }
 
+    private var journalBinding: Binding<String> {
+        Binding(
+            get: { app.persisted.journal[Date().dayKey] ?? "" },
+            set: { app.persisted.journal[Date().dayKey] = $0.nilIfEmpty ?? nil }
+        )
+    }
+
     private func taskNoteBinding(_ id: String) -> Binding<String> {
         Binding(
             get: { app.persisted.taskNotes[id] ?? "" },
@@ -380,6 +388,40 @@ struct TodayView: View {
         let hours = minutes / 60
         let rest = minutes % 60
         return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
+    }
+
+    // MARK: Weather alerts (NWS)
+
+    @ViewBuilder
+    private var alertBanner: some View {
+        ForEach(app.weatherAlerts) { alert in
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(alert.isUrgent ? Palette.coral : Palette.gold)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(alert.event.uppercased())
+                        .kickerStyle(alert.isUrgent ? Palette.coral : Palette.gold,
+                                     size: 9, tracking: 1.2)
+                    Text(alert.headline)
+                        .font(DS.label(11.5, weight: .medium))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(3)
+                    if let ends = alert.ends {
+                        Text("Until \(ends.timeText())")
+                            .font(DS.label(10, weight: .semibold))
+                            .foregroundStyle(Palette.subtle)
+                    }
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background((alert.isUrgent ? Palette.coralSoft : Palette.wash))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12)
+                .stroke(alert.isUrgent ? Palette.coral.opacity(0.4) : Palette.line, lineWidth: 1))
+            .padding(.top, 12)
+        }
     }
 
     // MARK: The Spoken Edition
@@ -792,6 +834,22 @@ struct TodayView: View {
                     Text("essentials landed · \(review.capturesCleared) loops cleared")
                         .font(DS.label(12, weight: .semibold))
                         .foregroundStyle(Palette.muted)
+                }
+
+                // One line for the record — the part only you can write.
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("FOR THE RECORD").kickerStyle(Palette.subtle, size: 8, tracking: 1.2)
+                    TextField("One line about today…", text: journalBinding, axis: .vertical)
+                        .font(DS.deck(14))
+                        .lineLimit(1...3)
+                        .padding(10)
+                        .background(Palette.wash)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    if let lastWeek = app.persisted.journal[Date().addingDays(-7).dayKey]?.nilIfEmpty {
+                        Text("A week ago tonight: \u{201C}\(lastWeek)\u{201D}")
+                            .font(DS.deck(12))
+                            .foregroundStyle(Palette.subtle)
+                    }
                 }
 
                 VStack(spacing: 7) {
