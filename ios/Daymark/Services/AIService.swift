@@ -374,13 +374,13 @@ enum AIDesk {
         )
     }
 
-    /// The Garden Desk's watering plan: species + conditions in, a
+    /// The Garden Bench's watering plan: species + conditions in, a
     /// cadence and care notes out. The first line MUST be machine-readable.
     static func wateringPlan(profile: String) async throws -> String {
         try await AIService.complete(
             system: voice,
             user: """
-            A plant on Ty's Garden Desk, in Durham, North Carolina (hot humid \
+            A plant on Ty's Garden Bench, in Durham, North Carolina (hot humid \
             summers, mild winters):
 
             \(profile)

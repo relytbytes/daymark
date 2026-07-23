@@ -369,7 +369,7 @@ final class AppState {
     private func syncGameActivity(_ game: GameInfo?) {}
     #endif
 
-    // MARK: The Garden Desk
+    // MARK: The Garden Bench
 
     func waterPlant(_ id: UUID) {
         guard let index = persisted.plants.firstIndex(where: { $0.id == id }) else { return }
