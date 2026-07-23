@@ -10,6 +10,7 @@
 
 import WidgetKit
 import SwiftUI
+import AppIntents
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
@@ -968,6 +969,7 @@ struct FocusActivityWidget: Widget {
 struct DaymarkWidgetBundle: WidgetBundle {
     var body: some Widget {
         AtAGlanceWidget()
+        EssentialsWidget()
         #if canImport(ActivityKit)
         FocusActivityWidget()
         GameActivityWidget()
@@ -1036,3 +1038,111 @@ struct GameActivityWidget: Widget {
     }
 }
 #endif
+
+
+// MARK: - The Essentials: check the three off from the home screen
+
+struct EssentialsEntry: TimelineEntry {
+    let date: Date
+    let essentials: [WidgetSnapshot.Essential]
+}
+
+struct EssentialsProvider: TimelineProvider {
+    static let placeholderTasks: [WidgetSnapshot.Essential] = [
+        .init(id: "m-jobs", kicker: "JOB SEARCH", title: "Move one application forward", done: true),
+        .init(id: "m-veraya", kicker: "VERAYA", title: "Advance the current milestone", done: false),
+        .init(id: "m-practical", kicker: "PRACTICAL", title: "Clear one captured loose end", done: false),
+    ]
+
+    func placeholder(in context: Context) -> EssentialsEntry {
+        EssentialsEntry(date: Date(), essentials: Self.placeholderTasks)
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (EssentialsEntry) -> Void) {
+        completion(EssentialsEntry(date: Date(),
+                                   essentials: WidgetSnapshot.read()?.essentials ?? Self.placeholderTasks))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<EssentialsEntry>) -> Void) {
+        let entry = EssentialsEntry(date: Date(),
+                                    essentials: WidgetSnapshot.read()?.essentials ?? [])
+        completion(Timeline(entries: [entry],
+                            policy: .after(Date().addingTimeInterval(30 * 60))))
+    }
+}
+
+struct EssentialsWidgetView: View {
+    let entry: EssentialsEntry
+    private let pal = WScheme.dark
+
+    private var remaining: Int { entry.essentials.filter { !$0.done }.count }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("THE ESSENTIAL THREE")
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(1.4)
+                    .foregroundStyle(pal.red)
+                Spacer()
+                Text(remaining == 0 ? "ALL CLEAR" : "\(remaining) OPEN")
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(1)
+                    .foregroundStyle(remaining == 0 ? pal.up : pal.muted)
+            }
+            .padding(.bottom, 2)
+
+            if entry.essentials.isEmpty {
+                Spacer()
+                Text("Open Daymark once to set today's slate.")
+                    .font(.system(size: 12, weight: .medium, design: .serif))
+                    .foregroundStyle(pal.muted)
+                Spacer()
+            } else {
+                ForEach(entry.essentials) { task in
+                    if task.id != entry.essentials.first?.id {
+                        Rectangle().fill(pal.line).frame(height: 0.5)
+                    }
+                    Button(intent: ToggleEssentialIntent(taskID: task.id)) {
+                        HStack(spacing: 9) {
+                            Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(task.done ? pal.up : pal.subtle)
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(task.kicker.uppercased())
+                                    .font(.system(size: 7.5, weight: .heavy))
+                                    .tracking(1)
+                                    .foregroundStyle(pal.subtle)
+                                Text(task.title)
+                                    .font(.system(size: 12.5, weight: .semibold, design: .serif))
+                                    .foregroundStyle(pal.ink)
+                                    .strikethrough(task.done, color: pal.subtle)
+                                    .opacity(task.done ? 0.45 : 1)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                        .frame(maxHeight: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(14)
+        .containerBackground(pal.paper, for: .widget)
+    }
+}
+
+struct EssentialsWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "DaymarkEssentials", provider: EssentialsProvider()) { entry in
+            EssentialsWidgetView(entry: entry)
+        }
+        .configurationDisplayName("The Essential Three")
+        .description("Today's three anchor tasks, checkable from the home screen.")
+        .contentMarginsDisabled()
+        .supportedFamilies([.systemMedium])
+    }
+}

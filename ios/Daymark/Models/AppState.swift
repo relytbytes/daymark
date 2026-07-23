@@ -154,7 +154,11 @@ final class AppState {
             nextEventTitle: next?.title,
             nextEventTime: next?.start,
             focusTitle: focusRunning ? focusTaskTitle : nil,
-            events: Array((today + tomorrow).prefix(8))
+            events: Array((today + tomorrow).prefix(8)),
+            essentials: essentialsForNow.map {
+                WidgetSnapshot.Essential(id: $0.id, kicker: $0.kicker,
+                                         title: $0.title, done: essentialDone($0.id))
+            }
         ))
         // Nudge the widgets whenever the app has fresher data than they
         // do — app-initiated reloads don't count against their budget.
@@ -876,6 +880,27 @@ final class AppState {
     }
 
     var essentialsForNow: [EssentialTask] { EssentialTask.forPhase(DayPhase.current()) }
+
+    /// File anything queued from the share sheet into the right desk.
+    func absorbSharedCaptures() {
+        for item in SharedCaptures.drain() {
+            addCapture(kind: CaptureKind(rawValue: item.kind) ?? .task,
+                       title: item.title, url: item.url, note: item.note)
+        }
+    }
+
+    /// Apply check-offs made from the home-screen widget while the
+    /// app was closed, then republish so both sides agree.
+    func absorbWidgetActions() {
+        let queued = WidgetActions.drain()
+        guard !queued.isEmpty else { return }
+        for (id, done) in queued {
+            persisted.tasks[id] = done
+            if persisted.focusTaskID == id, done {
+                persisted.focusTaskID = nil
+            }
+        }
+    }
 
     var essentialsRemaining: Int {
         essentialsForNow.filter { !essentialDone($0.id) }.count
