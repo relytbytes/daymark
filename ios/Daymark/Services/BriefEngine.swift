@@ -151,7 +151,7 @@ extension AppState {
 
     func glanceToday() -> [GlanceCellModel] {
         [
-            weatherCell(),
+            weatherCell(tapsToSky: true),
             // Indoor takes the second cell when Nest is reporting; the
             // clock lives in the status bar and the masthead already.
             nestReading.map { nest in
@@ -175,7 +175,8 @@ extension AppState {
             ),
             GlanceCellModel(
                 id: "open", label: "Open",
-                value: String(openLoops), sub: "loops", accent: true
+                value: String(openLoops), sub: "loops", accent: true,
+                onTap: { [weak self] in self?.pendingAnchor = "today-inbox" }
             ),
         ]
     }
@@ -228,12 +229,13 @@ extension AppState {
         ]
     }
 
-    private func weatherCell() -> GlanceCellModel {
+    private func weatherCell(tapsToSky: Bool = false) -> GlanceCellModel {
         GlanceCellModel(
             id: "weather", label: "Weather",
             value: weather.map { "\($0.tempF)°" } ?? "—",
             sub: weather?.description ?? "Durham",
-            symbol: weather?.symbol ?? "sun.max.fill"
+            symbol: weather?.symbol ?? "sun.max.fill",
+            onTap: tapsToSky ? { [weak self] in self?.navigate(tab: "life", anchor: "life-sky") } : nil
         )
     }
 

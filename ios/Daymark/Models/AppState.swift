@@ -688,6 +688,16 @@ final class AppState {
     /// The Indoor glance cell asks Today to present the thermostat.
     var thermostatRequested = false
 
+    /// Glance cells can steer navigation: a tab to switch to and an
+    /// optional section anchor for the page to scroll to.
+    var requestedTab: String?
+    var pendingAnchor: String?
+
+    func navigate(tab: String, anchor: String? = nil) {
+        requestedTab = tab
+        pendingAnchor = anchor
+    }
+
     // MARK: Toast
 
     func toast(_ message: String) {

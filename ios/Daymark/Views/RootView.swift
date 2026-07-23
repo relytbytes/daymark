@@ -52,6 +52,12 @@ struct RootView: View {
                 app.captureRequested = false
             }
         }
+        .onChange(of: app.requestedTab) { _, tab in
+            if let tab, let destination = AppSection(rawValue: tab) {
+                section = destination
+                app.requestedTab = nil
+            }
+        }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .overlay(alignment: .bottom) { toast }
         .task {
@@ -189,6 +195,24 @@ struct SectionPage<Content: View>: View {
             .scrollIndicators(.hidden)
             .refreshable { await app.refreshAll(force: true) }
             .background(Palette.paper)
+            .onChange(of: app.pendingAnchor) { _, anchor in
+                consumeAnchor(anchor, proxy: proxy)
+            }
+            .onAppear {
+                consumeAnchor(app.pendingAnchor, proxy: proxy)
+            }
+        }
+    }
+
+    /// Cross-tab deep links land here: scroll to the requested anchor
+    /// once the page is on screen, then clear the request.
+    private func consumeAnchor(_ anchor: String?, proxy: ScrollViewProxy) {
+        guard let anchor else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            withAnimation(.snappy(duration: 0.35)) {
+                proxy.scrollTo(anchor, anchor: .top)
+            }
+            app.pendingAnchor = nil
         }
     }
 

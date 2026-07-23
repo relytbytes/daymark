@@ -50,7 +50,7 @@ struct TodayView: View {
             mailSection
             aiTriageSection
             waitingSection
-            inboxSection
+            inboxSection.id("today-inbox")
             if app.weekReviewWindowOpen || !app.persisted.weekReview.isEmpty && app.persisted.weekReviewKey == Date().weekKey {
                 weekReviewSection
             }
