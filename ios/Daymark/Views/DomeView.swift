@@ -12,6 +12,7 @@
 
 import SwiftUI
 import CoreLocation
+import CoreMotion
 
 // MARK: - Bundled catalog
 
@@ -75,9 +76,35 @@ final class CompassManager: NSObject, CLLocationManagerDelegate {
     }
 }
 
+/// Device tilt for the sky-window mode — gravity alone gives the
+/// altitude the back of the phone points at; no permission needed.
+@Observable
+final class TiltManager {
+    private let manager = CMMotionManager()
+    var pointingAltitude: Double = 0
+
+    func start() {
+        guard manager.isDeviceMotionAvailable else { return }
+        manager.deviceMotionUpdateInterval = 1.0 / 30.0
+        manager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+            guard let self, let g = motion?.gravity else { return }
+            // The viewing direction is out the back of the phone (-z).
+            // Its angle above the horizon comes straight from gravity.
+            let cosine = max(-1, min(1, -g.z))
+            self.pointingAltitude = acos(cosine) * 180 / .pi - 90
+        }
+    }
+
+    func stop() {
+        manager.stopDeviceMotionUpdates()
+    }
+}
+
 struct DomeView: View {
     @State private var compass = CompassManager()
     @State private var compassOn = true
+    @State private var tilt = TiltManager()
+    @State private var arOn = false
     @State private var zoom: CGFloat = 1
     @State private var steadyZoom: CGFloat = 1
     @State private var pan: CGSize = .zero
@@ -99,33 +126,80 @@ struct DomeView: View {
                 .contentShape(Rectangle())
                 .gesture(domeGestures(size: size, date: context.date))
                 .overlay(alignment: .topTrailing) {
-                    Button {
-                        compassOn.toggle()
-                        if compassOn { compass.start() } else { compass.stop() }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: compassOn ? "location.north.circle.fill" : "location.north.circle")
-                                .font(.system(size: 12))
-                            Text(compassOn ? "FACING" : "COMPASS")
-                                .font(.system(size: 8, weight: .heavy)).tracking(0.8)
+                    HStack(spacing: 6) {
+                        Button {
+                            arOn.toggle()
+                            if arOn {
+                                tilt.start()
+                                if !compassOn { compassOn = true; compass.start() }
+                            } else {
+                                tilt.stop()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: arOn ? "arkit" : "viewfinder")
+                                    .font(.system(size: 12))
+                                Text("SKY WINDOW")
+                                    .font(.system(size: 8, weight: .heavy)).tracking(0.8)
+                            }
+                            .foregroundStyle(arOn ? Palette.coral
+                                             : Color(red: 0.86, green: 0.89, blue: 0.96).opacity(0.8))
+                            .padding(.horizontal, 9).padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.35)))
                         }
-                        .foregroundStyle(compassOn ? Palette.coral
-                                         : Color(red: 0.86, green: 0.89, blue: 0.96).opacity(0.8))
-                        .padding(.horizontal, 9).padding(.vertical, 6)
-                        .background(Capsule().fill(Color.black.opacity(0.35)))
+                        .buttonStyle(.plain)
+
+                        Button {
+                            compassOn.toggle()
+                            if compassOn { compass.start() } else { compass.stop() }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: compassOn ? "location.north.circle.fill" : "location.north.circle")
+                                    .font(.system(size: 12))
+                                Text(compassOn ? "FACING" : "COMPASS")
+                                    .font(.system(size: 8, weight: .heavy)).tracking(0.8)
+                            }
+                            .foregroundStyle(compassOn ? Palette.coral
+                                             : Color(red: 0.86, green: 0.89, blue: 0.96).opacity(0.8))
+                            .padding(.horizontal, 9).padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.35)))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(arOn)
+                        .opacity(arOn ? 0.4 : 1)
                     }
-                    .buttonStyle(.plain)
                     .padding(8)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    if arOn {
+                        Text("POINTING \(cardinal(compass.heading)) · \(Int(tilt.pointingAltitude.rounded()))°")
+                            .font(.system(size: 8.5, weight: .heavy)).tracking(0.8)
+                            .foregroundStyle(Palette.coral)
+                            .padding(.horizontal, 9).padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.35)))
+                            .padding(8)
+                    }
                 }
             }
             .aspectRatio(1, contentMode: .fit)
         }
-        .onAppear { if compassOn { compass.start() } }
-        .onDisappear { compass.stop() }
+        .onAppear {
+            if compassOn { compass.start() }
+            if arOn { tilt.start() }
+        }
+        .onDisappear {
+            compass.stop()
+            tilt.stop()
+        }
     }
 
     /// When the compass is on, the direction you face points up.
     private var headingOffset: Double { compassOn ? compass.heading : 0 }
+
+    private func cardinal(_ az: Double) -> String {
+        let names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        return names[Int(((az + 22.5).truncatingRemainder(dividingBy: 360)) / 45)]
+    }
 
     // MARK: Projection
 
@@ -140,9 +214,61 @@ struct DomeView: View {
         let h = Astronomy.horizontal(ra: ra, dec: dec, date: date,
                                      latitude: AppConfig.homeLatitude, longitude: AppConfig.homeLongitude)
         guard h.alt > -1 else { return nil }
-        let r = radius * CGFloat((90 - h.alt) / 90)
-        let azRad = (h.az - headingOffset) * .pi / 180
+        return plotHorizontal(az: h.az, alt: h.alt, radius: radius, center: center)
+    }
+
+    private func plotHorizontal(az: Double, alt: Double, radius: CGFloat, center: CGPoint) -> CGPoint {
+        let r = radius * CGFloat((90 - alt) / 90)
+        let azRad = (az - headingOffset) * .pi / 180
         return CGPoint(x: center.x + r * CGFloat(sin(azRad)), y: center.y - r * CGFloat(cos(azRad)))
+    }
+
+    // MARK: The sky window (AR mode): a gnomonic view where the phone points
+
+    /// Unit vector for a horizontal direction — x east, y north, z up.
+    private func unitVector(az: Double, alt: Double) -> (x: Double, y: Double, z: Double) {
+        let azR = az * .pi / 180, altR = alt * .pi / 180
+        return (sin(azR) * cos(altR), cos(azR) * cos(altR), sin(altR))
+    }
+
+    /// Screen position for a horizontal direction through the window,
+    /// or nil when it's behind the viewer.
+    private func windowPoint(az: Double, alt: Double, size: CGSize) -> CGPoint? {
+        let centerAlt = max(-25, min(89, tilt.pointingAltitude))
+        let forward = unitVector(az: compass.heading, alt: centerAlt)
+        // Camera basis: right stays level, up completes the frame.
+        var right = (x: forward.y, y: -forward.x, z: 0.0)
+        let rightNorm = max(1e-6, sqrt(right.x * right.x + right.y * right.y))
+        right = (right.x / rightNorm, right.y / rightNorm, 0)
+        let up = (x: right.y * forward.z - right.z * forward.y,
+                  y: right.z * forward.x - right.x * forward.z,
+                  z: right.x * forward.y - right.y * forward.x)
+
+        let v = unitVector(az: az, alt: alt)
+        let depth = v.x * forward.x + v.y * forward.y + v.z * forward.z
+        guard depth > 0.2 else { return nil }    // outside a ~78° half-window
+        let fov = (65.0 / zoom) * .pi / 180
+        let focal = Double(min(size.width, size.height) / 2) / tan(fov / 2)
+        let px = (v.x * right.x + v.y * right.y + v.z * right.z) / depth * focal
+        let py = (v.x * up.x + v.y * up.y + v.z * up.z) / depth * focal
+        return CGPoint(x: size.width / 2 + px, y: size.height / 2 - py)
+    }
+
+    /// The active projector for the current mode.
+    private func plotter(date: Date, size: CGSize) -> (Double, Double) -> CGPoint? {
+        if arOn {
+            return { ra, dec in
+                let h = Astronomy.horizontal(ra: ra, dec: dec, date: date,
+                                             latitude: AppConfig.homeLatitude,
+                                             longitude: AppConfig.homeLongitude)
+                guard h.alt > -6 else { return nil }
+                return self.windowPoint(az: h.az, alt: h.alt, size: size)
+            }
+        }
+        let (radius, center) = projection(size: size)
+        return { ra, dec in
+            self.project(ra: ra, dec: dec, date: date, radius: radius, center: center)
+        }
     }
 
     private func starColor(_ bv: Double) -> Color {
@@ -160,16 +286,20 @@ struct DomeView: View {
     private func draw(canvas: inout GraphicsContext, size: CGSize, date: Date) {
         let (radius, center) = projection(size: size)
         let domeRect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+        let plot = plotter(date: date, size: size)
+        let breakDistance = arOn ? min(size.width, size.height) * 0.7 : radius * 0.7
 
-        canvas.clip(to: Path(ellipseIn: domeRect))
+        if !arOn {
+            canvas.clip(to: Path(ellipseIn: domeRect))
+        }
 
         // Constellation lines
         for segment in SkyCatalog.shared.lines {
             var previous: CGPoint?
             for point in segment {
                 guard point.count >= 2 else { continue }
-                let q = project(ra: point[0], dec: point[1], date: date, radius: radius, center: center)
-                if let q, let p = previous, hypot(q.x - p.x, q.y - p.y) < radius * 0.7 {
+                let q = plot(point[0], point[1])
+                if let q, let p = previous, hypot(q.x - p.x, q.y - p.y) < breakDistance {
                     var path = Path()
                     path.move(to: p)
                     path.addLine(to: q)
@@ -181,7 +311,7 @@ struct DomeView: View {
 
         // Stars
         for star in SkyCatalog.shared.stars {
-            guard let q = project(ra: star.ra, dec: star.dec, date: date, radius: radius, center: center) else { continue }
+            guard let q = plot(star.ra, star.dec) else { continue }
             let dot = max(0.5, (5.4 - star.mag) * 0.62) * sqrt(zoom)
             canvas.fill(
                 Path(ellipseIn: CGRect(x: q.x - dot / 2, y: q.y - dot / 2, width: dot, height: dot)),
@@ -198,7 +328,7 @@ struct DomeView: View {
 
         // Sun, moon, planets
         for body in Astronomy.chartBodies(date: date) {
-            guard let q = project(ra: body.ra, dec: body.dec, date: date, radius: radius, center: center) else { continue }
+            guard let q = plot(body.ra, body.dec) else { continue }
             let (dot, color): (CGFloat, Color) = switch body.kind {
             case .sun: (14 * sqrt(zoom), Color(red: 1.0, green: 0.84, blue: 0.37))
             case .moon: (12 * sqrt(zoom), Color(red: 0.91, green: 0.93, blue: 0.96))
@@ -231,21 +361,45 @@ struct DomeView: View {
             )
         }
 
-        // Horizon ring + cardinals (drawn unclipped-ish: ring sits at radius)
-        var horizon = Path()
-        horizon.addEllipse(in: domeRect)
-        canvas.stroke(horizon, with: .color(Color(red: 0.78, green: 0.82, blue: 0.9).opacity(0.5)), lineWidth: 1.2)
-        for (label, az) in [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)] {
-            let rad = (az - headingOffset) * .pi / 180
-            let point = CGPoint(
-                x: center.x + (radius - 12) * CGFloat(sin(rad)),
-                y: center.y - (radius - 12) * CGFloat(cos(rad))
-            )
-            canvas.draw(
-                Text(label).font(.system(size: 10, weight: .heavy)).foregroundStyle(Color(red: 0.86, green: 0.89, blue: 0.96).opacity(0.85)),
-                at: point,
-                anchor: .center
-            )
+        if arOn {
+            // The horizon as a line across the window, cardinals sitting on it.
+            var horizon = Path()
+            var previous: CGPoint?
+            for step in stride(from: 0.0, through: 360.0, by: 2.0) {
+                let q = windowPoint(az: step, alt: 0, size: size)
+                if let q, let p = previous, hypot(q.x - p.x, q.y - p.y) < breakDistance {
+                    horizon.move(to: p)
+                    horizon.addLine(to: q)
+                }
+                previous = q
+            }
+            canvas.stroke(horizon, with: .color(Color(red: 0.78, green: 0.82, blue: 0.9).opacity(0.5)), lineWidth: 1.2)
+            for (label, az) in [("N", 0.0), ("NE", 45.0), ("E", 90.0), ("SE", 135.0),
+                                ("S", 180.0), ("SW", 225.0), ("W", 270.0), ("NW", 315.0)] {
+                guard let point = windowPoint(az: az, alt: 2.5, size: size) else { continue }
+                canvas.draw(
+                    Text(label).font(.system(size: 10, weight: .heavy)).foregroundStyle(Color(red: 0.86, green: 0.89, blue: 0.96).opacity(0.85)),
+                    at: point,
+                    anchor: .center
+                )
+            }
+        } else {
+            // Horizon ring + cardinals (drawn unclipped-ish: ring sits at radius)
+            var horizon = Path()
+            horizon.addEllipse(in: domeRect)
+            canvas.stroke(horizon, with: .color(Color(red: 0.78, green: 0.82, blue: 0.9).opacity(0.5)), lineWidth: 1.2)
+            for (label, az) in [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)] {
+                let rad = (az - headingOffset) * .pi / 180
+                let point = CGPoint(
+                    x: center.x + (radius - 12) * CGFloat(sin(rad)),
+                    y: center.y - (radius - 12) * CGFloat(cos(rad))
+                )
+                canvas.draw(
+                    Text(label).font(.system(size: 10, weight: .heavy)).foregroundStyle(Color(red: 0.86, green: 0.89, blue: 0.96).opacity(0.85)),
+                    at: point,
+                    anchor: .center
+                )
+            }
         }
     }
 
@@ -284,12 +438,12 @@ struct DomeView: View {
     }
 
     private func selectStar(at location: CGPoint, size: CGSize, date: Date) {
-        let (radius, center) = projection(size: size)
+        let plot = plotter(date: date, size: size)
         var best: (name: String, mag: Double, point: CGPoint)?
         var bestDistance: CGFloat = 18
         for star in SkyCatalog.shared.stars {
             guard let name = star.name,
-                  let q = project(ra: star.ra, dec: star.dec, date: date, radius: radius, center: center)
+                  let q = plot(star.ra, star.dec)
             else { continue }
             let distance = hypot(q.x - location.x, q.y - location.y)
             if distance < bestDistance {
