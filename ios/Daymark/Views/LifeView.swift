@@ -22,7 +22,6 @@ struct LifeView: View {
         SectionPage(tag: "Section C · Durham", showSettings: $showSettings, index: [
             (label: "Weather", anchor: "life-weather"),
             (label: "Sky", anchor: "life-sky"),
-            (label: "Training", anchor: "life-training"),
             (label: "Durham", anchor: "life-durham"),
             (label: "Spirit", anchor: "life-spirit"),
         ]) {
@@ -41,7 +40,7 @@ struct LifeView: View {
             weatherFeature.id("life-weather")
             hourlyStrip
             SkySectionsView().id("life-sky")
-            trainingDesk.id("life-training")
+            trainingDesk
             aroundTown.id("life-durham")
             bullsSection
             remindersSection
