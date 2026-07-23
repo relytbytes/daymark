@@ -470,16 +470,19 @@ body:not([data-view="today"]) .view-intro {
 
 body[data-view="today"] [data-view-section]:not([data-view-section~="today"]),
 body[data-view="work"] [data-view-section]:not([data-view-section~="work"]),
+body[data-view="sky"] [data-view-section]:not([data-view-section~="sky"]),
 body[data-view="life"] [data-view-section]:not([data-view-section~="life"]),
 body[data-view="more"] [data-view-section]:not([data-view-section~="more"]) {
   display: none !important;
 }
 
+body[data-view="sky"] .primary-column,
 body[data-view="life"] .primary-column,
 body[data-view="more"] .primary-column {
   display: none;
 }
 
+body[data-view="sky"] .content-grid,
 body[data-view="life"] .content-grid,
 body[data-view="more"] .content-grid {
   display: block;
@@ -488,6 +491,7 @@ body[data-view="more"] .content-grid {
   margin-left: auto;
 }
 
+body[data-view="sky"] .view-intro,
 body[data-view="life"] .view-intro,
 body[data-view="more"] .view-intro {
   margin-right: auto;
@@ -5038,3 +5042,177 @@ body[data-phase="night"] #eveningActions {
 .desk-diagnostics b { color: var(--ink); }
 .desk-diagnostics .ok { color: var(--green); font-weight: 700; }
 .desk-diagnostics .bad { color: var(--down); font-weight: 700; }
+
+
+/* --- The Sky tab: the desk rendered inline --- */
+
+.sky-inline .sky-dome {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+/* --- The Garden Desk --- */
+
+.garden-due-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.garden-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.garden-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.garden-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.garden-leaf {
+  font-size: 15px;
+  color: var(--up, #0f9f6e);
+}
+
+.garden-row.is-due .garden-leaf,
+.garden-row.is-due small {
+  color: var(--coral);
+}
+
+.garden-row-main {
+  display: grid;
+  flex: 1;
+  gap: 1px;
+}
+
+.garden-row-main strong {
+  font-size: 13.5px;
+}
+
+.garden-row-main small {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.garden-water {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--wash);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.garden-remove {
+  padding: 4px 7px;
+  border: 0;
+  background: transparent;
+  color: var(--subtle);
+  font-size: 11px;
+}
+
+.garden-form {
+  display: flex;
+  gap: 8px;
+}
+
+.garden-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.garden-form select {
+  padding: 9px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.garden-form button {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--coral);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* --- For the record --- */
+
+.journal-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--serif, Georgia, serif);
+  font-size: 14px;
+}
+
+.journal-echo {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* --- Severe weather banner --- */
+
+.alert-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--gold, #b8860b);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.alert-banner.is-urgent {
+  border-left-color: var(--coral);
+}
+
+.alert-banner strong {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.alert-banner.is-urgent strong {
+  color: var(--coral);
+}
+
+.alert-banner span {
+  color: var(--muted);
+  font-size: 12px;
+}
