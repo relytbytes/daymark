@@ -100,6 +100,8 @@ final class AppState {
     private var lastNestPoll = Date.distantPast
     var readiness: HealthService.Readiness?
     var weatherAlerts: [WeatherAlert] = []
+    var issPasses: [ISSPass] = []
+    private var lastISSFetch = Date.distantPast
 
     // MARK: Init
 
@@ -270,6 +272,13 @@ final class AppState {
         }
         // Sky math is local and instant.
         astro = Astronomy.snapshot(latitude: AppConfig.homeLatitude, longitude: AppConfig.homeLongitude)
+        // ISS passes change slowly; ask twice a day.
+        if Date().timeIntervalSince(lastISSFetch) > 12 * 3600 || issPasses.isEmpty {
+            if let passes = try? await SatelliteService.issPasses() {
+                issPasses = passes.filter { $0.start > Date() }
+                lastISSFetch = Date()
+            }
+        }
         await refreshFitnessScore()
         cadence = CadenceBridge.read()
         if NestService.isConfigured, nest.isConnected {
@@ -291,6 +300,41 @@ final class AppState {
         readiness = await health.readiness()
     }
 
+    // MARK: Game Live Activity
+
+    #if canImport(ActivityKit)
+    private var gameActivity: Activity<GameActivityAttributes>?
+
+    /// The live game rides the Lock Screen: start when it goes live,
+    /// update each refresh, end at the final.
+    private func syncGameActivity(_ game: GameInfo?) {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard let game else { return }
+        let state = GameActivityAttributes.ContentState(
+            awayScore: game.away.score ?? 0,
+            homeScore: game.home.score ?? 0,
+            detail: game.detail)
+
+        if game.isLive {
+            if let activity = gameActivity {
+                Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }
+            } else {
+                let attributes = GameActivityAttributes(
+                    awayAbbr: game.away.abbr.nilIfEmpty ?? String(game.away.name.prefix(3)).uppercased(),
+                    homeAbbr: game.home.abbr.nilIfEmpty ?? String(game.home.name.prefix(3)).uppercased())
+                gameActivity = try? Activity.request(
+                    attributes: attributes,
+                    content: ActivityContent(state: state, staleDate: nil))
+            }
+        } else if let activity = gameActivity {
+            Task { await activity.end(ActivityContent(state: state, staleDate: nil), dismissalPolicy: .after(Date().addingTimeInterval(1800))) }
+            gameActivity = nil
+        }
+    }
+    #else
+    private func syncGameActivity(_ game: GameInfo?) {}
+    #endif
+
     // MARK: The Garden Desk
 
     func waterPlant(_ id: UUID) {
@@ -305,7 +349,56 @@ final class AppState {
     }
 
     func removePlant(_ id: UUID) {
+        if let plant = persisted.plants.first(where: { $0.id == id }) {
+            for photo in plant.photos { CaptureImages.delete(photo.file) }
+        }
         persisted.plants.removeAll { $0.id == id }
+    }
+
+    func addPlantPhoto(_ id: UUID, image: UIImage) {
+        guard let index = persisted.plants.firstIndex(where: { $0.id == id }),
+              let file = CaptureImages.save(image) else { return }
+        persisted.plants[index].photos.append(PlantPhoto(file: file))
+        toast("Photo filed to \(persisted.plants[index].name)'s record.")
+    }
+
+    var plantPlanBusy: UUID?
+
+    /// The desk writes the watering plan and sets the cadence from it.
+    func composePlantPlan(_ id: UUID) {
+        guard AIService.isConfigured,
+              let index = persisted.plants.firstIndex(where: { $0.id == id }),
+              plantPlanBusy == nil else { return }
+        let plant = persisted.plants[index]
+        plantPlanBusy = id
+
+        var lines = ["Name: \(plant.name)"]
+        if !plant.species.isEmpty { lines.append("Species: \(plant.species)") }
+        if !plant.potSize.isEmpty { lines.append("Pot/size: \(plant.potSize)") }
+        if !plant.soil.isEmpty { lines.append("Soil: \(plant.soil)") }
+        if !plant.light.isEmpty { lines.append("Light: \(plant.light)") }
+        if !plant.note.isEmpty { lines.append("Notes: \(plant.note)") }
+        if let weather { lines.append("Current weather: \(weather.tempF)°F, \(weather.description)") }
+
+        Task {
+            defer { plantPlanBusy = nil }
+            guard let reply = try? await AIDesk.wateringPlan(profile: lines.joined(separator: "\n")),
+                  let idx = persisted.plants.firstIndex(where: { $0.id == id }) else { return }
+            var days: Int?
+            var planText = reply
+            if let firstLine = reply.split(separator: "\n").first,
+               firstLine.uppercased().contains("DAYS:") {
+                days = Int(firstLine.trimmingCharacters(in: CharacterSet.decimalDigits.inverted))
+                planText = reply.split(separator: "\n").dropFirst()
+                    .joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            persisted.plants[idx].plan = planText
+            if let days, days >= 1, days <= 60 {
+                persisted.plants[idx].waterEveryDays = days
+                toast("\(persisted.plants[idx].name): watering every \(days) days.")
+            }
+        }
     }
 
     var plantsDue: Int { persisted.plants.filter { $0.daysUntilDue <= 0 }.count }
@@ -347,6 +440,7 @@ final class AppState {
             announceGameTransitions(old: dbacksGame, new: fresh, team: "D-backs")
             dbacksGame = fresh
             dbacksNext = next
+            syncGameActivity(fresh)
             (nlWest, wildcard) = try await tables
             baseballStatus = .live(Date())
         } catch {

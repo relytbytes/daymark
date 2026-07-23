@@ -76,13 +76,52 @@ struct WireArchiveEntry: Identifiable, Codable, Hashable {
     }
 }
 
-/// A plant on the Garden Desk: name, watering cadence, last watered.
+/// One dated photo of a plant — the growth record.
+struct PlantPhoto: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var file: String                   // filename in the capture image store
+    var taken = Date()
+}
+
+/// A plant on the Garden Desk: name, watering cadence, last watered,
+/// a profile for the desk's plan, and a photo history.
 struct Plant: Identifiable, Codable, Hashable {
     var id = UUID()
     var name: String
-    var note: String = ""              // species, spot, quirks
+    var note: String = ""              // spot, quirks
     var waterEveryDays: Int = 7
     var lastWatered: Date = Date()
+    var species: String = ""
+    var potSize: String = ""
+    var soil: String = ""
+    var light: String = ""
+    var plan: String = ""              // the desk's care plan
+    var photos: [PlantPhoto] = []
+
+    init(id: UUID = UUID(), name: String, note: String = "",
+         waterEveryDays: Int = 7, lastWatered: Date = Date()) {
+        self.id = id
+        self.name = name
+        self.note = note
+        self.waterEveryDays = waterEveryDays
+        self.lastWatered = lastWatered
+    }
+
+    /// Tolerant decoding — adding profile fields never loses a plant.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(UUID.self, forKey: .id)) ?? nil ?? UUID()
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? nil ?? "Plant"
+        note = (try? c.decodeIfPresent(String.self, forKey: .note)) ?? nil ?? ""
+        waterEveryDays = (try? c.decodeIfPresent(Int.self, forKey: .waterEveryDays)) ?? nil ?? 7
+        lastWatered = (try? c.decodeIfPresent(Date.self, forKey: .lastWatered)) ?? nil ?? Date()
+        species = (try? c.decodeIfPresent(String.self, forKey: .species)) ?? nil ?? ""
+        potSize = (try? c.decodeIfPresent(String.self, forKey: .potSize)) ?? nil ?? ""
+        soil = (try? c.decodeIfPresent(String.self, forKey: .soil)) ?? nil ?? ""
+        light = (try? c.decodeIfPresent(String.self, forKey: .light)) ?? nil ?? ""
+        plan = (try? c.decodeIfPresent(String.self, forKey: .plan)) ?? nil ?? ""
+        photos = (try? c.decodeIfPresent([PlantPhoto].self, forKey: .photos)) ?? nil ?? []
+    }
 
     var nextWaterDue: Date {
         Calendar.current.date(byAdding: .day, value: waterEveryDays, to: lastWatered) ?? lastWatered

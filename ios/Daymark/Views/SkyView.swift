@@ -63,6 +63,7 @@ struct SkySectionsView: View {
             almanacSection.id("sky-almanac")
             domeSection.id("sky-dome")
             planetsSection
+            stationSection
             eventsSection
             astrologySection.id("sky-astro")
         }
@@ -182,6 +183,48 @@ struct SkySectionsView: View {
             }
             .background(alignment: .bottom) { Hairline() }
             .padding(.top, 8)
+        }
+    }
+
+    // MARK: The Station (ISS passes worth walking outside for)
+
+    @ViewBuilder
+    private var stationSection: some View {
+        if !app.issPasses.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionRuleHeader(title: "The Station")
+                    .padding(.bottom, 8)
+                Text("The ISS, when it crosses at a watchable hour — it moves like a bright, silent plane.")
+                    .font(DS.label(11, weight: .semibold))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.bottom, 6)
+                ForEach(app.issPasses) { pass in
+                    VStack(spacing: 0) {
+                        Hairline()
+                        HStack(spacing: 10) {
+                            Image(systemName: "sparkle")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Palette.gold)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(pass.start.isToday ? "Tonight" : pass.start.weekdayText())
+                                    .font(DS.label(13, weight: .semibold))
+                                    .foregroundStyle(Palette.ink)
+                                Text(pass.line)
+                                    .font(DS.label(11, weight: .regular))
+                                    .monospacedDigit()
+                                    .foregroundStyle(Palette.muted)
+                            }
+                            Spacer()
+                            if pass.maxElevation >= 60 {
+                                StatusChip(text: "Bright pass", foreground: .white, background: Palette.coral)
+                            }
+                        }
+                        .padding(.vertical, 9)
+                    }
+                }
+                Hairline()
+            }
+            .padding(.top, 24)
         }
     }
 
