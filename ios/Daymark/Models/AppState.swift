@@ -685,6 +685,9 @@ final class AppState {
         captureRequested = true
     }
 
+    /// The Indoor glance cell asks Today to present the thermostat.
+    var thermostatRequested = false
+
     // MARK: Toast
 
     func toast(_ message: String) {

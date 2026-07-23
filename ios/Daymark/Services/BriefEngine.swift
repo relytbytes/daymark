@@ -158,7 +158,8 @@ extension AppState {
                 GlanceCellModel(
                     id: "indoor", label: "Indoor",
                     value: "\(nest.indoorF)°",
-                    sub: nest.hvacActive ? "running" : (nest.setpointF.map { "set \($0)°" } ?? "idle")
+                    sub: nest.hvacActive ? "running" : (nest.setpointF.map { "set \($0)°" } ?? "idle"),
+                    onTap: { [weak self] in self?.thermostatRequested = true }
                 )
             } ?? nowCell(),
             leaveBy.map { leave in
