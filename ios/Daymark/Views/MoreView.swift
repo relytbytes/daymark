@@ -2,8 +2,7 @@
 //  MoreView.swift
 //  Daymark
 //
-//  Section D · Arts & Media: the news brief, markets, the D-backs,
-//  Spotify, and the reading queue.
+//  Section E · Media: the news brief, markets, music, and reading.
 //
 
 import SwiftUI
@@ -13,16 +12,14 @@ struct MoreView: View {
     @Environment(AppState.self) private var app
     @Binding var showSettings: Bool
     @State private var openURLItem: SheetLink?
-    @State private var standingsView = "division"
     @State private var showWireArchive = false
 
     var body: some View {
         let phase = DayPhase.current()
 
-        SectionPage(tag: "Section D · Arts & Media", showSettings: $showSettings, index: [
+        SectionPage(tag: "Section E · Media", showSettings: $showSettings, index: [
             (label: "Brief", anchor: "more-news"),
             (label: "Markets", anchor: "more-markets"),
-            (label: "Sports", anchor: "more-sports"),
             (label: "Music", anchor: "more-music"),
             (label: "Wire", anchor: "more-wire"),
             (label: "Reading", anchor: "more-reading"),
@@ -33,7 +30,7 @@ struct MoreView: View {
                         dateline: context.date.dateline(),
                         phaseLabel: phase.label,
                         accent: phase.accent,
-                        title: Text("More")
+                        title: Text("Media")
                     )
                     GlanceRibbon(cells: app.glanceMore())
                 }
@@ -41,7 +38,6 @@ struct MoreView: View {
 
             newsSection.id("more-news")
             marketsSection.id("more-markets")
-            sportsSection.id("more-sports")
             spotifySection.id("more-music")
             discoverySection.id("more-wire")
             soundcloudSection
@@ -199,116 +195,6 @@ struct MoreView: View {
         formatter.maximumFractionDigits = value >= 1000 ? 0 : 2
         formatter.minimumFractionDigits = value >= 1000 ? 0 : 2
         return formatter.string(from: NSNumber(value: value)) ?? String(format: "%.2f", value)
-    }
-
-    // MARK: Sports
-
-    private var sportsSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                SectionRuleHeader(title: "Box Score")
-            }
-            .padding(.bottom, 12)
-
-            if let game = app.dbacksGame {
-                VStack(alignment: .leading, spacing: 0) {
-                    gameBox(game, headline: "Diamondbacks", status: app.baseballStatus)
-                    BoxScoreGrid(game: game)
-                    if let next = app.dbacksNext {
-                        UpNextRow(game: next)
-                    }
-                }
-            } else {
-                HStack {
-                    EmptyNote(text: "No D-backs game in the current window.")
-                    AgeStamp(status: app.baseballStatus)
-                }
-            }
-
-            // Standings toggle
-            HStack(spacing: 7) {
-                standingsTab("NL West", key: "division")
-                standingsTab("Wild Card", key: "wildcard")
-                Spacer()
-                AgeStamp(status: app.baseballStatus)
-            }
-            .padding(.top, 14)
-            .padding(.bottom, 8)
-
-            let rows = standingsView == "division" ? app.nlWest : app.wildcard
-            if rows.isEmpty {
-                EmptyNote(text: "Standings will appear when MLB responds.")
-            } else {
-                standingsTable(rows)
-            }
-        }
-        .padding(.top, 26)
-    }
-
-    private func standingsTab(_ label: String, key: String) -> some View {
-        let active = standingsView == key
-        return Button {
-            standingsView = key
-        } label: {
-            Text(label)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(active ? Palette.card : Palette.ink)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(active ? Palette.ink : Palette.card)
-                .overlay(RoundedRectangle(cornerRadius: 999).stroke(Palette.line, lineWidth: active ? 0 : 1))
-                .clipShape(RoundedRectangle(cornerRadius: 999))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func standingsTable(_ rows: [StandingRow]) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("TEAM").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
-                Spacer()
-                Text("W–L").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
-                    .frame(width: 52, alignment: .trailing)
-                Text("PCT").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
-                    .frame(width: 44, alignment: .trailing)
-                Text("GB").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
-                    .frame(width: 36, alignment: .trailing)
-                Text("L10").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
-                    .frame(width: 38, alignment: .trailing)
-            }
-            .padding(.vertical, 7)
-            ForEach(rows) { row in
-                VStack(spacing: 0) {
-                    Hairline()
-                    HStack {
-                        StandingLogo(url: row.logoURL)
-                        Text(row.name)
-                            .font(DS.label(13, weight: row.isDbacks ? .bold : .medium))
-                            .foregroundStyle(row.isDbacks ? Palette.coral : Palette.ink)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("\(row.wins)–\(row.losses)")
-                            .font(DS.label(12, weight: .semibold))
-                            .foregroundStyle(Palette.ink)
-                            .frame(width: 52, alignment: .trailing)
-                        Text(row.pct)
-                            .font(DS.label(12, weight: .regular))
-                            .foregroundStyle(Palette.muted)
-                            .frame(width: 44, alignment: .trailing)
-                        Text(row.gamesBack)
-                            .font(DS.label(12, weight: .regular))
-                            .foregroundStyle(Palette.muted)
-                            .frame(width: 36, alignment: .trailing)
-                        Text(row.l10)
-                            .font(DS.label(12, weight: .regular)).monospacedDigit()
-                            .foregroundStyle(Palette.muted)
-                            .frame(width: 38, alignment: .trailing)
-                    }
-                    .padding(.vertical, 9)
-                }
-            }
-            Hairline()
-        }
     }
 
     // MARK: Spotify

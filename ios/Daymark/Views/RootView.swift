@@ -8,7 +8,7 @@
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case today, work, life, more
+    case today, work, sky, life, media
     var id: String { rawValue }
 
     var label: String { rawValue.capitalized }
@@ -17,8 +17,9 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .today: return "house"
         case .work: return "briefcase"
+        case .sky: return "moon.stars"
         case .life: return "mappin.and.ellipse"
-        case .more: return "square.grid.2x2"
+        case .media: return "newspaper"
         }
     }
 }
@@ -37,8 +38,9 @@ struct RootView: View {
                 switch section {
                 case .today: TodayView(showSettings: $showSettings)
                 case .work: WorkView(showSettings: $showSettings)
+                case .sky: SkyTabView(showSettings: $showSettings)
                 case .life: LifeView(showSettings: $showSettings)
-                case .more: MoreView(showSettings: $showSettings)
+                case .media: MoreView(showSettings: $showSettings)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -72,9 +74,9 @@ struct RootView: View {
         HStack(spacing: 0) {
             tabButton(.today)
             tabButton(.work)
-            captureButton
+            tabButton(.sky)
             tabButton(.life)
-            tabButton(.more)
+            tabButton(.media)
         }
         .padding(.horizontal, 14)
         .padding(.top, 10)
@@ -112,28 +114,6 @@ struct RootView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private var captureButton: some View {
-        Button {
-            showCapture = true
-        } label: {
-            VStack(spacing: 4) {
-                ZStack {
-                    Circle().fill(Palette.coral).frame(width: 34, height: 34)
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                Text("CAPTURE")
-                    .font(.system(size: 9, weight: .heavy))
-                    .tracking(0.6)
-                    .foregroundStyle(Palette.ink)
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Quick capture")
-    }
 
     // MARK: Toast
 
@@ -170,6 +150,7 @@ struct SectionPage<Content: View>: View {
                         tag: tag,
                         refreshing: app.isRefreshing,
                         onRefresh: { Task { await app.refreshAll(force: true) } },
+                        onCapture: { app.requestCapture() },
                         onSettings: { showSettings = true }
                     )
                     .padding(.bottom, index.isEmpty ? 14 : 8)

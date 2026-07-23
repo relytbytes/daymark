@@ -43,6 +43,7 @@ struct MastheadTopline: View {
     let tag: String
     var refreshing: Bool = false
     var onRefresh: (() -> Void)?
+    var onCapture: (() -> Void)?
     var onSettings: (() -> Void)?
 
     var body: some View {
@@ -61,6 +62,17 @@ struct MastheadTopline: View {
                         .animation(refreshing ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default, value: refreshing)
                 }
                 .accessibilityLabel("Refresh")
+            }
+            if let onCapture {
+                Button(action: onCapture) {
+                    ZStack {
+                        Circle().fill(Palette.coral).frame(width: 24, height: 24)
+                        Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .accessibilityLabel("Capture")
             }
             if let onSettings {
                 Button(action: onSettings) {
