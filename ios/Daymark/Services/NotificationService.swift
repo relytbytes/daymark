@@ -110,6 +110,16 @@ enum NotificationService {
     }
 
     /// Fired the moment the app observes a final score while refreshing.
+    /// An immediate, one-shot notification (nowcasts, weather alerts).
+    static func notifyNow(id: String, title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: id, content: content, trigger: nil))
+    }
+
     static func notifyFinal(id: String, headline: String) {
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()

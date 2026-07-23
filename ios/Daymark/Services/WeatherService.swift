@@ -17,6 +17,7 @@ enum WeatherService {
             URLQueryItem(name: "longitude", value: String(AppConfig.homeLongitude)),
             URLQueryItem(name: "current", value: "temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m"),
             URLQueryItem(name: "hourly", value: "temperature_2m,precipitation_probability,precipitation,weather_code"),
+            URLQueryItem(name: "minutely_15", value: "precipitation"),
             URLQueryItem(name: "daily", value: "temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,weather_code,uv_index_max"),
             URLQueryItem(name: "temperature_unit", value: "fahrenheit"),
             URLQueryItem(name: "wind_speed_unit", value: "mph"),
@@ -84,7 +85,20 @@ enum WeatherService {
             windMph: Int((response.current.wind_speed_10m ?? 0).rounded()),
             uvIndexMax: response.daily.uv_index_max?.first,
             week: week,
-            rainWindow: rainWindowSentence(hourly: hourly)
+            rainWindow: rainWindowSentence(hourly: hourly),
+            rainStartsAt: {
+                // The nowcast: first 15-minute slot with real precipitation
+                // inside the next hour.
+                guard let minutely = response.minutely_15,
+                      let amounts = minutely.precipitation else { return nil }
+                for (index, raw) in minutely.time.enumerated() {
+                    guard let slot = parse(raw), slot > now,
+                          slot.timeIntervalSince(now) <= 3600,
+                          index < amounts.count, amounts[index] >= 0.2 else { continue }
+                    return slot
+                }
+                return nil
+            }()
         )
     }
 
@@ -144,6 +158,12 @@ private struct OpenMeteoResponse: Decodable {
     let current: Current
     let hourly: Hourly
     let daily: Daily
+    let minutely_15: Minutely?
+
+    struct Minutely: Decodable {
+        let time: [String]
+        let precipitation: [Double]?
+    }
 
     struct Current: Decodable {
         let temperature_2m: Double

@@ -98,6 +98,8 @@ final class AppState {
     var autoJobTouches: Int = 0         // Landed: rows changed since Monday
     var landedError: String?            // why the Landed wire is down, if it is
     private var lastNestPoll = Date.distantPast
+    var readiness: HealthService.Readiness?
+    var weatherAlerts: [WeatherAlert] = []
 
     // MARK: Init
 
@@ -243,6 +245,29 @@ final class AppState {
         }
         // Air quality rides along; a miss never degrades the weather card.
         airQuality = try? await WeatherService.fetchAirQuality()
+        // NWS alerts: banner on Today, notification when a new one lands.
+        if let alerts = try? await AlertsService.active() {
+            let known = Set(UserDefaults.standard.stringArray(forKey: "daymark-alert-ids") ?? [])
+            for alert in alerts where !known.contains(alert.id) {
+                NotificationService.notifyNow(
+                    id: "daymark.wx.\(alert.id.hashValue)",
+                    title: alert.event,
+                    body: alert.headline)
+            }
+            UserDefaults.standard.set(alerts.map(\.id), forKey: "daymark-alert-ids")
+            weatherAlerts = alerts
+        }
+        // The rain nowcast: one heads-up per shower, not per refresh.
+        if let starts = weather?.rainStartsAt {
+            let slotKey = "daymark-nowcast-\(Int(starts.timeIntervalSince1970 / 1800))"
+            if !UserDefaults.standard.bool(forKey: slotKey) {
+                UserDefaults.standard.set(true, forKey: slotKey)
+                NotificationService.notifyNow(
+                    id: slotKey,
+                    title: "Rain incoming",
+                    body: "Starting around \(starts.timeText()) — about \(max(1, Int(starts.timeIntervalSinceNow / 60))) minutes out.")
+            }
+        }
         // Sky math is local and instant.
         astro = Astronomy.snapshot(latitude: AppConfig.homeLatitude, longitude: AppConfig.homeLongitude)
         await refreshFitnessScore()
@@ -263,7 +288,27 @@ final class AppState {
             guard await health.requestAuthorization() else { return }
         }
         autoFitnessDays = await health.fitnessDaysThisWeek()
+        readiness = await health.readiness()
     }
+
+    // MARK: The Garden Desk
+
+    func waterPlant(_ id: UUID) {
+        guard let index = persisted.plants.firstIndex(where: { $0.id == id }) else { return }
+        persisted.plants[index].lastWatered = Date()
+        toast("\(persisted.plants[index].name) watered.")
+    }
+
+    func addPlant(name: String, note: String, everyDays: Int) {
+        persisted.plants.append(Plant(name: name, note: note, waterEveryDays: max(1, everyDays)))
+        toast("\(name) joins the garden.")
+    }
+
+    func removePlant(_ id: UUID) {
+        persisted.plants.removeAll { $0.id == id }
+    }
+
+    var plantsDue: Int { persisted.plants.filter { $0.daysUntilDue <= 0 }.count }
 
     func refreshCalendar() async {
         let granted = await calendarService.ensureAccess()

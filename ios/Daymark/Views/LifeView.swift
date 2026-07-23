@@ -16,12 +16,17 @@ struct LifeView: View {
     @State private var mapQuery = ""
     @State private var showThermostat = false
     @State private var standingsView = "division"
+    @State private var addingPlant = false
+    @State private var plantName = ""
+    @State private var plantNote = ""
+    @State private var plantDays = 7
 
     var body: some View {
         let phase = DayPhase.current()
 
         SectionPage(tag: "Section D · Durham", showSettings: $showSettings, index: [
             (label: "Home", anchor: "life-home"),
+            (label: "Garden", anchor: "life-garden"),
             (label: "Training", anchor: "life-training"),
             (label: "Durham", anchor: "life-durham"),
             (label: "Scoreboard", anchor: "life-scoreboard"),
@@ -40,6 +45,7 @@ struct LifeView: View {
             }
 
             homeDesk.id("life-home")
+            gardenDesk.id("life-garden")
             trainingDesk.id("life-training")
             aroundTown.id("life-durham")
             remindersSection
@@ -67,6 +73,23 @@ struct LifeView: View {
                 app.thermostatRequested = false
             }
         }
+        .alert("New plant", isPresented: $addingPlant) {
+            TextField("Name (Monstera, tomatoes…)", text: $plantName)
+            TextField("Note (window, porch…)", text: $plantNote)
+            Button("Every 3 days") { savePlant(days: 3) }
+            Button("Weekly") { savePlant(days: 7) }
+            Button("Every 2 weeks") { savePlant(days: 14) }
+            Button("Cancel", role: .cancel) { plantName = ""; plantNote = "" }
+        } message: {
+            Text("Pick the watering cadence.")
+        }
+    }
+
+    private func savePlant(days: Int) {
+        guard let name = plantName.nilIfEmpty else { return }
+        app.addPlant(name: name, note: plantNote, everyDays: days)
+        plantName = ""
+        plantNote = ""
     }
 
     // MARK: The Home Desk (Nest, in its own quarters)
@@ -129,6 +152,9 @@ struct LifeView: View {
                 }
                 .padding(.bottom, 10)
 
+                readinessLine
+                    .padding(.bottom, 10)
+
                 VStack(spacing: 10) {
                     HStack(alignment: .lastTextBaseline, spacing: 8) {
                         Text(String(format: "%.1f", cadence.w))
@@ -161,6 +187,110 @@ struct LifeView: View {
             }
             .padding(.top, 24)
         }
+    }
+
+    /// Last night, against your own baselines — the go/easy signal.
+    @ViewBuilder
+    private var readinessLine: some View {
+        if let readiness = app.readiness {
+            HStack(alignment: .top, spacing: 8) {
+                Circle()
+                    .fill(readiness.score >= 2 ? Palette.green
+                          : readiness.score >= 0 ? Palette.gold : Palette.coral)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 4)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(readiness.verdict.uppercased())
+                        .kickerStyle(readiness.score >= 2 ? Palette.green
+                                     : readiness.score >= 0 ? Palette.gold : Palette.coral,
+                                     size: 8.5, tracking: 1.2)
+                    Text(readiness.line)
+                        .font(DS.label(12, weight: .medium))
+                        .foregroundStyle(Palette.muted)
+                }
+                Spacer()
+            }
+            .padding(10)
+            .background(Palette.wash)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    /// The Garden Desk: what needs water, and when.
+    @ViewBuilder
+    private var gardenDesk: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                SectionRuleHeader(title: "The Garden Desk")
+                if app.plantsDue > 0 {
+                    StatusChip(text: "\(app.plantsDue) due", foreground: .white, background: Palette.coral)
+                }
+            }
+            .padding(.bottom, 8)
+
+            if app.persisted.plants.isEmpty {
+                Button {
+                    addingPlant = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Palette.green)
+                        Text("No plants on file — tap to plant the first one.")
+                            .font(DS.deck(13))
+                            .foregroundStyle(Palette.muted)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                if let weather = app.weather, app.plantsDue > 0, weather.rainPct >= 60 {
+                    Text("Rain likely today (\(weather.rainPct)%) — the outdoor ones may take care of themselves.")
+                        .font(DS.label(11, weight: .medium))
+                        .foregroundStyle(Palette.blue)
+                        .padding(.bottom, 6)
+                }
+                ForEach(app.persisted.plants.sorted { $0.daysUntilDue < $1.daysUntilDue }) { plant in
+                    VStack(spacing: 0) {
+                        Hairline()
+                        HStack(spacing: 10) {
+                            Image(systemName: "leaf.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(plant.daysUntilDue <= 0 ? Palette.coral : Palette.green)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(plant.name)
+                                    .font(DS.label(13.5, weight: .semibold))
+                                    .foregroundStyle(Palette.ink)
+                                Text("every \(plant.waterEveryDays)d · \(plant.dueText)"
+                                     + (plant.note.nilIfEmpty.map { " · \($0)" } ?? ""))
+                                    .font(DS.label(10.5, weight: .regular))
+                                    .foregroundStyle(plant.daysUntilDue <= 0 ? Palette.coral : Palette.subtle)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            QuietButton(label: plant.daysUntilDue <= 0 ? "Water" : "Watered") {
+                                app.waterPlant(plant.id)
+                            }
+                        }
+                        .padding(.vertical, 9)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                app.removePlant(plant.id)
+                            } label: {
+                                Label("Remove plant", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                Hairline()
+                DeskAction(label: "Add a plant", systemImage: "plus") {
+                    addingPlant = true
+                }
+                .padding(.top, 10)
+            }
+        }
+        .padding(.top, 24)
     }
 
     private var fuelDivider: some View {

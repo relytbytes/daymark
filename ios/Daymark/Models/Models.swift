@@ -76,6 +76,36 @@ struct WireArchiveEntry: Identifiable, Codable, Hashable {
     }
 }
 
+/// A plant on the Garden Desk: name, watering cadence, last watered.
+struct Plant: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var name: String
+    var note: String = ""              // species, spot, quirks
+    var waterEveryDays: Int = 7
+    var lastWatered: Date = Date()
+
+    var nextWaterDue: Date {
+        Calendar.current.date(byAdding: .day, value: waterEveryDays, to: lastWatered) ?? lastWatered
+    }
+
+    var daysUntilDue: Int {
+        Calendar.current.dateComponents(
+            [.day],
+            from: Calendar.current.startOfDay(for: Date()),
+            to: Calendar.current.startOfDay(for: nextWaterDue)
+        ).day ?? 0
+    }
+
+    var dueText: String {
+        switch daysUntilDue {
+        case ..<0: return "overdue \(-daysUntilDue)d"
+        case 0: return "due today"
+        case 1: return "tomorrow"
+        default: return "in \(daysUntilDue)d"
+        }
+    }
+}
+
 /// Photos attached to captures, stored as JPEGs in Application Support.
 enum CaptureImages {
     static var directory: URL {
@@ -380,6 +410,8 @@ struct PersistedState: Codable {
     var sprintLedgerAt: Date?
     var weekReview: String = ""                // the Sunday column
     var weekReviewKey: String = ""             // weekKey it belongs to
+    var journal: [String: String] = [:]        // dayKey -> one line for the record
+    var plants: [Plant] = []                   // the garden desk
 
     init() {}
 
@@ -413,6 +445,8 @@ struct PersistedState: Codable {
         sprintLedgerAt = try? c.decodeIfPresent(Date.self, forKey: .sprintLedgerAt) ?? nil
         weekReview = (try? c.decodeIfPresent(String.self, forKey: .weekReview)) ?? nil ?? ""
         weekReviewKey = (try? c.decodeIfPresent(String.self, forKey: .weekReviewKey)) ?? nil ?? ""
+        journal = (try? c.decodeIfPresent([String: String].self, forKey: .journal)) ?? nil ?? [:]
+        plants = (try? c.decodeIfPresent([Plant].self, forKey: .plants)) ?? nil ?? []
     }
 }
 
@@ -478,6 +512,7 @@ struct WeatherSnapshot {
     var uvIndexMax: Double? = nil
     var week: [DayForecast] = []
     var rainWindow: String = ""
+    var rainStartsAt: Date?             // nowcast: rain inside the hour
 
     var description: String { weatherDescription(code) }
     var symbol: String { weatherSymbol(code, night: isNight()) }
