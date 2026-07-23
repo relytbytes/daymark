@@ -12,15 +12,15 @@ enum BaseballService {
     static let dbacksID = 109
     static let bullsID = 234
 
-    static func dbacksGame() async throws -> GameInfo? {
+    static func dbacksGame() async throws -> (current: GameInfo?, next: GameInfo?) {
         try await game(teamID: dbacksID, sportID: 1)
     }
 
-    static func bullsGame() async throws -> GameInfo? {
+    static func bullsGame() async throws -> (current: GameInfo?, next: GameInfo?) {
         try await game(teamID: bullsID, sportID: 11)
     }
 
-    private static func game(teamID: Int, sportID: Int) async throws -> GameInfo? {
+    private static func game(teamID: Int, sportID: Int) async throws -> (current: GameInfo?, next: GameInfo?) {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.timeZone = TimeZone(identifier: "America/New_York")
@@ -33,11 +33,11 @@ enum BaseballService {
             URLQueryItem(name: "teamId", value: String(teamID)),
             URLQueryItem(name: "startDate", value: start),
             URLQueryItem(name: "endDate", value: end),
-            URLQueryItem(name: "hydrate", value: "team,linescore"),
+            URLQueryItem(name: "hydrate", value: "team,linescore,probablePitcher"),
         ]
         let response = try await HTTP.json(ScheduleResponse.self, components.url!)
         let games = response.dates.flatMap { $0.games }
-        guard !games.isEmpty else { return nil }
+        guard !games.isEmpty else { return (nil, nil) }
 
         let iso = ISO8601DateFormatter()
         func date(_ g: ScheduleResponse.Game) -> Date? { g.gameDate.flatMap { iso.date(from: $0) } }
@@ -55,8 +55,14 @@ enum BaseballService {
                 return Date().timeIntervalSince(d) < 20 * 3600
             }
 
-        guard let chosen = live ?? upcoming ?? recentFinal else { return nil }
-        return info(from: chosen, gameDate: date(chosen))
+        guard let chosen = live ?? upcoming ?? recentFinal else { return (nil, nil) }
+        // Up next: the first future game that isn't the one being shown.
+        let next = games
+            .filter { ($0.status?.abstractGameState ?? "") == "Preview" && $0.gamePk != chosen.gamePk }
+            .sorted { (date($0) ?? .distantFuture) < (date($1) ?? .distantFuture) }
+            .first
+        return (info(from: chosen, gameDate: date(chosen)),
+                next.map { info(from: $0, gameDate: date($0)) })
     }
 
     private static func info(from game: ScheduleResponse.Game, gameDate: Date?) -> GameInfo {
@@ -85,6 +91,14 @@ enum BaseballService {
                 teamID: t?.team?.id
             )
         }
+        let innings = (game.linescore?.innings ?? []).compactMap { inning -> InningScore? in
+            guard let number = inning.num else { return nil }
+            return InningScore(number: number, away: inning.away?.runs, home: inning.home?.runs)
+        }
+        func rhe(_ side: ScheduleResponse.Linescore.Totals.Side?) -> TeamRHE? {
+            guard let side else { return nil }
+            return TeamRHE(runs: side.runs, hits: side.hits, errors: side.errors)
+        }
         return GameInfo(
             id: game.gamePk ?? 0,
             date: gameDate,
@@ -92,7 +106,12 @@ enum BaseballService {
             detail: detail,
             home: team(game.teams?.home),
             away: team(game.teams?.away),
-            venue: game.venue?.name
+            venue: game.venue?.name,
+            innings: innings,
+            awayRHE: rhe(game.linescore?.teams?.away),
+            homeRHE: rhe(game.linescore?.teams?.home),
+            awayPitcher: game.teams?.away?.probablePitcher?.fullName,
+            homePitcher: game.teams?.home?.probablePitcher?.fullName
         )
     }
 
@@ -149,6 +168,8 @@ private struct ScheduleResponse: Decodable {
         let abbreviation: String?
     }
     struct TeamEntry: Decodable {
+        struct Pitcher: Decodable { let fullName: String? }
+        let probablePitcher: Pitcher?
         let team: TeamInfo?
         let score: Int?
     }
@@ -161,9 +182,26 @@ private struct ScheduleResponse: Decodable {
         let detailedState: String?
     }
     struct Linescore: Decodable {
+        struct Inning: Decodable {
+            struct Half: Decodable { let runs: Int? }
+            let num: Int?
+            let away: Half?
+            let home: Half?
+        }
+        struct Totals: Decodable {
+            struct Side: Decodable {
+                let runs: Int?
+                let hits: Int?
+                let errors: Int?
+            }
+            let away: Side?
+            let home: Side?
+        }
         let currentInning: Int?
         let inningState: String?
         let outs: Int?
+        let innings: [Inning]?
+        let teams: Totals?
     }
     struct Venue: Decodable { let name: String? }
     struct Game: Decodable {

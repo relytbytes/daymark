@@ -211,7 +211,13 @@ struct MoreView: View {
             .padding(.bottom, 12)
 
             if let game = app.dbacksGame {
-                gameBox(game, headline: "Diamondbacks", status: app.baseballStatus)
+                VStack(alignment: .leading, spacing: 0) {
+                    gameBox(game, headline: "Diamondbacks", status: app.baseballStatus)
+                    BoxScoreGrid(game: game)
+                    if let next = app.dbacksNext {
+                        UpNextRow(game: next)
+                    }
+                }
             } else {
                 HStack {
                     EmptyNote(text: "No D-backs game in the current window.")

@@ -583,6 +583,18 @@ struct TeamScore: Hashable {
     }
 }
 
+struct InningScore: Hashable {
+    let number: Int
+    let away: Int?
+    let home: Int?
+}
+
+struct TeamRHE: Hashable {
+    let runs: Int?
+    let hits: Int?
+    let errors: Int?
+}
+
 struct GameInfo: Hashable {
     let id: Int
     let date: Date?
@@ -591,6 +603,11 @@ struct GameInfo: Hashable {
     let home: TeamScore
     let away: TeamScore
     let venue: String?
+    var innings: [InningScore] = []
+    var awayRHE: TeamRHE?
+    var homeRHE: TeamRHE?
+    var awayPitcher: String?
+    var homePitcher: String?
 
     var isLive: Bool { state == "Live" }
 }
