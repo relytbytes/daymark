@@ -121,7 +121,9 @@ extension AppState {
     // MARK: Evening review + week ahead
 
     func eveningReview() -> EveningReview {
-        let morning = EssentialTask.morning
+        // Count the set the reader actually saw and checked — by close
+        // time that's the evening slate, not the morning's.
+        let morning = EssentialTask.forPhase(DayPhase.current())
         let done = morning.filter { essentialDone($0.id) }.count
         let cleared = persisted.captures.filter { $0.done }.count
         let lines = ScoreCategory.defaults.map { category in
