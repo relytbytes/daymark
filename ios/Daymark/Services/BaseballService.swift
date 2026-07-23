@@ -33,7 +33,7 @@ enum BaseballService {
             URLQueryItem(name: "teamId", value: String(teamID)),
             URLQueryItem(name: "startDate", value: start),
             URLQueryItem(name: "endDate", value: end),
-            URLQueryItem(name: "hydrate", value: "team,linescore,probablePitcher"),
+            URLQueryItem(name: "hydrate", value: "team,linescore,probablePitcher,decisions"),
         ]
         let response = try await HTTP.json(ScheduleResponse.self, components.url!)
         let games = response.dates.flatMap { $0.games }
@@ -63,8 +63,115 @@ enum BaseballService {
             .filter { ($0.status?.abstractGameState ?? "") == "Preview" && $0.gamePk != chosen.gamePk }
             .sorted { (date($0) ?? .distantFuture) < (date($1) ?? .distantFuture) }
             .first
-        return (info(from: chosen, gameDate: date(chosen)),
-                next.map { info(from: $0, gameDate: date($0)) })
+        var current = info(from: chosen, gameDate: date(chosen))
+        if current.state != "Preview", let gamePk = chosen.gamePk {
+            if let notes = try? await gameNotes(gamePk: gamePk, decisions: chosen.decisions) {
+                current.decisionsLine = notes.decisions
+                current.topHitters = notes.hitters
+            }
+        }
+        return (current, next.map { info(from: $0, gameDate: date($0)) })
+    }
+
+    // MARK: Game notes: decisions with records, and the bats that mattered
+
+    private struct Boxscore: Decodable {
+        struct Player: Decodable {
+            struct Person: Decodable {
+                let id: Int?
+                let fullName: String?
+            }
+            struct Stats: Decodable {
+                let batting: Batting?
+            }
+            struct Batting: Decodable {
+                let hits: Int?
+                let atBats: Int?
+                let homeRuns: Int?
+                let rbi: Int?
+                let doubles: Int?
+                let triples: Int?
+            }
+            struct SeasonStats: Decodable {
+                struct Pitching: Decodable {
+                    let wins: Int?
+                    let losses: Int?
+                    let saves: Int?
+                }
+                let pitching: Pitching?
+            }
+            let person: Person?
+            let stats: Stats?
+            let seasonStats: SeasonStats?
+        }
+        struct Side: Decodable {
+            struct Meta: Decodable { let abbreviation: String? }
+            let team: Meta?
+            let players: [String: Player]?
+        }
+        struct Teams: Decodable {
+            let away: Side?
+            let home: Side?
+        }
+        let teams: Teams?
+    }
+
+    private static func gameNotes(gamePk: Int,
+                                  decisions: ScheduleResponse.Decisions?)
+        async throws -> (decisions: String?, hitters: [String]) {
+        let url = URL(string: "https://statsapi.mlb.com/api/v1/game/\(gamePk)/boxscore")!
+        let box = try await HTTP.json(Boxscore.self, url)
+        let sides = [box.teams?.away, box.teams?.home].compactMap { $0 }
+        let everyone = sides.flatMap { Array(($0.players ?? [:]).values) }
+
+        func lastName(_ full: String?) -> String {
+            (full ?? "").split(separator: " ").last.map(String.init) ?? (full ?? "?")
+        }
+        func seasonPitching(_ id: Int?) -> Boxscore.Player.SeasonStats.Pitching? {
+            everyone.first { $0.person?.id == id }?.seasonStats?.pitching
+        }
+
+        // Decisions line, records as of tonight.
+        var parts: [String] = []
+        if let winner = decisions?.winner {
+            let record = seasonPitching(winner.id)
+            let tail = record.map { " \($0.wins ?? 0)''' + ENDASH + '''\($0.losses ?? 0)" } ?? ""
+            parts.append("W: \(lastName(winner.fullName))\(tail)")
+        }
+        if let loser = decisions?.loser {
+            let record = seasonPitching(loser.id)
+            let tail = record.map { " \($0.wins ?? 0)''' + ENDASH + '''\($0.losses ?? 0)" } ?? ""
+            parts.append("L: \(lastName(loser.fullName))\(tail)")
+        }
+        if let save = decisions?.save {
+            let record = seasonPitching(save.id)
+            let tail = record?.saves.map { " (\($0))" } ?? ""
+            parts.append("SV: \(lastName(save.fullName))\(tail)")
+        }
+        let decisionsLine = parts.isEmpty ? nil : parts.joined(separator: " ''' + MIDDOT + ''' ")
+
+        // Bats that mattered: multi-hit games and home runs, best first.
+        var hitters: [(score: Int, line: String)] = []
+        for side in sides {
+            let abbr = side.team?.abbreviation ?? ""
+            for player in (side.players ?? [:]).values {
+                guard let batting = player.stats?.batting,
+                      let hits = batting.hits, let atBats = batting.atBats, atBats > 0 else { continue }
+                let homers = batting.homeRuns ?? 0
+                let rbi = batting.rbi ?? 0
+                guard hits >= 2 || homers >= 1 else { continue }
+                var extras: [String] = []
+                if homers > 0 { extras.append(homers == 1 ? "HR" : "\(homers) HR") }
+                if let doubles = batting.doubles, doubles > 0 { extras.append(doubles == 1 ? "2B" : "\(doubles) 2B") }
+                if let triples = batting.triples, triples > 0 { extras.append("3B") }
+                if rbi > 0 { extras.append("\(rbi) RBI") }
+                let line = "\(abbr) \(lastName(player.person?.fullName)) \(hits)-\(atBats)"
+                    + (extras.isEmpty ? "" : ", " + extras.joined(separator: ", "))
+                hitters.append((score: hits + homers * 3 + rbi, line: line))
+            }
+        }
+        let top = hitters.sorted { $0.score > $1.score }.prefix(3).map(\.line)
+        return (decisionsLine, Array(top))
     }
 
     private static func info(from game: ScheduleResponse.Game, gameDate: Date?) -> GameInfo {
@@ -131,6 +238,20 @@ enum BaseballService {
         return (nlWest, wc)
     }
 
+    /// The Bulls' International League division table, with L10.
+    static func bullsStandings() async throws -> [StandingRow] {
+        var components = URLComponents(string: "https://statsapi.mlb.com/api/v1/standings")!
+        components.queryItems = [
+            URLQueryItem(name: "leagueId", value: "117"),
+            URLQueryItem(name: "hydrate", value: "team,division"),
+        ]
+        let records = try await HTTP.json(StandingsResponse.self, components.url!).records
+        guard let division = records.first(where: { record in
+            record.teamRecords.contains { $0.team?.id == bullsID }
+        }) else { return [] }
+        return rows(from: division, limit: 10, wildCardGB: false, highlightID: bullsID)
+    }
+
     private static func fetchStandings(type: String) async throws -> [StandingsResponse.Record] {
         var components = URLComponents(string: "https://statsapi.mlb.com/api/v1/standings")!
         components.queryItems = [
@@ -142,7 +263,7 @@ enum BaseballService {
     }
 
     private static func rows(from record: StandingsResponse.Record, limit: Int = 5,
-                             wildCardGB: Bool) -> [StandingRow] {
+                             wildCardGB: Bool, highlightID: Int = BaseballService.dbacksID) -> [StandingRow] {
         record.teamRecords.prefix(limit).map { tr in
             StandingRow(
                 id: String(tr.team?.id ?? 0),
@@ -154,7 +275,8 @@ enum BaseballService {
                 // shows the wild-card deficit. Mixing them put wild-card
                 // numbers under the NL West toggle.
                 gamesBack: (wildCardGB ? tr.wildCardGamesBack : tr.gamesBack) ?? "—",
-                isDbacks: tr.team?.id == dbacksID
+                l10: tr.lastTen,
+                isDbacks: tr.team?.id == highlightID
             )
         }
     }
@@ -206,6 +328,15 @@ private struct ScheduleResponse: Decodable {
         let teams: Totals?
     }
     struct Venue: Decodable { let name: String? }
+    struct Decisions: Decodable {
+        struct Person: Decodable {
+            let id: Int?
+            let fullName: String?
+        }
+        let winner: Person?
+        let loser: Person?
+        let save: Person?
+    }
     struct Game: Decodable {
         let gamePk: Int?
         let gameDate: String?
@@ -213,6 +344,7 @@ private struct ScheduleResponse: Decodable {
         let teams: Teams?
         let linescore: Linescore?
         let venue: Venue?
+        let decisions: Decisions?
     }
     struct DateEntry: Decodable { let games: [Game] }
     let dates: [DateEntry]
@@ -221,12 +353,27 @@ private struct ScheduleResponse: Decodable {
 private struct StandingsResponse: Decodable {
     struct Division: Decodable { let id: Int? }
     struct TeamRecord: Decodable {
+        struct Records: Decodable {
+            struct Split: Decodable {
+                let wins: Int?
+                let losses: Int?
+                let type: String?
+            }
+            let splitRecords: [Split]?
+        }
         let team: ScheduleResponse.TeamInfo?
         let wins: Int?
         let losses: Int?
         let winningPercentage: String?
         let gamesBack: String?
         let wildCardGamesBack: String?
+        let records: Records?
+
+        var lastTen: String {
+            guard let split = records?.splitRecords?.first(where: { $0.type == "lastTen" }),
+                  let wins = split.wins, let losses = split.losses else { return "—" }
+            return "\(wins)–\(losses)"
+        }
     }
     struct Record: Decodable {
         let division: Division?

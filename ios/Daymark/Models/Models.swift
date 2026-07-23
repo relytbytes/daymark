@@ -608,6 +608,8 @@ struct GameInfo: Hashable {
     var homeRHE: TeamRHE?
     var awayPitcher: String?
     var homePitcher: String?
+    var decisionsLine: String?     // "W: Kelly 9–4 · L: Jump 2–3 · SV: Puk (18)"
+    var topHitters: [String] = []  // "AZ Tawa 2-5, 2B, 2 RBI"
 
     var isLive: Bool { state == "Live" }
 }
@@ -619,6 +621,7 @@ struct StandingRow: Identifiable, Hashable {
     let losses: Int
     let pct: String
     let gamesBack: String
+    var l10: String = "—"
     let isDbacks: Bool
 
     /// Official team mark from MLB's static CDN.
