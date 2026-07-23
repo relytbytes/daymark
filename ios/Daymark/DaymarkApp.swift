@@ -74,6 +74,10 @@ struct DaymarkApp: App {
                 }
             }
             if phase == .active {
+                WatchBridge.shared.onToggle = { [weak app] id in
+                    app?.toggleEssential(id)
+                }
+                WatchBridge.shared.activate()
                 app.rolloverIfNeeded()
                 app.absorbWidgetActions()
                 app.absorbSharedCaptures()

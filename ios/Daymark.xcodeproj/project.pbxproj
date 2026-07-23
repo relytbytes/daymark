@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		DA00000000000000000000A4 /* DaymarkWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DA00000000000000000000A3 /* DaymarkWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		DA00000000000000000000A9 /* DaymarkShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DA00000000000000000000A8 /* DaymarkShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		DA00000000000000000000AD /* DaymarkWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = DA00000000000000000000AC /* DaymarkWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,6 +27,13 @@
 			remoteGlobalIDString = DA00000000000000000000E6;
 			remoteInfo = DaymarkShare;
 		};
+		DA00000000000000000000AF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DA00000000000000000000E2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA00000000000000000000E7;
+			remoteInfo = DaymarkWatch;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -41,6 +49,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA00000000000000000000AE /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				DA00000000000000000000AD /* DaymarkWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -48,6 +67,7 @@
 		DA00000000000000000000A2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DA00000000000000000000A3 /* DaymarkWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DaymarkWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		DA00000000000000000000A8 /* DaymarkShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DaymarkShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA00000000000000000000AC /* DaymarkWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DaymarkWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -94,6 +114,11 @@
 			path = DaymarkShare;
 			sourceTree = "<group>";
 		};
+		DA00000000000000000000B8 /* DaymarkWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DaymarkWatch;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -118,6 +143,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA00000000000000000000CE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -127,6 +159,7 @@
 				DA00000000000000000000B1 /* Daymark */,
 				DA00000000000000000000B2 /* DaymarkWidgets */,
 				DA00000000000000000000B5 /* DaymarkShare */,
+				DA00000000000000000000B8 /* DaymarkWatch */,
 				DA00000000000000000000B3 /* Shared */,
 				DA00000000000000000000A2 /* Info.plist */,
 				DA00000000000000000000D2 /* Products */,
@@ -139,6 +172,7 @@
 				DA00000000000000000000A1 /* Daymark.app */,
 				DA00000000000000000000A3 /* DaymarkWidgets.appex */,
 				DA00000000000000000000A8 /* DaymarkShare.appex */,
+				DA00000000000000000000AC /* DaymarkWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -154,12 +188,14 @@
 				DA00000000000000000000C1 /* Frameworks */,
 				DA00000000000000000000C3 /* Resources */,
 				DA00000000000000000000A6 /* Embed Foundation Extensions */,
+				DA00000000000000000000AE /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				DA00000000000000000000A7 /* PBXTargetDependency */,
 				DA00000000000000000000AB /* PBXTargetDependency */,
+				DA00000000000000000000B7 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				DA00000000000000000000B1 /* Daymark */,
@@ -218,6 +254,28 @@
 			productReference = DA00000000000000000000A8 /* DaymarkShare.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		DA00000000000000000000E7 /* DaymarkWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA00000000000000000000FE /* Build configuration list for PBXNativeTarget "DaymarkWatch" */;
+			buildPhases = (
+				DA00000000000000000000CD /* Sources */,
+				DA00000000000000000000CE /* Frameworks */,
+				DA00000000000000000000CF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DA00000000000000000000B8 /* DaymarkWatch */,
+			);
+			name = DaymarkWatch;
+			packageProductDependencies = (
+			);
+			productName = DaymarkWatch;
+			productReference = DA00000000000000000000AC /* DaymarkWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -235,6 +293,9 @@
 						CreatedOnToolsVersion = 16.0;
 					};
 					DA00000000000000000000E6 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					DA00000000000000000000E7 = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -256,6 +317,7 @@
 				DA00000000000000000000E1 /* Daymark */,
 				DA00000000000000000000E5 /* DaymarkWidgets */,
 				DA00000000000000000000E6 /* DaymarkShare */,
+				DA00000000000000000000E7 /* DaymarkWatch */,
 			);
 		};
 /* End PBXProject section */
@@ -276,6 +338,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DA00000000000000000000CC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA00000000000000000000CF /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -306,6 +375,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA00000000000000000000CD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -318,6 +394,11 @@
 			isa = PBXTargetDependency;
 			target = DA00000000000000000000E6 /* DaymarkShare */;
 			targetProxy = DA00000000000000000000AA /* PBXContainerItemProxy */;
+		};
+		DA00000000000000000000B7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DA00000000000000000000E7 /* DaymarkWatch */;
+			targetProxy = DA00000000000000000000AF /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -613,6 +694,60 @@
 			};
 			name = Release;
 		};
+		DA00000000000000000000FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2ZC67A5ZYT;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Daymark;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.relytbytes.daymark;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.relytbytes.daymark.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		DA00000000000000000000FD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2ZC67A5ZYT;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Daymark;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.relytbytes.daymark;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.relytbytes.daymark.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -648,6 +783,15 @@
 			buildConfigurations = (
 				DA00000000000000000000FA /* Debug */,
 				DA00000000000000000000FB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA00000000000000000000FE /* Build configuration list for PBXNativeTarget "DaymarkWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA00000000000000000000FC /* Debug */,
+				DA00000000000000000000FD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
