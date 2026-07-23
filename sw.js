@@ -1,13 +1,13 @@
-const CACHE_NAME = "daymark-v34";
+const CACHE_NAME = "daymark-v35";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=34",
-  "./app.js?v=34",
-  "./astro.js?v=34",
-  "./skydata.json?v=34",
-  "./config.js?v=34",
-  "./manifest.webmanifest?v=34",
+  "./styles.css?v=35",
+  "./app.js?v=35",
+  "./astro.js?v=35",
+  "./skydata.json?v=35",
+  "./config.js?v=35",
+  "./manifest.webmanifest?v=35",
   "./SPOTIFY_SETUP.md",
   "./assets/icon.svg",
   "./assets/icon-192.png",

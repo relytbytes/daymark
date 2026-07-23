@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Daymark" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="A personal assistant dashboard that moves with your day." />
-    <link rel="manifest" href="./manifest.webmanifest?v=34" />
+    <link rel="manifest" href="./manifest.webmanifest?v=35" />
     <link rel="apple-touch-icon" href="./assets/icon-192.png" />
     <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,9 +18,9 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=34" />
-    <script src="./config.js?v=34"></script>
-    <script src="./astro.js?v=34" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=35" />
+    <script src="./config.js?v=35"></script>
+    <script src="./astro.js?v=35" defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <title>Daymark — Personal brief</title>
   </head>
@@ -75,6 +75,7 @@
       </div>
 
       <main>
+        <div id="alertBanner" data-view-section="today" hidden></div>
         <section class="hero" id="today" data-view-section="today">
           <div class="hero-copy">
             <p class="eyebrow">Lead · Your day</p>
@@ -415,6 +416,16 @@
               </article>
             </section>
 
+            <section class="section-block" id="skyDesk" data-view-section="sky">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">SECTION C</p>
+                  <h2>The Sky Desk</h2>
+                </div>
+              </div>
+              <div class="sky-inline" id="skyInline"></div>
+            </section>
+
             <section class="section-block" id="durham" data-view-section="life">
               <div class="section-heading">
                 <div>
@@ -521,7 +532,27 @@
               <div id="spiritBody"></div>
             </section>
 
-            <section class="section-block" id="sports" data-view-section="more">
+            <section class="section-block" id="garden" data-view-section="life">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">THE GARDEN DESK</p>
+                  <h2>Under your care</h2>
+                </div>
+                <span class="garden-due-chip" id="gardenDueChip" hidden></span>
+              </div>
+              <div class="garden-list" id="gardenList"></div>
+              <form class="garden-form" id="gardenForm">
+                <input id="gardenName" name="name" placeholder="Add a plant (pothos, basil…)" autocomplete="off" required />
+                <select id="gardenDays" name="days" aria-label="Watering cadence">
+                  <option value="3">Every 3 days</option>
+                  <option value="7" selected>Weekly</option>
+                  <option value="14">Every 2 weeks</option>
+                </select>
+                <button type="submit">Plant it</button>
+              </form>
+            </section>
+
+            <section class="section-block" id="sports" data-view-section="life">
               <div class="section-heading">
                 <div>
                   <p class="section-kicker">YOUR TEAMS</p>
@@ -773,6 +804,12 @@
               </div>
             </section>
 
+            <section class="section-block journal-card" data-view-section="today">
+              <p class="section-kicker">FOR THE RECORD</p>
+              <input class="journal-input" id="journalInput" placeholder="One line about today…" autocomplete="off" />
+              <p class="journal-echo" id="journalEcho" hidden></p>
+            </section>
+
             <section class="section-block tomorrow-card" data-view-section="today">
               <span class="tomorrow-label">TOMORROW · ACTUAL CALENDAR</span>
               <h2 id="tomorrowTitle">Tomorrow, without guesswork.</h2>
@@ -786,7 +823,7 @@
         <footer>
           <span class="footer-mark"><i></i><i></i><i></i></span>
           <p>That’s the brief.</p>
-          <small>Daymark · Build 34</small>
+          <small>Daymark · Build 35</small>
         </footer>
       </main>
 
@@ -799,17 +836,17 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V4h8v3M3 12h18M10 12v2h4v-2" /></svg>
           <span>Work</span>
         </button>
-        <button class="nav-button nav-capture" type="button" data-open-capture aria-label="Quick capture">
-          <span class="nav-capture-icon" aria-hidden="true">+</span>
-          <span>Capture</span>
+        <button class="nav-button" type="button" data-app-view="sky">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13.5A7.5 7.5 0 0 1 10.5 5 7.5 7.5 0 1 0 19 13.5Z" /><path d="m17.5 4 .6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6Z" /></svg>
+          <span>Sky</span>
         </button>
         <button class="nav-button" type="button" data-app-view="life">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" /><circle cx="12" cy="9" r="2.4" /></svg>
           <span>Life</span>
         </button>
         <button class="nav-button" type="button" data-app-view="more">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 9h16M9 9v11" /><path d="m13 14 2 2 4-4" /></svg>
-          <span>More</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h13v14H6a2 2 0 0 1-2-2Z" /><path d="M17 8h3v9a2 2 0 0 1-2 2M7 9h7M7 12h7M7 15h4" /></svg>
+          <span>Media</span>
         </button>
       </nav>
     </div>
@@ -914,6 +951,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=34" defer></script>
+    <script src="./app.js?v=35" defer></script>
   </body>
 </html>

@@ -148,23 +148,28 @@ const VIEW_CONFIG = Object.freeze({
       ["Scorecard", "scorecard"],
     ],
   },
+  sky: {
+    tag: "Section C · The Sky",
+    title: "The Sky",
+    glance: ["weather", "sunset", "daylight", "now"],
+    shortcuts: [],
+  },
   life: {
-    tag: "Section C · Durham",
+    tag: "Section D · Durham",
     title: "Life",
     glance: ["weather", "now", "sunset", "daylight"],
     shortcuts: [
       ["Weather", "durham"],
+      ["Garden", "garden"],
+      ["Scoreboard", "sports"],
       ["Events", "durham"],
-      ["Homes", "durham"],
-      ["Bulls", "durhamBullsGame"],
     ],
   },
   more: {
-    tag: "Section D · Arts & Media",
-    title: "More",
+    tag: "Section E · Media",
+    title: "Media",
     glance: ["dbacks", "saved", "playing", "now"],
     shortcuts: [
-      ["Sports", "sports"],
       ["Spotify", "listen"],
       ["Reading", "reading"],
       ["YouTube", "watch"],
@@ -753,9 +758,10 @@ function formatDate(date = new Date()) {
 
 function updateClock(date = new Date()) {
   const currentTime = document.querySelector("#currentTime");
-  currentTime.textContent = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
+  currentTime.textContent = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   }).format(date);
   currentTime.dateTime = date.toISOString();
   syncGlances();
@@ -2396,12 +2402,7 @@ async function mountDome() {
 }
 
 function openSkyDesk() {
-  const overlay = document.querySelector("#skyOverlay");
-  const body = document.querySelector("#skyBody");
-  if (!overlay || !body) return;
-  overlay.hidden = false;
-  document.body.style.overflow = "hidden";
-  renderSkyDesk(body);
+  setAppView("sky");
 }
 
 function closeSkyDesk() {
@@ -4040,6 +4041,7 @@ async function refreshWeather(force = false) {
     writeLiveCache(WEATHER_CACHE_KEY, data);
     publicFeedStatus.weather = "live";
     fetchAirQuality();
+    refreshWeatherAlerts();
   } catch {
     const cached = readLiveCache(WEATHER_CACHE_KEY);
     if (cached?.data) {
@@ -4435,6 +4437,13 @@ function setAppView(view, options = {}) {
     else button.removeAttribute("aria-current");
   });
 
+  if (nextView === "sky") {
+    const mount = document.querySelector("#skyInline");
+    if (mount) renderSkyDesk(mount);
+  } else {
+    window.clearInterval(domeState.timer);
+  }
+
   if (options.scroll !== false) {
     scrollToViewTarget(options.target || "", options.smooth !== false);
   }
@@ -4666,6 +4675,180 @@ document.addEventListener("keydown", (event) => {
     if (!captureDialog.open) openCaptureDialog("task");
   }
 });
+
+// ---------------------------------------------------------------------------
+// The Garden Desk: plants under care, watered on a cadence
+// ---------------------------------------------------------------------------
+
+const GARDEN_KEY = "daymark-garden";
+
+function loadGarden() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(GARDEN_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveGarden(plants) {
+  localStorage.setItem(GARDEN_KEY, JSON.stringify(plants));
+}
+
+function gardenDaysUntilDue(plant) {
+  const last = plant.last ? new Date(plant.last) : null;
+  if (!last || Number.isNaN(last.getTime())) return 0;
+  const elapsed = Math.floor((Date.now() - last.getTime()) / 86400000);
+  return (plant.days || 7) - elapsed;
+}
+
+function renderGarden() {
+  const list = document.querySelector("#gardenList");
+  const chip = document.querySelector("#gardenDueChip");
+  if (!list) return;
+  const plants = loadGarden().sort((a, b) => gardenDaysUntilDue(a) - gardenDaysUntilDue(b));
+
+  if (!plants.length) {
+    list.innerHTML = '<p class="garden-empty">Nothing under care yet. Add the first plant below.</p>';
+    if (chip) chip.hidden = true;
+    return;
+  }
+
+  const due = plants.filter((plant) => gardenDaysUntilDue(plant) <= 0).length;
+  if (chip) {
+    chip.hidden = due === 0;
+    chip.textContent = due === 1 ? "1 DUE" : `${due} DUE`;
+  }
+
+  list.innerHTML = plants
+    .map((plant) => {
+      const left = gardenDaysUntilDue(plant);
+      const dueText = left <= 0 ? "Water today" : left === 1 ? "Due tomorrow" : `Due in ${left} days`;
+      return `
+        <div class="garden-row${left <= 0 ? " is-due" : ""}" data-plant-id="${escapeHtml(plant.id)}">
+          <span class="garden-leaf" aria-hidden="true">☘</span>
+          <div class="garden-row-main">
+            <strong>${escapeHtml(plant.name)}</strong>
+            <small>every ${plant.days || 7}d · ${dueText}</small>
+          </div>
+          <button type="button" class="garden-water" data-garden-water="${escapeHtml(plant.id)}">Water</button>
+          <button type="button" class="garden-remove" data-garden-remove="${escapeHtml(plant.id)}" aria-label="Remove plant">✕</button>
+        </div>`;
+    })
+    .join("");
+
+  list.querySelectorAll("[data-garden-water]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const plants = loadGarden();
+      const plant = plants.find((entry) => entry.id === button.dataset.gardenWater);
+      if (!plant) return;
+      plant.last = new Date().toISOString();
+      saveGarden(plants);
+      renderGarden();
+    });
+  });
+  list.querySelectorAll("[data-garden-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const name = loadGarden().find((entry) => entry.id === button.dataset.gardenRemove)?.name;
+      if (name && !window.confirm(`Remove ${name} from the garden?`)) return;
+      saveGarden(loadGarden().filter((entry) => entry.id !== button.dataset.gardenRemove));
+      renderGarden();
+    });
+  });
+}
+
+document.querySelector("#gardenForm")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const nameInput = document.querySelector("#gardenName");
+  const name = nameInput?.value.trim();
+  if (!name) return;
+  const days = Number(document.querySelector("#gardenDays")?.value) || 7;
+  const plants = loadGarden();
+  plants.push({
+    id: `plant-${Date.now().toString(36)}`,
+    name,
+    days,
+    last: new Date().toISOString(),
+  });
+  saveGarden(plants);
+  if (nameInput) nameInput.value = "";
+  renderGarden();
+});
+
+renderGarden();
+
+// ---------------------------------------------------------------------------
+// For the record: one line a day, echoed a week later
+// ---------------------------------------------------------------------------
+
+const JOURNAL_KEY = "daymark-journal";
+
+function loadJournal() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function initJournal() {
+  const input = document.querySelector("#journalInput");
+  const echo = document.querySelector("#journalEcho");
+  if (!input) return;
+  const journal = loadJournal();
+  input.value = journal[formatApiDate(new Date())] || "";
+  input.addEventListener("change", () => {
+    const entries = loadJournal();
+    entries[formatApiDate(new Date())] = input.value.trim();
+    localStorage.setItem(JOURNAL_KEY, JSON.stringify(entries));
+  });
+
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const past = journal[formatApiDate(weekAgo)];
+  if (echo && past) {
+    echo.hidden = false;
+    echo.textContent = `A week ago tonight: “${past}”`;
+  }
+}
+
+initJournal();
+
+// ---------------------------------------------------------------------------
+// Severe weather: NWS alerts banner at the top of the front page
+// ---------------------------------------------------------------------------
+
+async function refreshWeatherAlerts() {
+  const banner = document.querySelector("#alertBanner");
+  if (!banner) return;
+  try {
+    const data = await fetchJson("https://api.weather.gov/alerts/active?point=35.994,-78.8986");
+    const alert = (data.features || [])
+      .map((feature) => feature.properties || {})
+      .find((props) => props.event);
+    if (!alert) {
+      banner.hidden = true;
+      return;
+    }
+    const urgent = alert.severity === "Severe" || alert.severity === "Extreme";
+    const ends = alert.ends || alert.expires;
+    const headline = (alert.headline || "").replace(alert.event, "").trim();
+    const until =
+      ends && !/until/i.test(headline)
+        ? ` · Until ${new Date(ends).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`
+        : "";
+    banner.hidden = false;
+    banner.className = urgent ? "alert-banner is-urgent" : "alert-banner";
+    banner.innerHTML = `<strong>${escapeHtml(alert.event.toUpperCase())}</strong><span>${escapeHtml(
+      headline || "Details at weather.gov",
+    )}${until}</span>`;
+  } catch {
+    banner.hidden = true;
+  }
+}
+
+refreshWeatherAlerts();
 
 setAppView("today", { scroll: false });
 formatDate();
