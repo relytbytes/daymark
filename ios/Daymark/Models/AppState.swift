@@ -677,6 +677,14 @@ final class AppState {
         }
     }
 
+    // MARK: Capture requests (empty states open the capture sheet)
+
+    var captureRequested = false
+
+    func requestCapture() {
+        captureRequested = true
+    }
+
     // MARK: Toast
 
     func toast(_ message: String) {

@@ -102,6 +102,27 @@ struct WorkView: View {
                                     foreground: role.stageRank <= 1 ? Color(hex: 0x0E7A54) : Palette.coral,
                                     background: role.stageRank <= 1 ? Palette.greenSoft : Palette.coralSoft
                                 )
+                                // Visible menu — same actions the long-press hides.
+                                Menu {
+                                    if role.stageRank <= 2 {
+                                        Button {
+                                            app.runInterviewPrep(role)
+                                            deskSheet = JobDeskSheet(role: role, kind: .prep)
+                                        } label: {
+                                            Label("Interview prep", systemImage: "text.book.closed")
+                                        }
+                                    }
+                                    Button {
+                                        app.runFollowUp(role)
+                                        deskSheet = JobDeskSheet(role: role, kind: .followUp)
+                                    } label: {
+                                        Label("Draft follow-up", systemImage: "envelope")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle")
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(Palette.subtle)
+                                }
                             }
                             .padding(.vertical, 10)
                             .contentShape(Rectangle())
@@ -124,9 +145,6 @@ struct WorkView: View {
                         }
                     }
                     Hairline()
-                    Text("LONG-PRESS A ROLE FOR PREP OR A FOLLOW-UP DRAFT")
-                        .kickerStyle(Palette.subtle, size: 7, tracking: 1.0)
-                        .padding(.top, 8)
 
                     DeskAction(label: "Open Landed", systemImage: "arrow.up.right") {
                         if let url = URL(string: "https://job-search-command-center-brown.vercel.app") {
@@ -166,9 +184,24 @@ struct WorkView: View {
             .padding(.bottom, 10)
 
             if app.persisted.applications.isEmpty {
-                EmptyNote(text: app.landedRoles.isEmpty
-                          ? "No applications tracked yet. Add the first real role you want to move."
-                          : "The pipeline lives in Landed — \(app.applicationsActive) open roles on the wire above. + Add is for one-offs outside the sheet.")
+                Button {
+                    creatingApplication = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Palette.coral)
+                        Text(app.landedRoles.isEmpty
+                             ? "No applications tracked yet — tap to add the first real role."
+                             : "The pipeline lives in Landed (\(app.applicationsActive) open roles above) — tap to add a one-off outside the sheet.")
+                            .font(DS.deck(13))
+                            .foregroundStyle(Palette.muted)
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             } else {
                 ForEach(app.persisted.applications) { application in
                     VStack(spacing: 0) {
@@ -256,7 +289,7 @@ struct WorkView: View {
                                 if app.sprintDone(milestone.id) {
                                     Image(systemName: "checkmark")
                                         .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(Palette.paper)
                                 }
                             }
                         }

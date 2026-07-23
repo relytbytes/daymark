@@ -413,7 +413,21 @@ struct MoreView: View {
                 .padding(.bottom, 4)
 
             if queue.isEmpty {
-                EmptyNote(text: "The queue is clear. Save a link from Capture and it lands here.")
+                Button {
+                    app.requestCapture()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Palette.coral)
+                        Text("The queue is clear — tap to save something to read.")
+                            .font(DS.deck(13))
+                            .foregroundStyle(Palette.muted)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             } else {
                 ForEach(queue) { item in
                     VStack(spacing: 0) {

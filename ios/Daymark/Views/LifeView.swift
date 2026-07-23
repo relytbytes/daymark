@@ -278,7 +278,7 @@ struct LifeView: View {
                 } label: {
                     Text("GO")
                         .font(.system(size: 10, weight: .heavy)).tracking(0.8)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Palette.paper)
                         .padding(.horizontal, 14).padding(.vertical, 12)
                         .background(Palette.ink)
                         .clipShape(Capsule())
@@ -380,7 +380,21 @@ struct LifeView: View {
             SectionRuleHeader(title: "Practical · Yours")
                 .padding(.bottom, 4)
             if reminders.isEmpty {
-                EmptyNote(text: "No reminders saved. Add one from Capture.")
+                Button {
+                    app.requestCapture()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Palette.coral)
+                        Text("No reminders saved — tap to add one.")
+                            .font(DS.deck(13))
+                            .foregroundStyle(Palette.muted)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             } else {
                 ForEach(reminders) { item in
                     VStack(spacing: 0) {
@@ -478,7 +492,7 @@ struct TeamBadge: View {
     private var monogram: some View {
         Text(team.abbr.isEmpty ? String(team.name.prefix(3)).uppercased() : team.abbr)
             .font(.system(size: size * 0.32, weight: .heavy))
-            .foregroundStyle(.white)
+            .foregroundStyle(Palette.paper)
             .frame(width: size, height: size)
             .background(Circle().fill(Palette.ink))
     }
