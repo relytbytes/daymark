@@ -55,7 +55,9 @@ enum BaseballService {
                 return Date().timeIntervalSince(d) < 20 * 3600
             }
 
-        guard let chosen = live ?? upcoming ?? recentFinal else { return (nil, nil) }
+        // A just-finished game outranks tomorrow's: that's when the box
+        // score matters. Upcoming takes over ~20h after first pitch.
+        guard let chosen = live ?? recentFinal ?? upcoming else { return (nil, nil) }
         // Up next: the first future game that isn't the one being shown.
         let next = games
             .filter { ($0.status?.abstractGameState ?? "") == "Preview" && $0.gamePk != chosen.gamePk }
