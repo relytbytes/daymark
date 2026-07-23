@@ -152,7 +152,15 @@ extension AppState {
     func glanceToday() -> [GlanceCellModel] {
         [
             weatherCell(),
-            nowCell(),
+            // Indoor takes the second cell when Nest is reporting; the
+            // clock lives in the status bar and the masthead already.
+            nestReading.map { nest in
+                GlanceCellModel(
+                    id: "indoor", label: "Indoor",
+                    value: "\(nest.indoorF)°",
+                    sub: nest.hvacActive ? "running" : (nest.setpointF.map { "set \($0)°" } ?? "idle")
+                )
+            } ?? nowCell(),
             leaveBy.map { leave in
                 GlanceCellModel(
                     id: "leaveby", label: "Leave by",
