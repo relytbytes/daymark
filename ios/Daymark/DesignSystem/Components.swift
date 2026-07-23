@@ -318,13 +318,39 @@ struct QuietButton: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Palette.ink)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Palette.card)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(Palette.wash)
                 .overlay(RoundedRectangle(cornerRadius: 999).stroke(Palette.line, lineWidth: 1))
                 .clipShape(RoundedRectangle(cornerRadius: 999))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// A desk action — the coral capsule for "do something" verbs, so
+/// functional controls read as buttons instead of hiding as caps text.
+struct DeskAction: View {
+    let label: String
+    var systemImage: String? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(label.uppercased())
+                    .font(.system(size: 10.5, weight: .heavy)).tracking(0.9)
+            }
+            .foregroundStyle(Palette.coral)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
+            .background(Capsule().fill(Palette.coralSoft))
         }
         .buttonStyle(.plain)
     }

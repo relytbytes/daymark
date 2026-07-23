@@ -317,6 +317,10 @@ struct TodayView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.subtle)
+                    .padding(.top, 2)
                 if let join = event.joinURL {
                     Button {
                         UIApplication.shared.open(join)
@@ -407,14 +411,9 @@ struct TodayView: View {
                         .foregroundStyle(Palette.ink)
                         .lineSpacing(5)
                         .textSelection(.enabled)
-                    Button {
+                    DeskAction(label: "Rewrite the column", systemImage: "arrow.clockwise") {
                         app.composeWeekReview(force: true)
-                    } label: {
-                        Text("REWRITE THE COLUMN")
-                            .font(.system(size: 8.5, weight: .heavy)).tracking(0.8)
-                            .foregroundStyle(Palette.subtle)
                     }
-                    .buttonStyle(.plain)
                     .disabled(app.weekReviewBusy)
                 } else if app.weekReviewBusy {
                     HStack(spacing: 10) {
@@ -430,14 +429,9 @@ struct TodayView: View {
                         .font(DS.label(11.5, weight: .regular))
                         .foregroundStyle(Palette.subtle)
                     if AIService.isConfigured {
-                        Button {
+                        DeskAction(label: "Write the column", systemImage: "pencil.line") {
                             app.composeWeekReview()
-                        } label: {
-                            Text("WRITE THE COLUMN")
-                                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
-                                .foregroundStyle(Palette.coral)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -542,30 +536,16 @@ struct TodayView: View {
                 Text(error)
                     .font(DS.label(11, weight: .medium))
                     .foregroundStyle(Palette.down)
-                Button {
+                DeskAction(label: "Try again", systemImage: "arrow.clockwise") {
                     app.runMeetingPrep(force: true)
-                } label: {
-                    Text("TRY AGAIN")
-                        .font(.system(size: 9, weight: .heavy)).tracking(0.8)
-                        .foregroundStyle(Palette.ink)
                 }
-                .buttonStyle(.plain)
             }
             .padding(.top, 4)
         } else if AIService.isConfigured {
-            Button {
+            DeskAction(label: "Prep me — the desk brief", systemImage: "text.book.closed.fill") {
                 app.runMeetingPrep()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "text.book.closed.fill")
-                        .font(.system(size: 10))
-                    Text("PREP ME — THE DESK BRIEF")
-                        .font(.system(size: 9.5, weight: .heavy)).tracking(1.0)
-                }
-                .foregroundStyle(Palette.coral)
-                .padding(.top, 4)
             }
-            .buttonStyle(.plain)
+            .padding(.top, 6)
         }
     }
 
