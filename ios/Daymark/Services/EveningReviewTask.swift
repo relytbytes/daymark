@@ -59,7 +59,7 @@ enum EveningReviewTask {
         guard AIService.isConfigured else { return nil }
         let persisted = JSONStore.load() ?? PersistedState()
 
-        let done = persisted.tasks.filter(\.value).count
+        let done = EssentialTask.evening.filter { persisted.tasks[$0.id] ?? false }.count
         let openCaptures = persisted.captures.filter { !$0.done }.map(\.title)
         let notes = persisted.taskNotes.values.joined(separator: " · ")
 
