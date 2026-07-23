@@ -472,6 +472,7 @@ struct WeatherSnapshot {
     let sunrise: Date
     let sunset: Date
     let hourly: [HourForecast]
+    var allHours: [HourForecast] = []   // the full multi-day hourly ledger
     var humidity: Int? = nil
     var windMph: Int = 0
     var uvIndexMax: Double? = nil

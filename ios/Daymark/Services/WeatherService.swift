@@ -37,13 +37,13 @@ enum WeatherService {
               let sunset = parse(response.daily.sunset.first)
         else { throw HTTPError.status(0) }
 
-        // Next 12 hours from now.
+        // Every fetched hour (8 days); the strip takes the next 12.
         let now = Date()
-        var hourly: [HourForecast] = []
+        var allHours: [HourForecast] = []
         let count = response.hourly.time.count
         for i in 0..<count {
-            guard let t = parse(response.hourly.time[i]), t >= now, hourly.count < 12 else { continue }
-            hourly.append(HourForecast(
+            guard let t = parse(response.hourly.time[i]) else { continue }
+            allHours.append(HourForecast(
                 time: t,
                 temp: Int(response.hourly.temperature_2m[i].rounded()),
                 precip: i < (response.hourly.precipitation_probability?.count ?? 0)
@@ -53,6 +53,7 @@ enum WeatherService {
                     ? response.hourly.precipitation![i] : 0
             ))
         }
+        let hourly = Array(allHours.filter { $0.time >= now }.prefix(12))
 
         // 7-day outlook (skip today at index 0).
         var week: [DayForecast] = []
@@ -78,6 +79,7 @@ enum WeatherService {
             sunrise: sunrise,
             sunset: sunset,
             hourly: hourly,
+            allHours: allHours,
             humidity: response.current.relative_humidity_2m,
             windMph: Int((response.current.wind_speed_10m ?? 0).rounded()),
             uvIndexMax: response.daily.uv_index_max?.first,

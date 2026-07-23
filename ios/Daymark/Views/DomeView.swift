@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 // MARK: - Bundled catalog
 
@@ -51,7 +52,32 @@ struct SkyCatalog {
 
 // MARK: - The Dome
 
+/// Device heading for the compass mode — heading updates need no
+/// location permission, just a magnetometer.
+@Observable
+final class CompassManager: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+    var heading: Double = 0
+
+    func start() {
+        guard CLLocationManager.headingAvailable() else { return }
+        manager.delegate = self
+        manager.headingFilter = 2
+        manager.startUpdatingHeading()
+    }
+
+    func stop() {
+        manager.stopUpdatingHeading()
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+    }
+}
+
 struct DomeView: View {
+    @State private var compass = CompassManager()
+    @State private var compassOn = false
     @State private var zoom: CGFloat = 1
     @State private var steadyZoom: CGFloat = 1
     @State private var pan: CGSize = .zero
@@ -72,10 +98,32 @@ struct DomeView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .contentShape(Rectangle())
                 .gesture(domeGestures(size: size, date: context.date))
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        compassOn.toggle()
+                        if compassOn { compass.start() } else { compass.stop() }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: compassOn ? "location.north.circle.fill" : "location.north.circle")
+                                .font(.system(size: 12))
+                            Text(compassOn ? "FACING" : "COMPASS")
+                                .font(.system(size: 8, weight: .heavy)).tracking(0.8)
+                        }
+                        .foregroundStyle(compassOn ? Palette.coral
+                                         : Color(red: 0.86, green: 0.89, blue: 0.96).opacity(0.8))
+                        .padding(.horizontal, 9).padding(.vertical, 6)
+                        .background(Capsule().fill(Color.black.opacity(0.35)))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(8)
+                }
             }
             .aspectRatio(1, contentMode: .fit)
         }
     }
+
+    /// When the compass is on, the direction you face points up.
+    private var headingOffset: Double { compassOn ? compass.heading : 0 }
 
     // MARK: Projection
 
@@ -91,7 +139,7 @@ struct DomeView: View {
                                      latitude: AppConfig.homeLatitude, longitude: AppConfig.homeLongitude)
         guard h.alt > -1 else { return nil }
         let r = radius * CGFloat((90 - h.alt) / 90)
-        let azRad = h.az * .pi / 180
+        let azRad = (h.az - headingOffset) * .pi / 180
         return CGPoint(x: center.x + r * CGFloat(sin(azRad)), y: center.y - r * CGFloat(cos(azRad)))
     }
 
@@ -186,7 +234,7 @@ struct DomeView: View {
         horizon.addEllipse(in: domeRect)
         canvas.stroke(horizon, with: .color(Color(red: 0.78, green: 0.82, blue: 0.9).opacity(0.5)), lineWidth: 1.2)
         for (label, az) in [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)] {
-            let rad = az * .pi / 180
+            let rad = (az - headingOffset) * .pi / 180
             let point = CGPoint(
                 x: center.x + (radius - 12) * CGFloat(sin(rad)),
                 y: center.y - (radius - 12) * CGFloat(cos(rad))
