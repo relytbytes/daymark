@@ -94,6 +94,7 @@ final class AppState {
     var autoFitnessDays: Int = 0        // HealthKit: fitness days since Monday
     var autoJobTouches: Int = 0         // Landed: rows changed since Monday
     var landedError: String?            // why the Landed wire is down, if it is
+    private var lastNestPoll = Date.distantPast
 
     // MARK: Init
 
@@ -244,7 +245,12 @@ final class AppState {
         await refreshFitnessScore()
         cadence = CadenceBridge.read()
         if NestService.isConfigured, nest.isConnected {
-            nestReading = try? await nest.thermostat()
+            // Keep the last good reading — SDM rate-limits hard, and a
+            // failed poll shouldn't blank the Indoor cell. Poll gently.
+            if Date().timeIntervalSince(lastNestPoll) > 120 || nestReading == nil {
+                lastNestPoll = Date()
+                if let fresh = try? await nest.thermostat() { nestReading = fresh }
+            }
         }
     }
 
@@ -593,7 +599,7 @@ final class AppState {
             do {
                 try await nest.setTemperature(targetF, reading: reading)
                 toast("Nest set to \(targetF)°.")
-                nestReading = try? await nest.thermostat()
+                if let fresh = try? await nest.thermostat() { nestReading = fresh }
             } catch {
                 toast("Nest didn't take it: \(error.localizedDescription)")
             }
@@ -608,7 +614,7 @@ final class AppState {
             do {
                 try await nest.setMode(mode)
                 toast("Nest mode: \(mode.capitalized).")
-                nestReading = try? await nest.thermostat()
+                if let fresh = try? await nest.thermostat() { nestReading = fresh }
             } catch {
                 toast("Nest didn't take it: \(error.localizedDescription)")
             }
@@ -623,7 +629,7 @@ final class AppState {
             do {
                 try await nest.setFan(on: on, minutes: minutes)
                 toast(on ? "Fan running for \(minutes) minutes." : "Fan off.")
-                nestReading = try? await nest.thermostat()
+                if let fresh = try? await nest.thermostat() { nestReading = fresh }
             } catch {
                 toast("Nest didn't take it: \(error.localizedDescription)")
             }
