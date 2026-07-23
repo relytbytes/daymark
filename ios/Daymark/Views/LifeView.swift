@@ -14,6 +14,7 @@ struct LifeView: View {
     @Binding var showSettings: Bool
     @State private var openURLItem: SheetLink?
     @State private var mapQuery = ""
+    @State private var showThermostat = false
 
     var body: some View {
         let phase = DayPhase.current()
@@ -56,6 +57,10 @@ struct LifeView: View {
         .sheet(item: $openURLItem) { item in
             SafariView(url: item.url).ignoresSafeArea()
         }
+        .sheet(isPresented: $showThermostat) {
+            ThermostatSheet()
+                .presentationDetents([.medium, .large])
+        }
     }
 
     // MARK: Weather feature
@@ -83,21 +88,13 @@ struct LifeView: View {
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
                             if let nest = app.nestReading {
-                                // Tap the indoor line to nudge the thermostat.
-                                Menu {
-                                    Button { app.nudgeNest(by: 1) } label: {
-                                        Label("Warmer · +1°", systemImage: "thermometer.sun")
-                                    }
-                                    Button { app.nudgeNest(by: -1) } label: {
-                                        Label("Cooler · −1°", systemImage: "thermometer.snowflake")
-                                    }
-                                    if let setpoint = nest.setpointF {
-                                        Text("Set to \(setpoint)° · \(nest.mode.capitalized)")
-                                    }
+                                // Tap the indoor line for the thermostat sheet.
+                                Button {
+                                    showThermostat = true
                                 } label: {
                                     detailLine("Indoor \(nest.indoorF)°\(nest.hvacActive ? " · running" : "") ⌄")
                                 }
-                                .disabled(app.nestAdjusting)
+                                .buttonStyle(.plain)
                             }
                             detailLine("H \(weather.high) · L \(weather.low)")
                             detailLine("Rain \(weather.rainPct)%")
@@ -485,5 +482,173 @@ struct TeamBadge: View {
             .foregroundStyle(.white)
             .frame(width: size, height: size)
             .background(Circle().fill(Palette.ink))
+    }
+}
+
+// MARK: - The Thermostat: full Nest control
+
+struct ThermostatSheet: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @State private var target: Int = 72
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("THE THERMOSTAT · NEST")
+                        .kickerStyle(Palette.coral, size: 10, tracking: 1.5)
+                        .padding(.bottom, 8)
+
+                    if let nest = app.nestReading {
+                        Text(nest.roomName)
+                            .font(DS.display(28))
+                            .foregroundStyle(Palette.ink)
+                        InkRule().padding(.vertical, 12)
+
+                        // Current conditions
+                        HStack(alignment: .lastTextBaseline, spacing: 12) {
+                            Text("\(nest.indoorF)°")
+                                .font(DS.display(54))
+                                .foregroundStyle(Palette.ink)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(nest.hvacActive ? "RUNNING" : "IDLE")
+                                    .kickerStyle(nest.hvacActive ? Palette.coral : Palette.subtle,
+                                                 size: 8.5, tracking: 1.2)
+                                if let humidity = nest.humidity {
+                                    Text("\(humidity)% humidity")
+                                        .font(DS.label(12, weight: .medium))
+                                        .foregroundStyle(Palette.muted)
+                                }
+                            }
+                            Spacer()
+                        }
+                        .padding(.bottom, 18)
+
+                        // Mode
+                        Text("MODE").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                            .padding(.bottom, 6)
+                        HStack(spacing: 8) {
+                            ForEach(["OFF", "HEAT", "COOL", "HEATCOOL"], id: \.self) { mode in
+                                let active = nest.mode == mode
+                                Button {
+                                    app.nestSetMode(mode)
+                                } label: {
+                                    Text(mode == "HEATCOOL" ? "AUTO" : mode)
+                                        .font(.system(size: 10, weight: .heavy)).tracking(0.8)
+                                        .foregroundStyle(active ? Palette.paper : Palette.ink)
+                                        .padding(.horizontal, 13).padding(.vertical, 9)
+                                        .background(Capsule().fill(active ? Palette.ink : Palette.wash))
+                                        .overlay(Capsule().stroke(Palette.line, lineWidth: active ? 0 : 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.bottom, 20)
+
+                        // Setpoint — big controls, exact degree
+                        if nest.mode != "OFF" {
+                            Text("SET TO").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                                .padding(.bottom, 6)
+                            HStack(spacing: 22) {
+                                bigStep("minus") { target = max(55, target - 1) }
+                                Text("\(target)°")
+                                    .font(DS.display(64))
+                                    .foregroundStyle(target > (nest.setpointF ?? target) ? Palette.coral
+                                                     : target < (nest.setpointF ?? target) ? Palette.blue
+                                                     : Palette.ink)
+                                    .monospacedDigit()
+                                    .frame(minWidth: 130)
+                                bigStep("plus") { target = min(90, target + 1) }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+
+                            Button {
+                                app.nestSetTemperature(target)
+                            } label: {
+                                Text(app.nestAdjusting ? "SETTING…" : "SET \(target)°")
+                                    .font(.system(size: 12, weight: .heavy)).tracking(1.2)
+                                    .foregroundStyle(Palette.paper)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(RoundedRectangle(cornerRadius: 14).fill(Palette.ink))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(app.nestAdjusting || target == nest.setpointF)
+                            .opacity(target == nest.setpointF ? 0.4 : 1)
+                            .padding(.bottom, 20)
+                        }
+
+                        // Fan
+                        Text("FAN").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                            .padding(.bottom, 6)
+                        HStack(spacing: 8) {
+                            if nest.fanRunning {
+                                Button {
+                                    app.nestFan(on: false)
+                                } label: {
+                                    Label("Stop fan", systemImage: "fan.slash")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Palette.paper)
+                                        .padding(.horizontal, 14).padding(.vertical, 10)
+                                        .background(Capsule().fill(Palette.coral))
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                ForEach([15, 30, 60], id: \.self) { minutes in
+                                    Button {
+                                        app.nestFan(on: true, minutes: minutes)
+                                    } label: {
+                                        Label("\(minutes)m", systemImage: "fan")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(Palette.ink)
+                                            .padding(.horizontal, 13).padding(.vertical, 10)
+                                            .background(Capsule().fill(Palette.wash))
+                                            .overlay(Capsule().stroke(Palette.line, lineWidth: 1))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            Spacer()
+                        }
+                        Text(nest.fanRunning
+                             ? "The fan is on its timer."
+                             : "Nest runs the fan on a timer — pick a duration.")
+                            .font(DS.label(10.5, weight: .regular))
+                            .foregroundStyle(Palette.subtle)
+                            .padding(.top, 8)
+                    } else {
+                        EmptyNote(text: "No thermostat reading yet — pull to refresh the Life page first.")
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 30)
+            }
+            .background(Palette.paper)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Palette.ink)
+                }
+            }
+            .onAppear {
+                target = app.nestReading?.setpointF ?? 72
+            }
+        }
+    }
+
+    private func bigStep(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Palette.ink)
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Palette.wash))
+                .overlay(Circle().stroke(Palette.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 }

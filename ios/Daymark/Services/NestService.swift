@@ -24,6 +24,9 @@ struct NestReading: Hashable {
     let mode: String            // HEAT / COOL / HEATCOOL / OFF
     let hvacActive: Bool        // currently heating or cooling
     let setpointF: Int?
+    let heatF: Int?
+    let coolF: Int?
+    let fanRunning: Bool        // fan timer currently active
     let roomName: String
 }
 
@@ -99,26 +102,19 @@ final class NestService {
         return access
     }
 
-    // MARK: Adjust the thermostat
+    // MARK: Command the thermostat
 
-    /// Nudge the setpoint by whole degrees Fahrenheit, respecting the
-    /// current mode (COOL adjusts the cool setpoint, HEAT the heat one).
-    func adjustSetpoint(by deltaF: Int) async throws -> Int {
-        guard let reading = try await thermostat(), let current = reading.setpointF else {
-            throw ServiceError.auth("No setpoint to adjust — is the thermostat off?")
-        }
-        let targetF = current + deltaF
-        let targetC = Double(targetF - 32) * 5 / 9
-        let (command, field): (String, String) = reading.mode == "HEAT"
-            ? ("SetHeat", "heatCelsius")
-            : ("SetCool", "coolCelsius")
+    /// The device's SDM name, cached for the session.
+    private var cachedDeviceName: String?
 
+    private func deviceName() async throws -> String {
+        if let cachedDeviceName { return cachedDeviceName }
         let token = try await validToken()
-        let devicesURL = URL(string:
+        let url = URL(string:
             "https://smartdevicemanagement.googleapis.com/v1/enterprises/\(AppConfig.nestProjectID)/devices")!
-        var listRequest = URLRequest(url: devicesURL, timeoutInterval: 20)
-        listRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (listData, _) = try await URLSession.shared.data(for: listRequest)
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: request)
         struct Devices: Decodable {
             struct Device: Decodable {
                 let name: String?
@@ -126,26 +122,72 @@ final class NestService {
             }
             let devices: [Device]?
         }
-        guard let device = (try? JSONDecoder().decode(Devices.self, from: listData))?
+        guard let device = (try? JSONDecoder().decode(Devices.self, from: data))?
             .devices?.first(where: { $0.type?.contains("THERMOSTAT") == true }),
-              let deviceName = device.name
+              let name = device.name
         else { throw ServiceError.auth("Thermostat not found.") }
+        cachedDeviceName = name
+        return name
+    }
 
+    private func execute(_ command: String, params: [String: Any]) async throws {
+        let token = try await validToken()
+        let name = try await deviceName()
         var request = URLRequest(
-            url: URL(string: "https://smartdevicemanagement.googleapis.com/v1/\(deviceName):executeCommand")!,
+            url: URL(string: "https://smartdevicemanagement.googleapis.com/v1/\(name):executeCommand")!,
             timeoutInterval: 20)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "command": "sdm.devices.commands.ThermostatTemperatureSetpoint.\(command)",
-            "params": [field: targetC],
+            "command": command,
+            "params": params,
         ])
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw HTTPError.status((response as? HTTPURLResponse)?.statusCode ?? 0)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            struct GoogleError: Decodable {
+                struct Inner: Decodable { let message: String? }
+                let error: Inner?
+            }
+            let message = (try? JSONDecoder().decode(GoogleError.self, from: data))?.error?.message ?? ""
+            throw ServiceError.auth(message.nilIfEmpty ?? "Nest refused the command (\(http.statusCode)).")
         }
-        return targetF
+    }
+
+    private func celsius(_ f: Int) -> Double { Double(f - 32) * 5 / 9 }
+
+    /// Set an exact target, respecting the mode. HEATCOOL keeps the
+    /// other bound where it is.
+    func setTemperature(_ targetF: Int, reading: NestReading) async throws {
+        switch reading.mode {
+        case "HEAT":
+            try await execute("sdm.devices.commands.ThermostatTemperatureSetpoint.SetHeat",
+                              params: ["heatCelsius": celsius(targetF)])
+        case "HEATCOOL":
+            let heat = reading.heatF ?? (targetF - 4)
+            let cool = reading.coolF ?? (targetF + 4)
+            // Move whichever bound is closer to the request.
+            let movingCool = abs(targetF - (reading.coolF ?? 999)) <= abs(targetF - (reading.heatF ?? -999))
+            try await execute("sdm.devices.commands.ThermostatTemperatureSetpoint.SetRange", params: [
+                "heatCelsius": celsius(movingCool ? heat : targetF),
+                "coolCelsius": celsius(movingCool ? targetF : cool),
+            ])
+        default:
+            try await execute("sdm.devices.commands.ThermostatTemperatureSetpoint.SetCool",
+                              params: ["coolCelsius": celsius(targetF)])
+        }
+    }
+
+    /// HEAT / COOL / HEATCOOL / OFF.
+    func setMode(_ mode: String) async throws {
+        try await execute("sdm.devices.commands.ThermostatMode.SetMode", params: ["mode": mode])
+    }
+
+    /// The fan runs on a timer in SDM — on for N minutes, or off now.
+    func setFan(on: Bool, minutes: Int = 60) async throws {
+        var params: [String: Any] = ["timerMode": on ? "ON" : "OFF"]
+        if on { params["duration"] = "\(minutes * 60)s" }
+        try await execute("sdm.devices.commands.Fan.SetTimer", params: params)
     }
 
     // MARK: Read the thermostat
@@ -184,7 +226,10 @@ final class NestService {
         let mode = trait("ThermostatMode")?["mode"]?.string ?? "OFF"
         let hvac = trait("ThermostatHvac")?["status"]?.string ?? "OFF"
         let setpointTrait = trait("ThermostatTemperatureSetpoint")
-        let setpoint = setpointTrait?["coolCelsius"]?.double ?? setpointTrait?["heatCelsius"]?.double
+        let heat = setpointTrait?["heatCelsius"]?.double
+        let cool = setpointTrait?["coolCelsius"]?.double
+        let setpoint = mode == "HEAT" ? heat : (cool ?? heat)
+        let fanMode = trait("Fan")?["timerMode"]?.string ?? "OFF"
 
         return NestReading(
             indoorF: fahrenheit(ambient),
@@ -192,6 +237,9 @@ final class NestService {
             mode: mode,
             hvacActive: hvac != "OFF",
             setpointF: setpoint.map(fahrenheit),
+            heatF: heat.map(fahrenheit),
+            coolF: cool.map(fahrenheit),
+            fanRunning: fanMode == "ON",
             roomName: thermostat.parentRelations?.first?.displayName ?? "Home"
         )
     }

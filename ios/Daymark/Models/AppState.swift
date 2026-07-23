@@ -585,14 +585,44 @@ final class AppState {
 
     var nestAdjusting = false
 
-    func nudgeNest(by deltaF: Int) {
+    func nestSetTemperature(_ targetF: Int) {
+        guard let reading = nestReading, !nestAdjusting else { return }
+        nestAdjusting = true
+        Task {
+            defer { nestAdjusting = false }
+            do {
+                try await nest.setTemperature(targetF, reading: reading)
+                toast("Nest set to \(targetF)°.")
+                nestReading = try? await nest.thermostat()
+            } catch {
+                toast("Nest didn't take it: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func nestSetMode(_ mode: String) {
         guard !nestAdjusting else { return }
         nestAdjusting = true
         Task {
             defer { nestAdjusting = false }
             do {
-                let target = try await nest.adjustSetpoint(by: deltaF)
-                toast("Nest set to \(target)°.")
+                try await nest.setMode(mode)
+                toast("Nest mode: \(mode.capitalized).")
+                nestReading = try? await nest.thermostat()
+            } catch {
+                toast("Nest didn't take it: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func nestFan(on: Bool, minutes: Int = 60) {
+        guard !nestAdjusting else { return }
+        nestAdjusting = true
+        Task {
+            defer { nestAdjusting = false }
+            do {
+                try await nest.setFan(on: on, minutes: minutes)
+                toast(on ? "Fan running for \(minutes) minutes." : "Fan off.")
                 nestReading = try? await nest.thermostat()
             } catch {
                 toast("Nest didn't take it: \(error.localizedDescription)")
