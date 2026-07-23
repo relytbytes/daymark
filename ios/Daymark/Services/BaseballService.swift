@@ -135,12 +135,12 @@ enum BaseballService {
         var parts: [String] = []
         if let winner = decisions?.winner {
             let record = seasonPitching(winner.id)
-            let tail = record.map { " \($0.wins ?? 0)''' + ENDASH + '''\($0.losses ?? 0)" } ?? ""
+            let tail = record.map { " \($0.wins ?? 0)–\($0.losses ?? 0)" } ?? ""
             parts.append("W: \(lastName(winner.fullName))\(tail)")
         }
         if let loser = decisions?.loser {
             let record = seasonPitching(loser.id)
-            let tail = record.map { " \($0.wins ?? 0)''' + ENDASH + '''\($0.losses ?? 0)" } ?? ""
+            let tail = record.map { " \($0.wins ?? 0)–\($0.losses ?? 0)" } ?? ""
             parts.append("L: \(lastName(loser.fullName))\(tail)")
         }
         if let save = decisions?.save {
@@ -148,7 +148,7 @@ enum BaseballService {
             let tail = record?.saves.map { " (\($0))" } ?? ""
             parts.append("SV: \(lastName(save.fullName))\(tail)")
         }
-        let decisionsLine = parts.isEmpty ? nil : parts.joined(separator: " ''' + MIDDOT + ''' ")
+        let decisionsLine = parts.isEmpty ? nil : parts.joined(separator: " · ")
 
         // Bats that mattered: multi-hit games and home runs, best first.
         var hitters: [(score: Int, line: String)] = []
@@ -243,6 +243,9 @@ enum BaseballService {
         var components = URLComponents(string: "https://statsapi.mlb.com/api/v1/standings")!
         components.queryItems = [
             URLQueryItem(name: "leagueId", value: "117"),
+            // The IL plays a split season; the second half is the live race
+            // (first-half winner already holds a playoff spot).
+            URLQueryItem(name: "standingsTypes", value: "secondHalf"),
             URLQueryItem(name: "hydrate", value: "team,division"),
         ]
         let records = try await HTTP.json(StandingsResponse.self, components.url!).records
