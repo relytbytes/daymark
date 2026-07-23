@@ -273,6 +273,8 @@ struct MoreView: View {
                     .frame(width: 44, alignment: .trailing)
                 Text("GB").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
                     .frame(width: 36, alignment: .trailing)
+                Text("L10").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                    .frame(width: 38, alignment: .trailing)
             }
             .padding(.vertical, 7)
             ForEach(rows) { row in
@@ -297,6 +299,10 @@ struct MoreView: View {
                             .font(DS.label(12, weight: .regular))
                             .foregroundStyle(Palette.muted)
                             .frame(width: 36, alignment: .trailing)
+                        Text(row.l10)
+                            .font(DS.label(12, weight: .regular)).monospacedDigit()
+                            .foregroundStyle(Palette.muted)
+                            .frame(width: 38, alignment: .trailing)
                     }
                     .padding(.vertical, 9)
                 }

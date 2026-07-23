@@ -67,6 +67,7 @@ final class AppState {
     var baseballStatus: FeedStatus = .idle
     var bullsGame: GameInfo?
     var bullsNext: GameInfo?
+    var bullsStandings: [StandingRow] = []
     var bullsStatus: FeedStatus = .idle
 
     var playback: PlaybackInfo?
@@ -311,10 +312,12 @@ final class AppState {
     func refreshBulls() async {
         if bullsGame == nil { bullsStatus = .checking }
         do {
+            async let standings = BaseballService.bullsStandings()
             let (fresh, next) = try await BaseballService.bullsGame()
             announceGameTransitions(old: bullsGame, new: fresh, team: "Bulls")
             bullsGame = fresh
             bullsNext = next
+            bullsStandings = (try? await standings) ?? bullsStandings
             bullsStatus = .live(Date())
         } catch {
             bullsStatus = degrade(bullsStatus)

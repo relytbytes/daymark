@@ -328,6 +328,8 @@ struct LifeView: View {
                     if let next = app.bullsNext {
                         UpNextRow(game: next)
                     }
+                    StandingsTable(rows: app.bullsStandings, title: "INTERNATIONAL LEAGUE")
+                        .padding(.top, 12)
                 }
             } else {
                 HStack {

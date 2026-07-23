@@ -530,6 +530,24 @@ struct BoxScoreGrid: View {
             }
             .padding(.vertical, 8)
             .overlay(alignment: .top) { Hairline() }
+
+            if game.decisionsLine != nil || !game.topHitters.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    if let decisions = game.decisionsLine {
+                        Text(decisions)
+                            .font(.system(size: 10.5, weight: .bold))
+                            .foregroundStyle(Palette.ink)
+                    }
+                    ForEach(game.topHitters, id: \.self) { line in
+                        Text(line)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(Palette.muted)
+                    }
+                }
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .bottom) { Hairline() }
+            }
         }
     }
 
@@ -594,5 +612,57 @@ struct UpNextRow: View {
         .padding(.top, 10)
         .overlay(alignment: .top) { Hairline() }
         .padding(.top, 10)
+    }
+}
+
+
+// MARK: - A compact standings table (used by the Bull City card)
+
+struct StandingsTable: View {
+    let rows: [StandingRow]
+    var title: String = "STANDINGS"
+
+    var body: some View {
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text(title).kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                    Spacer()
+                    Text("W–L").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                        .frame(width: 48, alignment: .trailing)
+                    Text("GB").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                        .frame(width: 34, alignment: .trailing)
+                    Text("L10").kickerStyle(Palette.subtle, size: 8, tracking: 1.0)
+                        .frame(width: 38, alignment: .trailing)
+                }
+                .padding(.vertical, 7)
+                ForEach(rows) { row in
+                    VStack(spacing: 0) {
+                        Hairline()
+                        HStack {
+                            Text(row.name)
+                                .font(DS.label(12.5, weight: row.isDbacks ? .bold : .medium))
+                                .foregroundStyle(row.isDbacks ? Palette.coral : Palette.ink)
+                                .lineLimit(1)
+                            Spacer()
+                            Text("\(row.wins)–\(row.losses)")
+                                .font(DS.label(11.5, weight: .semibold)).monospacedDigit()
+                                .foregroundStyle(Palette.ink)
+                                .frame(width: 48, alignment: .trailing)
+                            Text(row.gamesBack)
+                                .font(DS.label(11.5, weight: .regular)).monospacedDigit()
+                                .foregroundStyle(Palette.muted)
+                                .frame(width: 34, alignment: .trailing)
+                            Text(row.l10)
+                                .font(DS.label(11.5, weight: .regular)).monospacedDigit()
+                                .foregroundStyle(Palette.muted)
+                                .frame(width: 38, alignment: .trailing)
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+                Hairline()
+            }
+        }
     }
 }
