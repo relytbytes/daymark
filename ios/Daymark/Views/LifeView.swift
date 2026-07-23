@@ -8,6 +8,7 @@
 
 import SwiftUI
 import UIKit
+import PhotosUI
 
 struct LifeView: View {
     @Environment(AppState.self) private var app
@@ -20,6 +21,7 @@ struct LifeView: View {
     @State private var plantName = ""
     @State private var plantNote = ""
     @State private var plantDays = 7
+    @State private var openPlant: UUID?
 
     var body: some View {
         let phase = DayPhase.current()
@@ -72,6 +74,12 @@ struct LifeView: View {
                 showThermostat = true
                 app.thermostatRequested = false
             }
+        }
+        .sheet(item: Binding(
+            get: { openPlant.map { PlantSheetTarget(id: $0) } },
+            set: { openPlant = $0?.id }
+        )) { target in
+            PlantSheet(plantID: target.id)
         }
         .alert("New plant", isPresented: $addingPlant) {
             TextField("Name (Monstera, tomatoes…)", text: $plantName)
@@ -255,19 +263,27 @@ struct LifeView: View {
                     VStack(spacing: 0) {
                         Hairline()
                         HStack(spacing: 10) {
-                            Image(systemName: "leaf.fill")
-                                .font(.system(size: 13))
-                                .foregroundStyle(plant.daysUntilDue <= 0 ? Palette.coral : Palette.green)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(plant.name)
-                                    .font(DS.label(13.5, weight: .semibold))
-                                    .foregroundStyle(Palette.ink)
-                                Text("every \(plant.waterEveryDays)d · \(plant.dueText)"
-                                     + (plant.note.nilIfEmpty.map { " · \($0)" } ?? ""))
-                                    .font(DS.label(10.5, weight: .regular))
-                                    .foregroundStyle(plant.daysUntilDue <= 0 ? Palette.coral : Palette.subtle)
-                                    .lineLimit(1)
+                            Button {
+                                openPlant = plant.id
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "leaf.fill")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(plant.daysUntilDue <= 0 ? Palette.coral : Palette.green)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(plant.name)
+                                            .font(DS.label(13.5, weight: .semibold))
+                                            .foregroundStyle(Palette.ink)
+                                        Text("every \(plant.waterEveryDays)d · \(plant.dueText)"
+                                             + (plant.note.nilIfEmpty.map { " · \($0)" } ?? ""))
+                                            .font(DS.label(10.5, weight: .regular))
+                                            .foregroundStyle(plant.daysUntilDue <= 0 ? Palette.coral : Palette.subtle)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                             Spacer()
                             QuietButton(label: plant.daysUntilDue <= 0 ? "Water" : "Watered") {
                                 app.waterPlant(plant.id)
@@ -888,4 +904,169 @@ struct ThermostatSheet: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+// MARK: - The plant file: profile, photo record, and the desk's plan
+
+struct PlantSheet: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    let plantID: UUID
+
+    @State private var libraryItem: PhotosPickerItem?
+    @State private var showCamera = false
+
+    private var plant: Plant? {
+        app.persisted.plants.first { $0.id == plantID }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                if let plant {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("THE PLANT FILE")
+                            .kickerStyle(Palette.coral, size: 10, tracking: 1.5)
+                            .padding(.bottom, 8)
+                        Text(plant.name)
+                            .font(DS.display(28))
+                            .foregroundStyle(Palette.ink)
+                        Text("Watering every \(plant.waterEveryDays) days · \(plant.dueText)")
+                            .font(DS.label(12, weight: .semibold))
+                            .foregroundStyle(plant.daysUntilDue <= 0 ? Palette.coral : Palette.muted)
+                            .padding(.top, 4)
+                        InkRule().padding(.vertical, 12)
+
+                        // The growth record
+                        Text("THE RECORD").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                            .padding(.bottom, 6)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(plant.photos.sorted { $0.taken > $1.taken }) { photo in
+                                    if let image = CaptureImages.load(photo.file) {
+                                        VStack(spacing: 3) {
+                                            Image(uiImage: image)
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 92, height: 92)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                            Text(photo.taken.shortDate())
+                                                .font(.system(size: 8, weight: .heavy)).tracking(0.5)
+                                                .foregroundStyle(Palette.subtle)
+                                        }
+                                    }
+                                }
+                                VStack(spacing: 6) {
+                                    Button { showCamera = true } label: {
+                                        photoAddTile(icon: "camera")
+                                    }
+                                    .buttonStyle(.plain)
+                                    PhotosPicker(selection: $libraryItem, matching: .images) {
+                                        photoAddTile(icon: "photo.on.rectangle")
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.bottom, 16)
+
+                        // Profile for the plan
+                        Text("THE PROFILE").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                            .padding(.bottom, 6)
+                        VStack(spacing: 8) {
+                            profileField("Species (pothos, monstera…)", key: \.species)
+                            profileField("Pot & size (8\" terracotta…)", key: \.potSize)
+                            profileField("Soil (standard potting mix…)", key: \.soil)
+                            profileField("Light (bright indirect, porch sun…)", key: \.light)
+                        }
+                        .padding(.bottom, 12)
+
+                        if app.plantPlanBusy == plantID {
+                            HStack(spacing: 10) {
+                                ProgressView().controlSize(.small)
+                                Text("The desk is writing the plan…")
+                                    .font(DS.deck(13))
+                                    .foregroundStyle(Palette.muted)
+                            }
+                        } else {
+                            DeskAction(label: plant.plan.isEmpty ? "Compose the watering plan" : "Recompose the plan",
+                                       systemImage: "drop.fill") {
+                                app.composePlantPlan(plantID)
+                            }
+                        }
+
+                        if !plant.plan.isEmpty {
+                            Text(plant.plan)
+                                .font(DS.deck(14))
+                                .foregroundStyle(Palette.ink)
+                                .lineSpacing(4)
+                                .textSelection(.enabled)
+                                .padding(12)
+                                .background(Palette.wash)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .padding(.top, 12)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 30)
+                }
+            }
+            .background(Palette.paper)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Palette.ink)
+                }
+            }
+            .onChange(of: libraryItem) { _, item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        app.addPlantPhoto(plantID, image: image)
+                    }
+                    libraryItem = nil
+                }
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraPicker { image in app.addPlantPhoto(plantID, image: image) }
+                    .ignoresSafeArea()
+            }
+        }
+    }
+
+    private func photoAddTile(icon: String) -> some View {
+        VStack {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(Palette.green)
+        }
+        .frame(width: 92, height: 43)
+        .background(Palette.wash)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10)
+            .stroke(Palette.line, style: StrokeStyle(lineWidth: 1, dash: [4])))
+    }
+
+    private func profileField(_ placeholder: String, key: WritableKeyPath<Plant, String>) -> some View {
+        TextField(placeholder, text: Binding(
+            get: { app.persisted.plants.first { $0.id == plantID }?[keyPath: key] ?? "" },
+            set: { value in
+                if let index = app.persisted.plants.firstIndex(where: { $0.id == plantID }) {
+                    app.persisted.plants[index][keyPath: key] = value
+                }
+            }
+        ))
+        .font(DS.label(13, weight: .medium))
+        .padding(10)
+        .background(Palette.card)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Palette.line, lineWidth: 1))
+    }
+}
+
+
+struct PlantSheetTarget: Identifiable {
+    let id: UUID
 }

@@ -970,6 +970,69 @@ struct DaymarkWidgetBundle: WidgetBundle {
         AtAGlanceWidget()
         #if canImport(ActivityKit)
         FocusActivityWidget()
+        GameActivityWidget()
         #endif
     }
 }
+
+// MARK: - Game Live Activity: the score rides the Lock Screen
+
+#if canImport(ActivityKit)
+struct GameActivityWidget: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: GameActivityAttributes.self) { context in
+            HStack(spacing: 14) {
+                HStack(spacing: 3) {
+                    Circle().fill(WScheme.dark.red).frame(width: 6, height: 6)
+                    Text("LIVE")
+                        .font(.system(size: 9, weight: .heavy)).tracking(1.0)
+                        .foregroundStyle(WScheme.dark.red)
+                }
+                HStack(spacing: 8) {
+                    Text(context.attributes.awayAbbr)
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundStyle(WScheme.dark.muted)
+                    Text("\(context.state.awayScore)–\(context.state.homeScore)")
+                        .font(.system(size: 22, weight: .bold, design: .serif))
+                        .monospacedDigit()
+                        .foregroundStyle(WScheme.dark.ink)
+                    Text(context.attributes.homeAbbr)
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundStyle(WScheme.dark.muted)
+                }
+                Spacer()
+                Text(context.state.detail.uppercased())
+                    .font(.system(size: 10, weight: .heavy)).tracking(0.6)
+                    .foregroundStyle(WScheme.dark.muted)
+                    .lineLimit(1)
+            }
+            .padding(14)
+            .activityBackgroundTint(WScheme.dark.paper)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    Text("\(context.attributes.awayAbbr) \(context.state.awayScore)")
+                        .font(.system(size: 16, weight: .bold)).monospacedDigit()
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    Text("\(context.attributes.homeAbbr) \(context.state.homeScore)")
+                        .font(.system(size: 16, weight: .bold)).monospacedDigit()
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    Text(context.state.detail)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+            } compactLeading: {
+                Text("\(context.state.awayScore)–\(context.state.homeScore)")
+                    .font(.system(size: 12, weight: .bold)).monospacedDigit()
+            } compactTrailing: {
+                Circle().fill(WScheme.dark.red).frame(width: 7, height: 7)
+            } minimal: {
+                Text("\(context.state.awayScore)–\(context.state.homeScore)")
+                    .font(.system(size: 9, weight: .bold)).monospacedDigit()
+                    .minimumScaleFactor(0.6)
+            }
+        }
+    }
+}
+#endif

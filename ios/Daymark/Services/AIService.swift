@@ -340,6 +340,29 @@ enum AIDesk {
         )
     }
 
+    /// The Garden Desk's watering plan: species + conditions in, a
+    /// cadence and care notes out. The first line MUST be machine-readable.
+    static func wateringPlan(profile: String) async throws -> String {
+        try await AIService.complete(
+            system: voice,
+            user: """
+            A plant on Ty's Garden Desk, in Durham, North Carolina (hot humid \
+            summers, mild winters):
+
+            \(profile)
+
+            Reply in EXACTLY this format:
+            Line 1: "DAYS: n" where n is the watering interval in days for \
+            this plant in these conditions right now (this season).
+            Then a blank line, then 3-5 sentences of care guidance: how to \
+            check if it actually needs water before pouring, what its light \
+            situation means for it, one common failure mode for this species, \
+            and any seasonal adjustment coming. Practical, no filler.
+            """,
+            maxTokens: 350
+        )
+    }
+
     /// The Veraya sprint ledger: a running record of what the checkmarks
     /// and notes actually mean, rewritten as the sprint moves.
     static func sprintLedger(state: String, percent: Int, previous: String) async throws -> String {
