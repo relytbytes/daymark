@@ -16,15 +16,17 @@ struct SkySectionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            domeSection
             if let weather = app.weather {
                 conditionsBoard(weather)
                 precipSection(weather)
+            }
+            radarSection
+            if let weather = app.weather {
                 weekSection(weather)
             }
             airSection
-            radarSection
             almanacSection
+            domeSection
             planetsSection
             eventsSection
             astrologySection
