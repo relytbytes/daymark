@@ -328,7 +328,7 @@ struct LifeView: View {
                     if let next = app.bullsNext {
                         UpNextRow(game: next)
                     }
-                    StandingsTable(rows: app.bullsStandings, title: "INTERNATIONAL LEAGUE")
+                    StandingsTable(rows: app.bullsStandings, title: "IL · SECOND HALF")
                         .padding(.top, 12)
                 }
             } else {
