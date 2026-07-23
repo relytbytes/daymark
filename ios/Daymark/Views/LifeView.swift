@@ -322,7 +322,13 @@ struct LifeView: View {
             .padding(.bottom, 12)
 
             if let game = app.bullsGame {
-                gameBox(game, headline: "Durham Bulls", status: app.bullsStatus)
+                VStack(alignment: .leading, spacing: 0) {
+                    gameBox(game, headline: "Durham Bulls", status: app.bullsStatus)
+                    BoxScoreGrid(game: game)
+                    if let next = app.bullsNext {
+                        UpNextRow(game: next)
+                    }
+                }
             } else {
                 HStack {
                     EmptyNote(text: "No Bulls game found in the current window.")

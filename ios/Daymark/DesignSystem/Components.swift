@@ -486,3 +486,113 @@ struct SafariView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ vc: SFSafariViewController, context: Context) {}
 }
+
+// MARK: - The box score proper: runs by inning, R/H/E
+
+struct BoxScoreGrid: View {
+    let game: GameInfo
+
+    private var columns: [InningScore] {
+        // Always show at least nine frames; extras extend the grid.
+        var innings = game.innings
+        while innings.count < 9 {
+            innings.append(InningScore(number: innings.count + 1, away: nil, home: nil))
+        }
+        return innings
+    }
+
+    var body: some View {
+        if !game.innings.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    // header row
+                    HStack(spacing: 0) {
+                        Text(" ").frame(width: 44, alignment: .leading)
+                        ForEach(columns, id: \.number) { inning in
+                            Text("\(inning.number)")
+                                .font(.system(size: 8.5, weight: .heavy))
+                                .foregroundStyle(Palette.subtle)
+                                .frame(width: 22)
+                        }
+                        ForEach(["R", "H", "E"], id: \.self) { label in
+                            Text(label)
+                                .font(.system(size: 8.5, weight: .heavy))
+                                .foregroundStyle(Palette.coral)
+                                .frame(width: 24)
+                        }
+                    }
+                    .padding(.bottom, 4)
+                    scoreRow(abbr: game.away.abbr.nilIfEmpty ?? String(game.away.name.prefix(3)).uppercased(),
+                             runs: columns.map(\.away), rhe: game.awayRHE)
+                    scoreRow(abbr: game.home.abbr.nilIfEmpty ?? String(game.home.name.prefix(3)).uppercased(),
+                             runs: columns.map(\.home), rhe: game.homeRHE)
+                }
+            }
+            .padding(.vertical, 8)
+            .overlay(alignment: .top) { Hairline() }
+        }
+    }
+
+    private func scoreRow(abbr: String, runs: [Int?], rhe: TeamRHE?) -> some View {
+        HStack(spacing: 0) {
+            Text(abbr)
+                .font(.system(size: 10, weight: .heavy)).tracking(0.6)
+                .foregroundStyle(Palette.ink)
+                .frame(width: 44, alignment: .leading)
+            ForEach(Array(runs.enumerated()), id: \.offset) { _, value in
+                Text(value.map(String.init) ?? "–")
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(value == nil ? Palette.subtle : Palette.ink)
+                    .frame(width: 22)
+            }
+            Text(rhe?.runs.map(String.init) ?? "–")
+                .font(.system(size: 11, weight: .heavy)).monospacedDigit()
+                .foregroundStyle(Palette.ink).frame(width: 24)
+            Text(rhe?.hits.map(String.init) ?? "–")
+                .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                .foregroundStyle(Palette.muted).frame(width: 24)
+            Text(rhe?.errors.map(String.init) ?? "–")
+                .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                .foregroundStyle(Palette.muted).frame(width: 24)
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+// MARK: - Up next: tomorrow's game, on the card
+
+struct UpNextRow: View {
+    let game: GameInfo
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text("UP NEXT").kickerStyle(Palette.coral, size: 8, tracking: 1.2)
+                Spacer()
+                if let date = game.date {
+                    Text("\(date.isToday ? "TODAY" : date.shortDate().uppercased()) · \(date.timeText())")
+                        .font(.system(size: 8.5, weight: .heavy)).tracking(0.6)
+                        .foregroundStyle(Palette.subtle)
+                }
+            }
+            Text("\(game.away.name) at \(game.home.name)")
+                .font(DS.label(13.5, weight: .semibold))
+                .foregroundStyle(Palette.ink)
+            if let venue = game.venue {
+                Text(venue)
+                    .font(DS.label(10.5, weight: .regular))
+                    .foregroundStyle(Palette.subtle)
+            }
+            if game.awayPitcher != nil || game.homePitcher != nil {
+                Text("\(game.awayPitcher ?? "TBD") vs \(game.homePitcher ?? "TBD")")
+                    .font(DS.label(11, weight: .medium))
+                    .foregroundStyle(Palette.muted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 10)
+        .overlay(alignment: .top) { Hairline() }
+        .padding(.top, 10)
+    }
+}

@@ -61,10 +61,12 @@ final class AppState {
     var marketsStatus: FeedStatus = .idle
 
     var dbacksGame: GameInfo?
+    var dbacksNext: GameInfo?
     var nlWest: [StandingRow] = []
     var wildcard: [StandingRow] = []
     var baseballStatus: FeedStatus = .idle
     var bullsGame: GameInfo?
+    var bullsNext: GameInfo?
     var bullsStatus: FeedStatus = .idle
 
     var playback: PlaybackInfo?
@@ -295,9 +297,10 @@ final class AppState {
         do {
             async let game = BaseballService.dbacksGame()
             async let tables = BaseballService.standings()
-            let fresh = try await game
+            let (fresh, next) = try await game
             announceGameTransitions(old: dbacksGame, new: fresh, team: "D-backs")
             dbacksGame = fresh
+            dbacksNext = next
             (nlWest, wildcard) = try await tables
             baseballStatus = .live(Date())
         } catch {
@@ -308,9 +311,10 @@ final class AppState {
     func refreshBulls() async {
         if bullsGame == nil { bullsStatus = .checking }
         do {
-            let fresh = try await BaseballService.bullsGame()
+            let (fresh, next) = try await BaseballService.bullsGame()
             announceGameTransitions(old: bullsGame, new: fresh, team: "Bulls")
             bullsGame = fresh
+            bullsNext = next
             bullsStatus = .live(Date())
         } catch {
             bullsStatus = degrade(bullsStatus)
