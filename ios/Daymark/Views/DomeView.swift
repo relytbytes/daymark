@@ -77,7 +77,7 @@ final class CompassManager: NSObject, CLLocationManagerDelegate {
 
 struct DomeView: View {
     @State private var compass = CompassManager()
-    @State private var compassOn = false
+    @State private var compassOn = true
     @State private var zoom: CGFloat = 1
     @State private var steadyZoom: CGFloat = 1
     @State private var pan: CGSize = .zero
@@ -120,6 +120,8 @@ struct DomeView: View {
             }
             .aspectRatio(1, contentMode: .fit)
         }
+        .onAppear { if compassOn { compass.start() } }
+        .onDisappear { compass.stop() }
     }
 
     /// When the compass is on, the direction you face points up.
