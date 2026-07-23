@@ -304,6 +304,8 @@ final class AppState {
                     body: "Starting around \(starts.timeText()) — about \(max(1, Int(starts.timeIntervalSinceNow / 60))) minutes out.")
             }
         }
+        // The bench reads the same forecast: seasonal plans + photo nudge.
+        tendGarden()
         // Sky math is local and instant.
         astro = Astronomy.snapshot(latitude: AppConfig.homeLatitude, longitude: AppConfig.homeLongitude)
         // ISS passes change slowly; ask twice a day.
@@ -396,6 +398,77 @@ final class AppState {
         toast("Photo filed to \(persisted.plants[index].name)'s record.")
     }
 
+    func addPlantEvent(_ id: UUID, kind: String, note: String) {
+        guard let index = persisted.plants.firstIndex(where: { $0.id == id }) else { return }
+        persisted.plants[index].events.append(PlantEvent(kind: kind, note: note))
+        toast("Filed to \(persisted.plants[index].name)'s journal.")
+    }
+
+    func setPlantOutdoor(_ id: UUID, outdoor: Bool) {
+        guard let index = persisted.plants.firstIndex(where: { $0.id == id }) else { return }
+        persisted.plants[index].outdoor = outdoor
+    }
+
+    /// The season a plan belongs to — heat waves count as their own season
+    /// so the plan gets rewritten when one settles in or breaks.
+    func benchSeason() -> String {
+        let month = Calendar.current.component(.month, from: Date())
+        let season = switch month {
+        case 12, 1, 2: "winter"
+        case 3, 4, 5: "spring"
+        case 6, 7, 8: "summer"
+        default: "fall"
+        }
+        let heatWave = (weather?.week.prefix(3).map(\.high).max() ?? 0) >= 97
+        return heatWave ? "\(season)-heat" : season
+    }
+
+    /// Frost or heat guidance for outdoor plants, from the real forecast.
+    var gardenWatch: String? {
+        let outdoorNames = persisted.plants.filter(\.outdoor).map(\.name)
+        guard !outdoorNames.isEmpty, let weather else { return nil }
+        let plants = outdoorNames.count == 1 ? outdoorNames[0]
+            : outdoorNames.count == 2 ? "\(outdoorNames[0]) and \(outdoorNames[1])"
+            : "\(outdoorNames.count) outdoor plants"
+        let nights = weather.week.prefix(2)
+        if let coldest = nights.map(\.low).min(), coldest <= 36 {
+            return "Frost watch: low of \(coldest)° — bring \(plants) in tonight."
+        }
+        if let hottest = nights.map(\.high).max(), hottest >= 97 {
+            return "Heat watch: \(hottest)° ahead — water \(plants) in the morning, shade the pots."
+        }
+        return nil
+    }
+
+    /// Recompose plans whose season has turned, and nudge the growth
+    /// record once a month. Called after each weather refresh.
+    func tendGarden() {
+        // Seasonal recompose: only plants that already have a plan opted in.
+        // An unstamped plan counts as stale, so older plans catch up once.
+        let season = benchSeason()
+        for plant in persisted.plants where !plant.plan.isEmpty && plant.planSeason != season {
+            composePlantPlan(plant.id)
+            break   // one per refresh — the rest follow on later refreshes
+        }
+
+        // Monthly photo nudge, mid-month so there's been time to shoot.
+        let monthKey = String(Date().dayKey.prefix(7))
+        let day = Calendar.current.component(.day, from: Date())
+        if day >= 15, persisted.photoNudgeMonth != monthKey, !persisted.plants.isEmpty {
+            let missing = persisted.plants.filter { plant in
+                !plant.photos.contains { $0.taken.dayKey.hasPrefix(monthKey) }
+            }.map(\.name)
+            if !missing.isEmpty {
+                persisted.photoNudgeMonth = monthKey
+                let names = missing.prefix(3).joined(separator: ", ")
+                NotificationService.notifyNow(
+                    id: "daymark.gardenphoto",
+                    title: "The growth record",
+                    body: "No photo this month for \(names). A quick shot keeps the record honest.")
+            }
+        }
+    }
+
     var plantPlanBusy: UUID?
 
     /// The desk writes the watering plan and sets the cadence from it.
@@ -412,7 +485,10 @@ final class AppState {
         if !plant.soil.isEmpty { lines.append("Soil: \(plant.soil)") }
         if !plant.light.isEmpty { lines.append("Light: \(plant.light)") }
         if !plant.note.isEmpty { lines.append("Notes: \(plant.note)") }
+        lines.append(plant.outdoor ? "Location: outdoors" : "Location: indoors")
         if let weather { lines.append("Current weather: \(weather.tempF)°F, \(weather.description)") }
+        let recent = plant.events.suffix(3).map { "\($0.label) \($0.date.shortDate())\($0.note.isEmpty ? "" : " — \($0.note)")" }
+        if !recent.isEmpty { lines.append("Recent care: " + recent.joined(separator: "; ")) }
 
         Task {
             defer { plantPlanBusy = nil }
@@ -428,6 +504,7 @@ final class AppState {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
             }
             persisted.plants[idx].plan = planText
+            persisted.plants[idx].planSeason = benchSeason()
             if let days, days >= 1, days <= 60 {
                 persisted.plants[idx].waterEveryDays = days
                 toast("\(persisted.plants[idx].name): watering every \(days) days.")

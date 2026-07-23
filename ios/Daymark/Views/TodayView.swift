@@ -41,6 +41,7 @@ struct TodayView: View {
             }
 
             alertBanner
+            gardenWatchLine
             spokenRow
             leadSection(phase: phase)
             focusBulletin
@@ -391,6 +392,27 @@ struct TodayView: View {
     }
 
     // MARK: Weather alerts (NWS)
+
+    /// Frost or heat guidance for the outdoor plants, when it matters.
+    @ViewBuilder private var gardenWatchLine: some View {
+        if let watch = app.gardenWatch {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: watch.hasPrefix("Frost") ? "snowflake" : "sun.max.trianglebadge.exclamationmark")
+                    .font(.system(size: 12))
+                    .foregroundStyle(watch.hasPrefix("Frost") ? Palette.blue : Palette.coral)
+                Text(watch)
+                    .font(DS.label(12, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                Spacer()
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(Palette.wash)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+            .onTapGesture { app.navigate(tab: "life", anchor: "life-garden") }
+        }
+    }
 
     @ViewBuilder
     private var alertBanner: some View {
