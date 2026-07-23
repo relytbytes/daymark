@@ -47,7 +47,7 @@ struct LifeView: View {
             }
 
             homeDesk.id("life-home")
-            gardenDesk.id("life-garden")
+            gardenBench.id("life-garden")
             trainingDesk.id("life-training")
             aroundTown.id("life-durham")
             remindersSection
@@ -224,12 +224,12 @@ struct LifeView: View {
         }
     }
 
-    /// The Garden Desk: what needs water, and when.
+    /// The Garden Bench: what needs water, and when.
     @ViewBuilder
-    private var gardenDesk: some View {
+    private var gardenBench: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                SectionRuleHeader(title: "The Garden Desk")
+                SectionRuleHeader(title: "The Garden Bench")
                 if app.plantsDue > 0 {
                     StatusChip(text: "\(app.plantsDue) due", foreground: .white, background: Palette.coral)
                 }

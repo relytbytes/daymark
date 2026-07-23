@@ -4677,7 +4677,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 // ---------------------------------------------------------------------------
-// The Garden Desk: plants under care, watered on a cadence
+// The Garden Bench: plants under care, watered on a cadence
 // ---------------------------------------------------------------------------
 
 const GARDEN_KEY = "daymark-garden";

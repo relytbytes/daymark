@@ -90,7 +90,7 @@ struct PlantPhoto: Identifiable, Codable, Hashable {
     var taken = Date()
 }
 
-/// A plant on the Garden Desk: name, watering cadence, last watered,
+/// A plant on the Garden Bench: name, watering cadence, last watered,
 /// a profile for the desk's plan, and a photo history.
 struct Plant: Identifiable, Codable, Hashable {
     var id = UUID()
@@ -458,7 +458,7 @@ struct PersistedState: Codable {
     var musicReviews: [String: String] = [:]   // monthKey (yyyy-MM) -> the column
     var weekReviewKey: String = ""             // weekKey it belongs to
     var journal: [String: String] = [:]        // dayKey -> one line for the record
-    var plants: [Plant] = []                   // the garden desk
+    var plants: [Plant] = []                   // the garden bench
 
     init() {}
 
