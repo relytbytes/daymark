@@ -138,6 +138,35 @@ final class AppState {
         }
     }
 
+    /// Keep the wrist edition current alongside the widgets.
+    private func pushWatchContext() {
+        let essentials = essentialsForNow.map {
+            ["id": $0.id, "kicker": $0.kicker, "title": $0.title,
+             "done": essentialDone($0.id)] as [String: Any]
+        }
+        var context: [String: Any] = [
+            "updated": Date(),
+            "loops": openLoops,
+            "essentials": essentials,
+        ]
+        if let weather {
+            context["weather"] = "\(weather.tempF)° \(weather.description) · H \(weather.high) L \(weather.low)"
+        }
+        if let next = nextMeeting {
+            context["event"] = "\(next.start.formatted(date: .omitted, time: .shortened)) \(next.title)"
+        }
+        if let game = dbacksGame ?? dbacksNext {
+            let score: String
+            if let awayRuns = game.away.score, let homeRuns = game.home.score {
+                score = "\(game.away.abbr) \(awayRuns)\u{2013}\(homeRuns) \(game.home.abbr)"
+            } else {
+                score = "\(game.away.abbr) at \(game.home.abbr)"
+            }
+            context["game"] = "\(score) · \(game.detail)"
+        }
+        WatchBridge.shared.push(context)
+    }
+
     /// Keep the widget's personal numbers current.
     func publishWidgetSnapshot() {
         let next = nextMeeting
@@ -163,6 +192,7 @@ final class AppState {
         // Nudge the widgets whenever the app has fresher data than they
         // do — app-initiated reloads don't count against their budget.
         WidgetCenter.shared.reloadAllTimelines()
+        pushWatchContext()
     }
 
     func rolloverIfNeeded() {
