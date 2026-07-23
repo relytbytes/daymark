@@ -18,6 +18,7 @@ struct SkySectionsView: View {
             header
             if let weather = app.weather {
                 conditionsBoard(weather)
+                hourlyStrip
                 precipSection(weather)
             }
             radarSection
@@ -116,6 +117,38 @@ struct SkySectionsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
+    }
+
+
+    // MARK: Hourly strip (the next 12 hours, at a scroll)
+
+    @ViewBuilder
+    private var hourlyStrip: some View {
+        if let weather = app.weather, !weather.hourly.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(weather.hourly) { hour in
+                        VStack(spacing: 6) {
+                            Text(hour.time.clockText())
+                                .kickerStyle(Palette.subtle, size: 8, tracking: 0.6)
+                            Image(systemName: weatherSymbol(hour.code))
+                                .font(.system(size: 13))
+                                .foregroundStyle(Palette.gold)
+                            Text("\(hour.temp)°")
+                                .font(DS.display(15))
+                                .foregroundStyle(Palette.ink)
+                            Text(hour.precip > 0 ? "\(hour.precip)%" : " ")
+                                .font(DS.label(8.5, weight: .bold))
+                                .foregroundStyle(Palette.blue)
+                        }
+                        .frame(width: 56)
+                        .padding(.vertical, 10)
+                    }
+                }
+            }
+            .background(alignment: .bottom) { Hairline() }
+            .padding(.top, 8)
+        }
     }
 
     // MARK: Precipitation timeline
