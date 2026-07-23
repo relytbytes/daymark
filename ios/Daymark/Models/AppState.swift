@@ -881,6 +881,77 @@ final class AppState {
 
     var essentialsForNow: [EssentialTask] { EssentialTask.forPhase(DayPhase.current()) }
 
+    // MARK: Reading desk intelligence
+
+    var gistBusy: UUID?
+    var presentedGist: ReadingGist?
+    var musicReviewBusy = false
+
+    /// Fetch a saved story and hand back the desk's summary.
+    func composeGist(for item: ReadingItem) {
+        guard gistBusy == nil else { return }
+        gistBusy = item.id
+        Task {
+            defer { gistBusy = nil }
+            guard let raw = item.url, let url = URL(string: raw),
+                  let text = await ArticleService.extract(url) else {
+                toast("Couldn't pull the article text.")
+                return
+            }
+            do {
+                let gist = try await AIDesk.storyGist(title: item.title, text: text)
+                presentedGist = ReadingGist(title: item.title, text: gist)
+            } catch {
+                toast("The desk couldn't summarize it.")
+            }
+        }
+    }
+
+    /// Read a saved story aloud — same voice as the spoken edition.
+    func speakReading(_ item: ReadingItem) {
+        if spokenEdition.isSpeaking {
+            spokenEdition.stop()
+            return
+        }
+        toast("Fetching the story…")
+        Task {
+            guard let raw = item.url, let url = URL(string: raw),
+                  let text = await ArticleService.extract(url) else {
+                toast("Couldn't pull the article text.")
+                return
+            }
+            spokenEdition.toggle(script: "\(item.title). \(text)")
+        }
+    }
+
+    /// The month in music, composed from the wire archive.
+    func composeMonthInMusic() {
+        guard !musicReviewBusy else { return }
+        let monthKey = String(Date().dayKey.prefix(7))
+        let entries = persisted.wireArchive.filter { $0.day.hasPrefix(monthKey) }
+        guard !entries.isEmpty else {
+            toast("No discoveries on the wire this month yet.")
+            return
+        }
+        musicReviewBusy = true
+        Task {
+            defer { musicReviewBusy = false }
+            let lines = entries.map { entry -> String in
+                let verdict = entry.verdict == "like" ? "liked"
+                    : entry.verdict == "pass" ? "passed" : "unjudged"
+                return "\(entry.title) — \(entry.artist) (\(verdict))"
+            }
+            do {
+                let column = try await AIDesk.monthInMusic(
+                    month: monthKey, entries: lines.joined(separator: "\n"))
+                persisted.musicReviews[monthKey] = column
+                toast("The month in music is in.")
+            } catch {
+                toast("The desk couldn't write the column.")
+            }
+        }
+    }
+
     /// File anything queued from the share sheet into the right desk.
     func absorbSharedCaptures() {
         for item in SharedCaptures.drain() {

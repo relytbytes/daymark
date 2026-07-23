@@ -970,6 +970,9 @@ struct DaymarkWidgetBundle: WidgetBundle {
     var body: some Widget {
         AtAGlanceWidget()
         EssentialsWidget()
+        if #available(iOS 18.0, *) {
+            CaptureControl()
+        }
         #if canImport(ActivityKit)
         FocusActivityWidget()
         GameActivityWidget()
@@ -1144,5 +1147,21 @@ struct EssentialsWidget: Widget {
         .description("Today's three anchor tasks, checkable from the home screen.")
         .contentMarginsDisabled()
         .supportedFamilies([.systemMedium])
+    }
+}
+
+
+// MARK: - Control Center: capture without hunting for the app
+
+@available(iOS 18.0, *)
+struct CaptureControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "DaymarkCaptureControl") {
+            ControlWidgetButton(action: OpenCaptureIntent()) {
+                Label("Capture", systemImage: "plus.bubble")
+            }
+        }
+        .displayName("Daymark Capture")
+        .description("Open Daymark straight into quick capture.")
     }
 }
