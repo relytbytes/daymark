@@ -9,12 +9,23 @@ import SwiftUI
 import UserNotifications
 
 final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    var onRoute: ((String) -> Void)?
+
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        onRoute?(response.notification.request.identifier)
+        completionHandler()
     }
 }
 
@@ -42,6 +53,26 @@ struct DaymarkApp: App {
             }
         }
         .onChange(of: scenePhase) { _, phase in
+            // Route notification taps once per launch.
+            if notificationDelegate.onRoute == nil {
+                notificationDelegate.onRoute = { [weak app] identifier in
+                    guard let app else { return }
+                    Task { @MainActor in
+                        switch true {
+                        case identifier.hasPrefix("daymark.autopilot"):
+                            app.navigate(tab: "today", anchor: "today-prep")
+                        case identifier.hasPrefix("daymark.evening"):
+                            app.navigate(tab: "today", anchor: "today-close")
+                        case identifier.hasPrefix("daymark.game"), identifier.hasPrefix("daymark.final"):
+                            app.navigate(tab: "more", anchor: "more-sports")
+                        case identifier == "daymark.leaveby":
+                            app.navigate(tab: "today", anchor: "today-day")
+                        default:
+                            app.navigate(tab: "today")
+                        }
+                    }
+                }
+            }
             if phase == .active {
                 app.rolloverIfNeeded()
                 MorningBriefTask.scheduleNext()

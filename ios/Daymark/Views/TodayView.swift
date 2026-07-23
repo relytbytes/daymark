@@ -45,8 +45,8 @@ struct TodayView: View {
             focusBulletin
             essentialsSection(phase: phase)
             aiPlanSection(phase: phase)
-            timelineSection
-            meetingPrepSection
+            timelineSection.id("today-day")
+            meetingPrepSection.id("today-prep")
             mailSection
             aiTriageSection
             waitingSection
@@ -55,7 +55,7 @@ struct TodayView: View {
                 weekReviewSection
             }
             if phase.isEndOfDay {
-                eveningReviewSection
+                eveningReviewSection.id("today-close")
                 aiEveningSection
             }
         }
