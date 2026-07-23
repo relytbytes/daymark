@@ -20,7 +20,7 @@ struct LifeView: View {
         let phase = DayPhase.current()
 
         SectionPage(tag: "Section C · Durham", showSettings: $showSettings, index: [
-            (label: "Weather", anchor: "life-weather"),
+            (label: "Home", anchor: "life-home"),
             (label: "Sky", anchor: "life-sky"),
             (label: "Durham", anchor: "life-durham"),
             (label: "Spirit", anchor: "life-spirit"),
@@ -37,8 +37,7 @@ struct LifeView: View {
                 }
             }
 
-            homeDesk
-            hourlyStrip.id("life-weather")
+            homeDesk.id("life-home")
             SkySectionsView().id("life-sky")
             trainingDesk
             aroundTown.id("life-durham")
@@ -210,34 +209,6 @@ struct LifeView: View {
     }
 
     // MARK: Hourly strip
-
-    @ViewBuilder
-    private var hourlyStrip: some View {
-        if let weather = app.weather, !weather.hourly.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
-                    ForEach(weather.hourly) { hour in
-                        VStack(spacing: 6) {
-                            Text(hour.time.clockText())
-                                .kickerStyle(Palette.subtle, size: 8, tracking: 0.6)
-                            Image(systemName: weatherSymbol(hour.code))
-                                .font(.system(size: 13))
-                                .foregroundStyle(Palette.gold)
-                            Text("\(hour.temp)°")
-                                .font(DS.display(15))
-                                .foregroundStyle(Palette.ink)
-                            Text(hour.precip > 0 ? "\(hour.precip)%" : " ")
-                                .font(DS.label(8.5, weight: .bold))
-                                .foregroundStyle(Palette.blue)
-                        }
-                        .frame(width: 56)
-                        .padding(.vertical, 10)
-                    }
-                }
-            }
-            .background(alignment: .bottom) { Hairline() }
-        }
-    }
 
     // MARK: Around town
 
