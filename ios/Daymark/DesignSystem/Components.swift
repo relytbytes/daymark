@@ -301,7 +301,7 @@ struct AcidButton: View {
                 Image(systemName: systemImage).font(.system(size: 12, weight: .black))
                 Text(label).font(.system(size: 13, weight: .heavy)).tracking(0.4)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Palette.paper)
             .frame(maxWidth: .infinity, minHeight: 46)
             .background(Palette.ink)
             .clipShape(RoundedRectangle(cornerRadius: 999))
@@ -401,7 +401,7 @@ struct CircleCheck: View {
                 if checked {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Palette.paper)
                 }
             }
         }
@@ -433,9 +433,15 @@ struct AIDeskCard: View {
                         if busy {
                             ProgressView().controlSize(.small)
                         } else {
-                            Text(output == nil ? "WRITE IT" : "REWRITE")
-                                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
-                                .foregroundStyle(Palette.ink)
+                            HStack(spacing: 5) {
+                                Image(systemName: output == nil ? "pencil.line" : "arrow.clockwise")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text(output == nil ? "WRITE IT" : "REWRITE")
+                                    .font(.system(size: 10, weight: .heavy)).tracking(0.8)
+                            }
+                            .foregroundStyle(Palette.coral)
+                            .padding(.horizontal, 11).padding(.vertical, 7)
+                            .background(Capsule().fill(Palette.coralSoft))
                         }
                     }
                     .buttonStyle(.plain)

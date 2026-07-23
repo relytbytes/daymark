@@ -79,17 +79,14 @@ struct SpiritSectionsView: View {
                         .foregroundStyle(app.aiHoroscope == nil ? Palette.muted : Palette.ink)
                         .lineSpacing(3)
                     if AIService.isConfigured {
-                        Button {
-                            app.runHoroscope()
-                        } label: {
-                            if app.aiBusy.contains("horoscope") {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Text(app.aiHoroscope == nil ? "WRITE IT" : "REWRITE")
-                                    .kickerStyle(Palette.ink, size: 9, tracking: 1.2)
+                        if app.aiBusy.contains("horoscope") {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            DeskAction(label: app.aiHoroscope == nil ? "Write it" : "Rewrite",
+                                       systemImage: app.aiHoroscope == nil ? "pencil.line" : "arrow.clockwise") {
+                                app.runHoroscope()
                             }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .inkPanel(padding: 15)
@@ -122,7 +119,7 @@ struct SpiritSectionsView: View {
                 } label: {
                     Text(spread.isEmpty ? "DRAW" : "REDRAW")
                         .font(.system(size: 10, weight: .heavy)).tracking(0.8)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Palette.paper)
                         .padding(.horizontal, 14).padding(.vertical, 12)
                         .background(Palette.ink)
                         .clipShape(Capsule())

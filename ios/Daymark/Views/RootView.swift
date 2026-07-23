@@ -46,6 +46,12 @@ struct RootView: View {
             tabBar
         }
         .sheet(isPresented: $showCapture) { CaptureSheet() }
+        .onChange(of: app.captureRequested) { _, requested in
+            if requested {
+                showCapture = true
+                app.captureRequested = false
+            }
+        }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .overlay(alignment: .bottom) { toast }
         .task {
@@ -130,7 +136,7 @@ struct RootView: View {
         if let message = app.toastMessage {
             Text(message)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Palette.paper)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 11)
                 .background(Palette.ink)

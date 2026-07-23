@@ -327,7 +327,7 @@ struct TodayView: View {
                     } label: {
                         Label("Join", systemImage: "video.fill")
                             .font(.system(size: 10, weight: .heavy))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Palette.paper)
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(Palette.ink)
                             .clipShape(Capsule())
@@ -555,7 +555,7 @@ struct TodayView: View {
                 HStack(spacing: 5) {
                     Text(initials(of: name))
                         .font(.system(size: 9, weight: .heavy))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Palette.paper)
                         .frame(width: 20, height: 20)
                         .background(Circle().fill(Palette.ink))
                     Text(name.split(separator: " ").first.map(String.init) ?? name)

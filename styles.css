@@ -1278,12 +1278,16 @@ body[data-phase="night"] .day-progress i {
 
 .text-button,
 .add-button {
-  min-height: 36px;
-  border: 0;
-  color: var(--blue);
-  font-size: 11px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--coral);
+  font-size: 12px;
   font-weight: 800;
-  background: transparent;
+  letter-spacing: 0.04em;
+  background: var(--coral-soft);
+  cursor: pointer;
 }
 
 .section-heading-actions {
