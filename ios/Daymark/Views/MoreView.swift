@@ -48,6 +48,12 @@ struct MoreView: View {
             SafariView(url: item.url).ignoresSafeArea()
         }
         .sheet(isPresented: $showWireArchive) { WireArchiveView() }
+        .sheet(item: Binding(
+            get: { app.presentedGist },
+            set: { app.presentedGist = $0 }
+        )) { gist in
+            GistSheet(gist: gist)
+        }
     }
 
     // MARK: News brief
@@ -607,6 +613,38 @@ private struct WireArchiveView: View {
                         .padding(.top, 6)
                     InkRule().padding(.vertical, 14)
 
+                    let monthKey = String(Date().dayKey.prefix(7))
+                    if let column = app.persisted.musicReviews[monthKey] {
+                        Text("THE MONTH IN MUSIC")
+                            .kickerStyle(Palette.coral, size: 9, tracking: 1.4)
+                            .padding(.bottom, 6)
+                        Text(column)
+                            .font(DS.deck(14))
+                            .foregroundStyle(Palette.ink)
+                            .lineSpacing(4)
+                            .padding(12)
+                            .background(Palette.wash)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .padding(.bottom, 8)
+                    }
+                    if app.musicReviewBusy {
+                        HStack(spacing: 10) {
+                            ProgressView().controlSize(.small)
+                            Text("The critic is writing…")
+                                .font(DS.deck(13))
+                                .foregroundStyle(Palette.muted)
+                        }
+                        .padding(.bottom, 10)
+                    } else {
+                        DeskAction(label: app.persisted.musicReviews[monthKey] == nil
+                                       ? "Compose the month in music"
+                                       : "Recompose the column",
+                                   systemImage: "music.quarternote.3") {
+                            app.composeMonthInMusic()
+                        }
+                        .padding(.bottom, 10)
+                    }
+
                     ForEach(days, id: \.day) { group in
                         Text(displayDay(group.day))
                             .kickerStyle(Palette.subtle, size: 9, tracking: 1.2)
@@ -672,5 +710,46 @@ private struct WireArchiveView: View {
         let out = DateFormatter()
         out.dateFormat = "EEEE, MMMM d"
         return out.string(from: date).uppercased()
+    }
+}
+
+
+// MARK: - The Gist: a saved story, boiled down
+
+struct GistSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let gist: ReadingGist
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("THE GIST")
+                        .kickerStyle(Palette.coral, size: 10, tracking: 1.5)
+                        .padding(.bottom, 8)
+                    Text(gist.title)
+                        .font(DS.display(24))
+                        .foregroundStyle(Palette.ink)
+                    InkRule().padding(.vertical, 12)
+                    Text(gist.text)
+                        .font(DS.deck(15))
+                        .foregroundStyle(Palette.ink)
+                        .lineSpacing(5)
+                        .textSelection(.enabled)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 30)
+            }
+            .background(Palette.paper)
+            .presentationDetents([.medium, .large])
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Palette.ink)
+                }
+            }
+        }
     }
 }

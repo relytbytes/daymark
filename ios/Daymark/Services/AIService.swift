@@ -340,6 +340,40 @@ enum AIDesk {
         )
     }
 
+    /// A saved story, boiled down to the gist.
+    static func storyGist(title: String, text: String) async throws -> String {
+        try await AIService.complete(
+            system: """
+            You are the media desk editor of Daymark, a personal morning paper. \
+            Summarize the story the reader saved. Be faithful to the text — do not \
+            invent details. Format: three to five plain sentences with the substance \
+            (who, what, the key numbers or arguments), then a final line starting \
+            with "Worth the full read?" answering yes or no with a short reason. \
+            No headers, no bullets, no preamble.
+            """,
+            user: "Title: \(title)\n\nArticle text:\n\(text)",
+            maxTokens: 400
+        )
+    }
+
+    /// The month in music: a short column from the wire archive.
+    static func monthInMusic(month: String, entries: String) async throws -> String {
+        try await AIService.complete(
+            system: """
+            You are the music critic of Daymark, a personal morning paper. Write a \
+            short month-in-review column (140-190 words) about the reader's month on \
+            the discovery wire. The data lists tracks with artist and a verdict \
+            (liked, passed, or unjudged). Name the standouts, describe the taste \
+            pattern you actually see in the likes, note anything they kept passing \
+            on, and end with one specific direction to explore next month (a scene, \
+            era, or artist adjacent to the likes). Warm, specific, no lists, no \
+            headers, no flattery filler.
+            """,
+            user: "Month: \(month)\n\nThe wire:\n\(entries)",
+            maxTokens: 420
+        )
+    }
+
     /// The Garden Desk's watering plan: species + conditions in, a
     /// cadence and care notes out. The first line MUST be machine-readable.
     static func wateringPlan(profile: String) async throws -> String {

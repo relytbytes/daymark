@@ -76,6 +76,13 @@ struct WireArchiveEntry: Identifiable, Codable, Hashable {
     }
 }
 
+/// A composed summary of a saved story, presented as a sheet.
+struct ReadingGist: Identifiable {
+    var id = UUID()
+    var title: String
+    var text: String
+}
+
 /// One dated photo of a plant — the growth record.
 struct PlantPhoto: Identifiable, Codable, Hashable {
     var id = UUID()
@@ -448,6 +455,7 @@ struct PersistedState: Codable {
     var sprintLedger: String = ""              // the desk's running sprint summary
     var sprintLedgerAt: Date?
     var weekReview: String = ""                // the Sunday column
+    var musicReviews: [String: String] = [:]   // monthKey (yyyy-MM) -> the column
     var weekReviewKey: String = ""             // weekKey it belongs to
     var journal: [String: String] = [:]        // dayKey -> one line for the record
     var plants: [Plant] = []                   // the garden desk
@@ -485,6 +493,7 @@ struct PersistedState: Codable {
         weekReview = (try? c.decodeIfPresent(String.self, forKey: .weekReview)) ?? nil ?? ""
         weekReviewKey = (try? c.decodeIfPresent(String.self, forKey: .weekReviewKey)) ?? nil ?? ""
         journal = (try? c.decodeIfPresent([String: String].self, forKey: .journal)) ?? nil ?? [:]
+        musicReviews = (try? c.decodeIfPresent([String: String].self, forKey: .musicReviews)) ?? nil ?? [:]
         plants = (try? c.decodeIfPresent([Plant].self, forKey: .plants)) ?? nil ?? []
     }
 }

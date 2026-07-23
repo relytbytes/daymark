@@ -77,6 +77,11 @@ struct DaymarkApp: App {
                 app.rolloverIfNeeded()
                 app.absorbWidgetActions()
                 app.absorbSharedCaptures()
+                let groupDefaults = UserDefaults(suiteName: WidgetSnapshot.groupID)
+                if groupDefaults?.bool(forKey: "daymark-pending-capture") == true {
+                    groupDefaults?.set(false, forKey: "daymark-pending-capture")
+                    app.requestCapture()
+                }
                 MorningBriefTask.scheduleNext()
                 EveningReviewTask.scheduleNext()
                 if UserDefaults.standard.bool(forKey: "daymark-pending-focus") {
