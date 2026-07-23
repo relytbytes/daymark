@@ -161,14 +161,9 @@ struct SpiritSectionsView: View {
                         Text(tarotError)
                             .font(DS.label(11, weight: .medium))
                             .foregroundStyle(Palette.down)
-                        Button {
+                        DeskAction(label: "Read again", systemImage: "arrow.clockwise") {
                             requestReading()
-                        } label: {
-                            Text("READ AGAIN")
-                                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
-                                .foregroundStyle(Palette.ink)
                         }
-                        .buttonStyle(.plain)
                     }
                 } else if !AIService.isConfigured {
                     Text("Add an AI key in Settings and the desk reads the spread against your question.")
@@ -281,14 +276,9 @@ struct SpiritSectionsView: View {
                         Text(oracleError)
                             .font(DS.label(11, weight: .medium))
                             .foregroundStyle(Palette.down)
-                        Button {
+                        DeskAction(label: "Read again", systemImage: "arrow.clockwise") {
                             Task { await loadOracleReading(force: true) }
-                        } label: {
-                            Text("READ AGAIN")
-                                .font(.system(size: 9, weight: .heavy)).tracking(0.8)
-                                .foregroundStyle(Palette.ink)
                         }
-                        .buttonStyle(.plain)
                     }
                     .padding(.top, 8)
                 }
@@ -348,9 +338,11 @@ struct SpiritSectionsView: View {
                             .foregroundStyle(Palette.muted)
                             .multilineTextAlignment(.leading)
                         Text("OPEN THE CABINET ›")
-                            .font(.system(size: 8, weight: .heavy)).tracking(1.0)
+                            .font(.system(size: 10, weight: .heavy)).tracking(1.0)
                             .foregroundStyle(Palette.coral)
-                            .padding(.top, 4)
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(Capsule().fill(Palette.coralSoft))
+                            .padding(.top, 6)
                     }
                     Spacer()
                 }
@@ -387,9 +379,11 @@ struct SpiritSectionsView: View {
                         .foregroundStyle(Palette.muted)
                         .multilineTextAlignment(.leading)
                     Text("THE FULL WHEEL ›")
-                        .font(.system(size: 8, weight: .heavy)).tracking(1.0)
+                        .font(.system(size: 10, weight: .heavy)).tracking(1.0)
                         .foregroundStyle(Palette.coral)
-                        .padding(.top, 4)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(Capsule().fill(Palette.coralSoft))
+                        .padding(.top, 6)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .editorialPanel()

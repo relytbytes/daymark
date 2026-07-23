@@ -128,16 +128,12 @@ struct WorkView: View {
                         .kickerStyle(Palette.subtle, size: 7, tracking: 1.0)
                         .padding(.top, 8)
 
-                    Button {
+                    DeskAction(label: "Open Landed", systemImage: "arrow.up.right") {
                         if let url = URL(string: "https://job-search-command-center-brown.vercel.app") {
                             UIApplication.shared.open(url)
                         }
-                    } label: {
-                        Text("OPEN LANDED ↗")
-                            .kickerStyle(Palette.coral, size: 9, tracking: 1.2)
-                            .padding(.top, 10)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.top, 10)
                 }
             }
             .padding(.top, 26)
@@ -357,16 +353,11 @@ struct WorkView: View {
                     .textSelection(.enabled)
             }
             if !app.persisted.sprintLedger.isEmpty || AIService.isConfigured {
-                Button {
+                DeskAction(label: "Update the ledger", systemImage: "arrow.clockwise") {
                     app.updateSprintLedger()
-                } label: {
-                    Text("UPDATE THE LEDGER")
-                        .font(.system(size: 9, weight: .heavy)).tracking(0.8)
-                        .foregroundStyle(Palette.ink)
                 }
-                .buttonStyle(.plain)
                 .disabled(app.sprintLedgerBusy)
-                .padding(.top, 2)
+                .padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
