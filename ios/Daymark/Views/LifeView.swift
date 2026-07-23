@@ -253,6 +253,12 @@ struct LifeView: View {
                 }
                 .buttonStyle(.plain)
             } else {
+                if let watch = app.gardenWatch {
+                    Text(watch)
+                        .font(DS.label(11, weight: .semibold))
+                        .foregroundStyle(watch.hasPrefix("Frost") ? Palette.blue : Palette.coral)
+                        .padding(.bottom, 6)
+                }
                 if let weather = app.weather, app.plantsDue > 0, weather.rainPct >= 60 {
                     Text("Rain likely today (\(weather.rainPct)%) — the outdoor ones may take care of themselves.")
                         .font(DS.label(11, weight: .medium))
@@ -915,6 +921,8 @@ struct PlantSheet: View {
 
     @State private var libraryItem: PhotosPickerItem?
     @State private var showCamera = false
+    @State private var pendingEventKind: String?
+    @State private var eventNote = ""
 
     private var plant: Plant? {
         app.persisted.plants.first { $0.id == plantID }
@@ -977,8 +985,68 @@ struct PlantSheet: View {
                             profileField("Pot & size (8\" terracotta…)", key: \.potSize)
                             profileField("Soil (standard potting mix…)", key: \.soil)
                             profileField("Light (bright indirect, porch sun…)", key: \.light)
+                            HStack(spacing: 8) {
+                                Button {
+                                    app.setPlantOutdoor(plantID, outdoor: false)
+                                } label: {
+                                    placeChip("Indoors", icon: "house", active: !plant.outdoor)
+                                }
+                                .buttonStyle(.plain)
+                                Button {
+                                    app.setPlantOutdoor(plantID, outdoor: true)
+                                } label: {
+                                    placeChip("Outdoors", icon: "sun.max", active: plant.outdoor)
+                                }
+                                .buttonStyle(.plain)
+                                Spacer()
+                                if plant.outdoor {
+                                    Text("FROST & HEAT WATCH ON")
+                                        .font(.system(size: 7.5, weight: .heavy)).tracking(0.8)
+                                        .foregroundStyle(Palette.subtle)
+                                }
+                            }
                         }
                         .padding(.bottom, 12)
+
+                        // The journal: the file reads like a growing history
+                        Text("THE JOURNAL").kickerStyle(Palette.subtle, size: 8.5, tracking: 1.2)
+                            .padding(.bottom, 6)
+                        if plant.events.isEmpty {
+                            Text("Nothing filed yet — repots, blooms, and feedings live here.")
+                                .font(DS.deck(12))
+                                .foregroundStyle(Palette.subtle)
+                                .padding(.bottom, 8)
+                        } else {
+                            ForEach(plant.events.sorted { $0.date > $1.date }) { event in
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Image(systemName: event.symbol)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Palette.green)
+                                        .frame(width: 16)
+                                    Text(event.label + (event.note.isEmpty ? "" : " — \(event.note)"))
+                                        .font(DS.label(12, weight: .medium))
+                                        .foregroundStyle(Palette.ink)
+                                    Spacer()
+                                    Text(event.date.shortDate())
+                                        .font(.system(size: 9, weight: .heavy)).tracking(0.5)
+                                        .foregroundStyle(Palette.subtle)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .padding(.bottom, 4)
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach([("bloom", "Bloom"), ("repot", "Repot"), ("fertilize", "Fertilize"),
+                                         ("harvest", "Harvest"), ("note", "Note")], id: \.0) { kind, label in
+                                    QuietButton(label: "+ \(label)") {
+                                        pendingEventKind = kind
+                                        eventNote = ""
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.bottom, 14)
 
                         if app.plantPlanBusy == plantID {
                             HStack(spacing: 10) {
@@ -1033,7 +1101,32 @@ struct PlantSheet: View {
                 CameraPicker { image in app.addPlantPhoto(plantID, image: image) }
                     .ignoresSafeArea()
             }
+            .alert("File to the journal", isPresented: Binding(
+                get: { pendingEventKind != nil },
+                set: { if !$0 { pendingEventKind = nil } }
+            )) {
+                TextField("Note (optional)", text: $eventNote)
+                Button("File it") {
+                    if let kind = pendingEventKind {
+                        app.addPlantEvent(plantID, kind: kind,
+                                          note: eventNote.trimmingCharacters(in: .whitespaces))
+                    }
+                    pendingEventKind = nil
+                }
+                Button("Cancel", role: .cancel) { pendingEventKind = nil }
+            }
         }
+    }
+
+    private func placeChip(_ label: String, icon: String, active: Bool) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 10))
+            Text(label).font(.system(size: 11, weight: .bold))
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(active ? Palette.ink : Palette.wash)
+        .foregroundStyle(active ? Palette.paper : Palette.muted)
+        .clipShape(Capsule())
     }
 
     private func photoAddTile(icon: String) -> some View {

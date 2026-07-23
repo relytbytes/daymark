@@ -83,6 +83,29 @@ struct ReadingGist: Identifiable {
     var text: String
 }
 
+/// One entry in a plant's journal — bloom, repot, fertilize, harvest,
+/// or a plain note. The bench file reads like a growing history.
+struct PlantEvent: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var kind: String                   // "bloom" | "repot" | "fertilize" | "harvest" | "note"
+    var note: String = ""
+    var date = Date()
+
+    var symbol: String {
+        switch kind {
+        case "bloom": return "camera.macro"
+        case "repot": return "arrow.up.bin"
+        case "fertilize": return "aqi.medium"
+        case "harvest": return "basket"
+        default: return "pencil.line"
+        }
+    }
+
+    var label: String {
+        kind == "note" ? "Note" : kind.prefix(1).uppercased() + kind.dropFirst()
+    }
+}
+
 /// One dated photo of a plant — the growth record.
 struct PlantPhoto: Identifiable, Codable, Hashable {
     var id = UUID()
@@ -103,7 +126,10 @@ struct Plant: Identifiable, Codable, Hashable {
     var soil: String = ""
     var light: String = ""
     var plan: String = ""              // the desk's care plan
+    var planSeason: String = ""        // season the plan was composed under
+    var outdoor: Bool = false          // lives outside — frost and heat apply
     var photos: [PlantPhoto] = []
+    var events: [PlantEvent] = []      // the bench journal
 
     init(id: UUID = UUID(), name: String, note: String = "",
          waterEveryDays: Int = 7, lastWatered: Date = Date()) {
@@ -127,7 +153,10 @@ struct Plant: Identifiable, Codable, Hashable {
         soil = (try? c.decodeIfPresent(String.self, forKey: .soil)) ?? nil ?? ""
         light = (try? c.decodeIfPresent(String.self, forKey: .light)) ?? nil ?? ""
         plan = (try? c.decodeIfPresent(String.self, forKey: .plan)) ?? nil ?? ""
+        planSeason = (try? c.decodeIfPresent(String.self, forKey: .planSeason)) ?? nil ?? ""
+        outdoor = (try? c.decodeIfPresent(Bool.self, forKey: .outdoor)) ?? nil ?? false
         photos = (try? c.decodeIfPresent([PlantPhoto].self, forKey: .photos)) ?? nil ?? []
+        events = (try? c.decodeIfPresent([PlantEvent].self, forKey: .events)) ?? nil ?? []
     }
 
     var nextWaterDue: Date {
@@ -456,6 +485,7 @@ struct PersistedState: Codable {
     var sprintLedgerAt: Date?
     var weekReview: String = ""                // the Sunday column
     var musicReviews: [String: String] = [:]   // monthKey (yyyy-MM) -> the column
+    var photoNudgeMonth: String = ""           // last month the bench asked for photos
     var weekReviewKey: String = ""             // weekKey it belongs to
     var journal: [String: String] = [:]        // dayKey -> one line for the record
     var plants: [Plant] = []                   // the garden bench
@@ -494,6 +524,7 @@ struct PersistedState: Codable {
         weekReviewKey = (try? c.decodeIfPresent(String.self, forKey: .weekReviewKey)) ?? nil ?? ""
         journal = (try? c.decodeIfPresent([String: String].self, forKey: .journal)) ?? nil ?? [:]
         musicReviews = (try? c.decodeIfPresent([String: String].self, forKey: .musicReviews)) ?? nil ?? [:]
+        photoNudgeMonth = (try? c.decodeIfPresent(String.self, forKey: .photoNudgeMonth)) ?? nil ?? ""
         plants = (try? c.decodeIfPresent([Plant].self, forKey: .plants)) ?? nil ?? []
     }
 }
