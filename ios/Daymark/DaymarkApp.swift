@@ -75,6 +75,8 @@ struct DaymarkApp: App {
             }
             if phase == .active {
                 app.rolloverIfNeeded()
+                app.absorbWidgetActions()
+                app.absorbSharedCaptures()
                 MorningBriefTask.scheduleNext()
                 EveningReviewTask.scheduleNext()
                 if UserDefaults.standard.bool(forKey: "daymark-pending-focus") {
