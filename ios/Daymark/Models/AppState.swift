@@ -40,6 +40,7 @@ final class AppState {
     var airQuality: AirQuality?
     var astro: AstroSnapshot?
     var nestReading: NestReading?
+    var nestError: String?
     var cadence: CadenceSnapshot?
 
     var calendarAccess: Bool?
@@ -322,9 +323,29 @@ final class AppState {
             // failed poll shouldn't blank the Indoor cell. Poll gently.
             if Date().timeIntervalSince(lastNestPoll) > 120 || nestReading == nil {
                 lastNestPoll = Date()
-                if let fresh = try? await nest.thermostat() { nestReading = fresh }
+                do {
+                    nestReading = try await nest.thermostat() ?? nestReading
+                    nestError = nil
+                } catch {
+                    // Keep last-good on screen; name the failure when there
+                    // is nothing to show instead of hiding the desk.
+                    if nestReading == nil { nestError = readableNestError(error) }
+                }
             }
         }
+    }
+
+    /// The failures worth naming on the Home Desk.
+    private func readableNestError(_ error: Error) -> String {
+        let text = String(describing: error)
+        if text.contains("invalid_grant") || text.contains("400") || text.contains("401")
+            || text.contains("403") || text.contains("notConnected") {
+            return "Google signed this connection out — a reconnect fixes it."
+        }
+        if text.contains("429") {
+            return "Nest is rate-limiting — it'll come back on its own."
+        }
+        return "The thermostat didn't answer. It'll retry shortly."
     }
 
     func refreshFitnessScore() async {

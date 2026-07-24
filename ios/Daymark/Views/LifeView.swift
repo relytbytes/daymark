@@ -87,6 +87,34 @@ struct LifeView: View {
 
     @ViewBuilder
     private var homeDesk: some View {
+        if NestService.isConfigured, app.nestReading == nil {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("THE HOME DESK").kickerStyle(Palette.coral, size: 9, tracking: 1.4)
+                    .padding(.bottom, 8)
+                Text(app.nestError
+                     ?? (app.nest.isConnected ? "Checking in with the thermostat…"
+                                              : "The thermostat isn't connected."))
+                    .font(DS.deck(13))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.bottom, 10)
+                if !app.nest.isConnected || app.nestError != nil {
+                    DeskAction(label: app.nest.isConnected ? "Reconnect Nest" : "Connect Nest",
+                               systemImage: "thermometer.medium") {
+                        Task {
+                            try? await app.nest.connect()
+                            if app.nest.isConnected {
+                                app.toast("Nest connected.")
+                                app.nestError = nil
+                                await app.refreshWeather()
+                            } else {
+                                app.toast("Nest connection didn't complete.")
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.top, 22)
+        }
         if let nest = app.nestReading {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
