@@ -324,6 +324,42 @@ struct ScoreCategory: Identifiable, Codable, Hashable {
     ]
 }
 
+/// One line of the day's slate — the desk (or Ty) writes these; the
+/// static EssentialTask lists below are the standing fallback.
+struct SlateTask: Codable, Hashable {
+    var id: String
+    var kicker: String
+    var title: String
+    var detail: String
+}
+
+/// Pulls the machine-readable SLATE block out of the desk's daily plan.
+enum SlateParser {
+    /// Returns the plan text with the block removed, plus the parsed
+    /// tasks (nil when no block or nothing parseable).
+    static func extract(from raw: String) -> (text: String, tasks: [SlateTask]?) {
+        guard let markerRange = raw.range(of: "SLATE:", options: .caseInsensitive) else {
+            return (raw, nil)
+        }
+        let block = raw[markerRange.upperBound...]
+        var tasks: [SlateTask] = []
+        for line in block.split(separator: "\n") {
+            let parts = line.split(separator: "|").map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+            guard parts.count >= 2, !parts[0].isEmpty, !parts[1].isEmpty else { continue }
+            tasks.append(SlateTask(id: "slate-\(tasks.count + 1)",
+                                   kicker: parts[0],
+                                   title: parts[1],
+                                   detail: parts.count > 2 ? parts[2] : ""))
+            if tasks.count == 3 { break }
+        }
+        let text = String(raw[..<markerRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (text, tasks.isEmpty ? nil : tasks)
+    }
+}
+
 /// A fixed daily anchor task (the Essential Three), defined per phase.
 struct EssentialTask: Identifiable, Hashable {
     let id: String
@@ -486,6 +522,8 @@ struct PersistedState: Codable {
     var weekReview: String = ""                // the Sunday column
     var musicReviews: [String: String] = [:]   // monthKey (yyyy-MM) -> the column
     var photoNudgeMonth: String = ""           // last month the bench asked for photos
+    var slate: [SlateTask] = []                // today's Essential Three, when composed
+    var slateDay: String = ""                  // dayKey the slate belongs to
     var weekReviewKey: String = ""             // weekKey it belongs to
     var journal: [String: String] = [:]        // dayKey -> one line for the record
     var plants: [Plant] = []                   // the garden bench
@@ -525,6 +563,8 @@ struct PersistedState: Codable {
         journal = (try? c.decodeIfPresent([String: String].self, forKey: .journal)) ?? nil ?? [:]
         musicReviews = (try? c.decodeIfPresent([String: String].self, forKey: .musicReviews)) ?? nil ?? [:]
         photoNudgeMonth = (try? c.decodeIfPresent(String.self, forKey: .photoNudgeMonth)) ?? nil ?? ""
+        slate = (try? c.decodeIfPresent([SlateTask].self, forKey: .slate)) ?? nil ?? []
+        slateDay = (try? c.decodeIfPresent(String.self, forKey: .slateDay)) ?? nil ?? ""
         plants = (try? c.decodeIfPresent([Plant].self, forKey: .plants)) ?? nil ?? []
     }
 }

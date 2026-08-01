@@ -188,8 +188,17 @@ enum AIDesk {
             2. …
             3. …
             First move: …
+
+            Then end with EXACTLY this machine block (it sets the app's actual task \
+            list — keep each title under 45 characters, specific to today's data, \
+            not generic; the kicker names the area of life it serves):
+
+            SLATE:
+            Job search | <title> | <one-line why or how>
+            Veraya | <title> | <one-line why or how>
+            Practical | <title> | <one-line why or how>
             """,
-            maxTokens: 400
+            maxTokens: 550
         )
     }
 

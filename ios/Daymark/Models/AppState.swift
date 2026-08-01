@@ -941,7 +941,7 @@ final class AppState {
         if let plan = aiPlan?.nilIfEmpty {
             parts.append("The plan. " + plan.replacingOccurrences(of: "\n", with: ". "))
         } else {
-            let open = EssentialTask.forPhase(phase).filter { !essentialDone($0.id) }.map(\.title)
+            let open = essentials(for: phase).filter { !essentialDone($0.id) }.map(\.title)
             if !open.isEmpty {
                 parts.append("Still open: " + open.joined(separator: ". ") + ".")
             }
@@ -1017,7 +1017,54 @@ final class AppState {
         }
     }
 
-    var essentialsForNow: [EssentialTask] { EssentialTask.forPhase(DayPhase.current()) }
+    var essentialsForNow: [EssentialTask] { essentials(for: DayPhase.current()) }
+
+    /// The Essential Three for a phase: the desk-composed (or hand-edited)
+    /// slate when one exists for today, the standing list otherwise.
+    /// Evenings keep the standing close-of-day ritual.
+    func essentials(for phase: DayPhase) -> [EssentialTask] {
+        if !phase.isEndOfDay, persisted.slateDay == Date().dayKey, !persisted.slate.isEmpty {
+            return persisted.slate.map {
+                EssentialTask(id: $0.id, kicker: $0.kicker, title: $0.title, detail: $0.detail)
+            }
+        }
+        return EssentialTask.forPhase(phase)
+    }
+
+    /// Whether today's list came from the desk rather than the standing slate.
+    var slateIsComposed: Bool {
+        persisted.slateDay == Date().dayKey && !persisted.slate.isEmpty
+    }
+
+    /// Pull the SLATE block out of the desk's plan and make it today's list.
+    func absorbSlate(from raw: String) -> String {
+        let (text, tasks) = SlateParser.extract(from: raw)
+        if let tasks {
+            persisted.slate = tasks
+            persisted.slateDay = Date().dayKey
+            // A new slate means a fresh scoreboard for those lines.
+            for task in tasks { persisted.tasks[task.id] = persisted.tasks[task.id] ?? false }
+        }
+        return text
+    }
+
+    /// Hand-edit one line of today's list. Editing a standing task first
+    /// materializes the current list as today's slate so the change holds.
+    func rewriteEssential(_ id: String, title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        if !slateIsComposed {
+            persisted.slate = essentials(for: DayPhase.current()).map {
+                SlateTask(id: $0.id, kicker: $0.kicker, title: $0.title, detail: $0.detail)
+            }
+            persisted.slateDay = Date().dayKey
+        }
+        // The materialized slate may use the standing ids — match either way.
+        if let index = persisted.slate.firstIndex(where: { $0.id == id }) {
+            persisted.slate[index].title = trimmed
+        }
+        toast("The slate is amended.")
+    }
 
     // MARK: Reading desk intelligence
 
@@ -1872,7 +1919,7 @@ final class AppState {
         Job pipeline:
         \(apps.nilIfEmpty ?? "(none)")
         """
-        runAI("plan", into: \.aiPlan) { try await AIDesk.dailyPlan(briefing: briefing) }
+        runAI("plan", into: \.aiPlan) { self.absorbSlate(from: try await AIDesk.dailyPlan(briefing: briefing)) }
     }
 
     func runJobCoach() {
