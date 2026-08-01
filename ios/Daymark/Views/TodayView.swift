@@ -174,12 +174,36 @@ struct TodayView: View {
 
     // MARK: Essential three
 
+    @State private var rewritingEssential: String?
+    @State private var rewriteText = ""
+
     private func essentialsSection(phase: DayPhase) -> some View {
-        let tasks = EssentialTask.forPhase(phase)
+        let tasks = app.essentials(for: phase)
         let numerals = ["I.", "II.", "III."]
         return VStack(alignment: .leading, spacing: 0) {
             SectionRuleHeader(title: "The Essential Three")
                 .padding(.bottom, 4)
+            if !phase.isEndOfDay {
+                Text(app.slateIsComposed
+                     ? "Set by the desk for today. Long-press a line to rewrite it."
+                     : "The standing slate — tap Write it below and the desk sets today's from your real data.")
+                    .font(DS.label(10.5, weight: .regular))
+                    .foregroundStyle(Palette.subtle)
+                    .padding(.bottom, 6)
+                    .alert("Rewrite this line", isPresented: Binding(
+                        get: { rewritingEssential != nil },
+                        set: { if !$0 { rewritingEssential = nil } }
+                    )) {
+                        TextField("The task", text: $rewriteText)
+                        Button("Amend the slate") {
+                            if let id = rewritingEssential {
+                                app.rewriteEssential(id, title: rewriteText)
+                            }
+                            rewritingEssential = nil
+                        }
+                        Button("Cancel", role: .cancel) { rewritingEssential = nil }
+                    }
+            }
             ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 let isOpen = openEssential == task.id
                 VStack(spacing: 0) {
@@ -219,6 +243,14 @@ struct TodayView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                rewritingEssential = task.id
+                                rewriteText = task.title
+                            } label: {
+                                Label("Rewrite this line", systemImage: "pencil.line")
+                            }
+                        }
                         CircleCheck(checked: app.essentialDone(task.id)) {
                             app.toggleEssential(task.id)
                         }

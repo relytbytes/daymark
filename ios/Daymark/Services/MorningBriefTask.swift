@@ -76,7 +76,14 @@ enum MorningBriefTask {
         \(applications.nilIfEmpty ?? "(none)")
         """
         guard let plan = try? await AIDesk.dailyPlan(briefing: briefing) else { return nil }
-        return plan
+        // The overnight edition also sets today's actual list.
+        let (text, tasks) = SlateParser.extract(from: plan)
+        if let tasks, var state = JSONStore.load() {
+            state.slate = tasks
+            state.slateDay = Date().dayKey
+            JSONStore.save(state)
+        }
+        return text
     }
 
     /// Replace this morning's static edition with the composed one, then
